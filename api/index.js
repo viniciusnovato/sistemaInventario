@@ -43,12 +43,8 @@ function generateUniqueQRCode() {
 
 // Função para gerar link do item
 function generateItemLink(itemId, port = PORT) {
-    // Em produção na Vercel, usar a URL do domínio
-    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_URL) {
-        return `https://${process.env.VERCEL_URL}/view-item.html?id=${itemId}`;
-    }
-    // Em desenvolvimento, usar localhost
-    return `http://localhost:${port}/view-item.html?id=${itemId}`;
+    // Sempre usar o domínio de produção
+    return `https://erp.institutoareluna.pt/view-item.html?id=${itemId}`;
 }
 
 // Função para gerar QR Code como Data URL

@@ -388,44 +388,47 @@
                     </div>
                 </div>
 
-                <!-- QR Code Management Section -->
-                <div class="mt-8 animate-fade-in">
-                    <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-900/20 dark:to-blue-900/20 backdrop-blur-xl rounded-3xl shadow-xl border border-purple-200/30 dark:border-purple-700/30 p-8">
-                        <div class="flex items-center justify-between mb-6">
-                            <div>
-                                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight mb-2">
-                                    <i class="fas fa-qrcode text-purple-600 dark:text-purple-400 mr-3"></i>
-                                    🔄 Gerenciamento de QR Codes
+                <!-- QR Code Management Section - Enhanced Responsive Design -->
+                <div class="mt-6 sm:mt-8 animate-fade-in">
+                    <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-900/20 dark:to-blue-900/20 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-xl border border-purple-200/30 dark:border-purple-700/30 p-4 sm:p-6 lg:p-8">
+                        <!-- Header Section - Responsive Layout -->
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                            <div class="flex-1">
+                                <h3 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight mb-2">
+                                    <i class="fas fa-qrcode text-purple-600 dark:text-purple-400 mr-2 sm:mr-3 text-lg sm:text-xl"></i>
+                                    <span class="break-words">🔄 Gerenciamento de QR Codes</span>
                                 </h3>
-                                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                                <p class="text-gray-600 dark:text-gray-400 text-xs sm:text-sm leading-relaxed">
                                     Atualize todos os QR codes existentes para o novo formato com links diretos
                                 </p>
                             </div>
-                            <button id="updateQRCodesBtn" onclick="updateAllQRCodes()" 
-                                class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="fas fa-sync-alt"></i>
-                                <span>Atualizar QR Codes</span>
-                            </button>
+                            <div class="flex-shrink-0 w-full lg:w-auto">
+                                <button id="updateQRCodesBtn" onclick="updateAllQRCodes()" 
+                                    class="w-full lg:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                                    <i class="fas fa-sync-alt text-sm sm:text-base"></i>
+                                    <span class="whitespace-nowrap">Atualizar QR Codes</span>
+                                </button>
+                            </div>
                         </div>
                         
-                        <!-- Progress and Status -->
+                        <!-- Progress and Status - Responsive Layout -->
                         <div id="qrUpdateStatus" class="hidden">
-                            <div class="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-4 mb-4">
-                                <div class="flex items-center space-x-3 mb-3">
-                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-                                    <span class="text-gray-700 dark:text-gray-300 font-medium">Atualizando QR codes...</span>
+                            <div class="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-3 sm:p-4 mb-4">
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                                    <div class="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-purple-600 flex-shrink-0"></div>
+                                    <span class="text-gray-700 dark:text-gray-300 font-medium text-sm sm:text-base">Atualizando QR codes...</span>
                                 </div>
                                 <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
                                     <div id="qrUpdateProgress" class="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                                 </div>
                                 
-                                <!-- Logs em tempo real -->
-                                <div id="qrUpdateLogs" class="bg-gray-900 dark:bg-gray-950 rounded-xl p-4 max-h-64 overflow-y-auto">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <i class="fas fa-terminal text-green-400 text-sm"></i>
-                                        <span class="text-green-400 font-mono text-sm font-bold">Logs de Atualização</span>
+                                <!-- Logs em tempo real - Responsive -->
+                                <div id="qrUpdateLogs" class="bg-gray-900 dark:bg-gray-950 rounded-xl p-3 sm:p-4 max-h-48 sm:max-h-64 overflow-y-auto">
+                                    <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                                        <i class="fas fa-terminal text-green-400 text-xs sm:text-sm flex-shrink-0"></i>
+                                        <span class="text-green-400 font-mono text-xs sm:text-sm font-bold break-words">Logs de Atualização</span>
                                     </div>
-                                    <div id="logContent" class="font-mono text-xs space-y-1">
+                                    <div id="logContent" class="font-mono text-xs space-y-1 break-words">
                                         <div class="text-gray-400">Iniciando processo de atualização...</div>
                                     </div>
                                 </div>

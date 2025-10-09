@@ -1179,15 +1179,43 @@ const AdvancedSearch = {
                 </div>
                 
                 <div class="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button data-action="edit" data-item-id="${item.id}" 
-                        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                        <i class="fas fa-edit"></i>
-                        <span>Editar</span>
-                    </button>
-                    <button data-action="delete" data-item-id="${item.id}" 
-                        class="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <!-- Mobile layout: stacked buttons -->
+                    <div class="flex flex-col gap-2 w-full sm:hidden">
+                        <button data-action="view" data-item-id="${item.id}" 
+                            class="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                            <i class="fas fa-eye"></i>
+                            <span>Visualizar</span>
+                        </button>
+                        <div class="flex gap-2">
+                            <button data-action="edit" data-item-id="${item.id}" 
+                                class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                                <i class="fas fa-edit"></i>
+                                <span>Editar</span>
+                            </button>
+                            <button data-action="delete" data-item-id="${item.id}" 
+                                class="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Desktop layout: horizontal buttons -->
+                    <div class="hidden sm:flex gap-2 w-full">
+                        <button data-action="view" data-item-id="${item.id}" 
+                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                            <i class="fas fa-eye"></i>
+                            <span class="hidden md:inline">Visualizar</span>
+                        </button>
+                        <button data-action="edit" data-item-id="${item.id}" 
+                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                            <i class="fas fa-edit"></i>
+                            <span class="hidden md:inline">Editar</span>
+                        </button>
+                        <button data-action="delete" data-item-id="${item.id}" 
+                            class="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -1664,20 +1692,46 @@ function createInventoryItemCard(item) {
         </div>
         
         <div class="item-actions">
-            ${hasQRCode ? `
-                <button class="btn-small btn-qr" data-action="view-qr" data-item-id="${item.id}" title="Ver QR Code">
-                    <i class="fas fa-qrcode"></i>
+            <!-- Mobile layout: stacked buttons -->
+            <div class="flex flex-col gap-2 w-full sm:hidden">
+                <button class="btn-small btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                    <span>Visualizar</span>
                 </button>
-            ` : ''}
-            <button class="btn-small btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
-                <i class="fas fa-eye"></i>
-            </button>
-            <button class="btn-small btn-edit" data-action="edit" data-item-id="${item.id}" title="Editar">
-                <i class="fas fa-edit"></i>
-            </button>
-            <button class="btn-small btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
-                <i class="fas fa-trash"></i>
-            </button>
+                <div class="flex gap-2">
+                    ${hasQRCode ? `
+                        <button class="btn-small btn-qr flex-1" data-action="view-qr" data-item-id="${item.id}" title="Ver QR Code">
+                            <i class="fas fa-qrcode"></i>
+                            <span>QR</span>
+                        </button>
+                    ` : ''}
+                    <button class="btn-small btn-edit flex-1" data-action="edit" data-item-id="${item.id}" title="Editar">
+                        <i class="fas fa-edit"></i>
+                        <span>Editar</span>
+                    </button>
+                    <button class="btn-small btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Desktop layout: horizontal buttons -->
+            <div class="hidden sm:flex gap-2">
+                <button class="btn-small btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                </button>
+                ${hasQRCode ? `
+                    <button class="btn-small btn-qr" data-action="view-qr" data-item-id="${item.id}" title="Ver QR Code">
+                        <i class="fas fa-qrcode"></i>
+                    </button>
+                ` : ''}
+                <button class="btn-small btn-edit" data-action="edit" data-item-id="${item.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-small btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         </div>
     `;
     

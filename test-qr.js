@@ -37,7 +37,7 @@ async function testQRCodeGeneration() {
             console.log('🎯 QR Code gerado:', result.data.module_data.qr_code);
             
             // Verificar se é um link válido para o item
-            const expectedLink = `http://localhost:3002/view-item.html?id=${result.data.id}`;
+            const expectedLink = `https://erp.institutoareluna.pt/view-item.html?id=${result.data.id}`;
             if (result.data.module_data.qr_code === expectedLink) {
                 console.log('✅ QR Code está correto! Contém o link para o item específico.');
             } else {

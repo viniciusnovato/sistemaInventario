@@ -9,8 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Função para gerar o link do item
 function generateItemLink(itemId) {
-    const port = process.env.PORT || 3002;
-    return `http://localhost:${port}/view-item.html?id=${itemId}`;
+    return `https://erp.institutoareluna.pt/view-item.html?id=${itemId}`;
 }
 
 // Função para gerar QR Code como Data URL
