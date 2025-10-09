@@ -1,7 +1,21 @@
 {
   "version": 2,
   "name": "sistema-inventario-areluna",
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    }
+  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
     {
       "src": "/(.*\\.(js|css|html|png|jpg|jpeg|gif|svg|ico|json|woff|woff2|ttf|eot))",
       "dest": "/public/$1"

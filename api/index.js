@@ -119,8 +119,8 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Servir arquivos estáticos
-app.use(express.static(path.join(__dirname, 'public')));
+// Servir arquivos estáticos da pasta public
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Middleware de logging
 app.use((req, res, next) => {
@@ -128,9 +128,9 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rota principal
+// Rota principal - servir index.html
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // Rotas da API
