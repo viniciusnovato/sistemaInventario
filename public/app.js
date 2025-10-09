@@ -1161,7 +1161,7 @@ const AdvancedSearch = {
                     <div class="flex justify-between items-center">
                         <span class="text-sm text-gray-600 dark:text-gray-400">💰 Preço:</span>
                         <span class="text-sm font-bold text-primary-600 dark:text-primary-400">
-                            R$ ${parseFloat(item.price || 0).toFixed(2)}
+                            € ${parseFloat(item.price || 0).toFixed(2)}
                         </span>
                     </div>
                     
@@ -1485,7 +1485,7 @@ function updateRecentItems() {
                 </div>
             </div>
             <div class="text-right">
-                <div class="text-sm font-bold text-green-600 dark:text-green-400">R$ ${(item.unit_price || 0).toFixed(2)}</div>
+                <div class="text-sm font-bold text-green-600 dark:text-green-400">€ ${(item.unit_price || 0).toFixed(2)}</div>
                 <div class="text-xs text-gray-500 dark:text-gray-400">${item.quantity || 0} unidades</div>
             </div>
         `;

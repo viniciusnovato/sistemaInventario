@@ -35,10 +35,15 @@
                         <span class="text-lg font-semibold">Voltar ao Inventário</span>
                     </a>
                 </div>
-                <h1 class="text-2xl font-bold">
-                    <i class="fas fa-edit mr-2"></i>
-                    Editar Item
-                </h1>
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-edit mr-2"></i>
+                        Editar Item
+                    </h1>
+                    <a href="settings.html" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110 group" title="Configurações">
+                        <i class="fas fa-cog text-white group-hover:rotate-90 transition-transform duration-300"></i>
+                    </a>
+                </div>
             </div>
         </div>
     </header>
@@ -233,7 +238,7 @@
                             <div>
                                 <label for="itemValue" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     <i class="fas fa-dollar-sign mr-1"></i>
-                                    Valor (R$)
+                                    Valor (€)
                                 </label>
                                 <input type="number" id="itemValue" name="value" step="0.01" min="0"
                                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -399,6 +404,39 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script>
+        // Proteger página - verificar autenticação
+        document.addEventListener('DOMContentLoaded', () => {
+            // Aguardar o AuthManager inicializar
+            setTimeout(() => {
+                if (!requireAuthentication()) {
+                    return; // Será redirecionado para login
+                }
+                
+                // Mostrar informações do usuário
+                displayUserInfo();
+                
+                // Adicionar botão de logout se não existir
+                addLogoutButtonToHeader();
+            }, 200);
+        });
+
+        // Adicionar botão de logout ao cabeçalho
+        function addLogoutButtonToHeader() {
+            const header = document.querySelector('header');
+            if (!header || header.querySelector('[data-logout-btn]')) return;
+            
+            const logoutBtn = document.createElement('button');
+            logoutBtn.setAttribute('data-logout-btn', 'true');
+            logoutBtn.className = 'ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm';
+            logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt mr-2"></i>Sair';
+            
+            const headerContent = header.querySelector('.container') || header;
+            headerContent.appendChild(logoutBtn);
+        }
+    </script>
     <script src="edit-item.js"></script>
 </body>
 </html>

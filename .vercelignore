@@ -1,89 +1,36 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Development files
+# Arquivos de desenvolvimento
+node_modules
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # Logs
-logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 *.log
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# Arquivos temporários
+.DS_Store
+Thumbs.db
 
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Backup files
-*-backup.*
+# Arquivos de backup
+*.backup
 styles-backup.css
 
-# Test files
+# Arquivos de teste
 test-*.js
 
-# Development tools
-nodemon.json
+# Documentação de desenvolvimento
+PRINT-AGENT-README.md
+
+# Arquivos SQL de desenvolvimento
+create-print-table.sql
+fix-print-table.sql
+supabase-print-queue.sql
+
+# Agente de impressão local
+local-print-agent.js
+package-print-agent.json

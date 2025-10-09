@@ -35,10 +35,15 @@
                         <span class="text-lg font-semibold">Voltar ao Inventário</span>
                     </a>
                 </div>
-                <h1 class="text-2xl font-bold">
-                    <i class="fas fa-eye mr-2"></i>
-                    Visualizar Item
-                </h1>
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-eye mr-2"></i>
+                        Visualizar Item
+                    </h1>
+                    <a href="settings.html" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110 group" title="Configurações">
+                        <i class="fas fa-cog text-white group-hover:rotate-90 transition-transform duration-300"></i>
+                    </a>
+                </div>
             </div>
         </div>
     </header>
@@ -268,10 +273,37 @@
                         <i class="fas fa-arrow-left mr-2"></i>
                         Voltar
                     </a>
-                    <a id="editButton" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
-                        <i class="fas fa-edit mr-2"></i>
-                        Editar Item
-                    </a>
+                    <div class="flex items-center space-x-3">
+                        <!-- QR Code Size Selection -->
+                        <div class="flex items-center space-x-2">
+                            <label for="qrCodeSize" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <i class="fas fa-expand-arrows-alt mr-1"></i>
+                                Tamanho QR:
+                            </label>
+                            <select id="qrCodeSize" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-1 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="5mm">Micro (5mm)</option>
+                                <option value="10mm">Mini (10mm)</option>
+                                <option value="15mm">Pequeno (15mm)</option>
+                                <option value="20mm">Médio (20mm)</option>
+                                <option value="25mm" selected>Padrão (25mm)</option>
+                                <option value="30mm">Grande (30mm)</option>
+                                <option value="35mm">Muito Grande (35mm)</option>
+                                <option value="40mm">Extra Grande (40mm)</option>
+                                <option value="45mm">Jumbo (45mm)</option>
+                                <option value="50mm">Máximo (50mm)</option>
+                                <option value="55mm">Ultra (55mm)</option>
+                            </select>
+                        </div>
+                        
+                        <button id="printButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-print mr-2"></i>
+                            Imprimir QR Code
+                        </button>
+                        <a id="editButton" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-edit mr-2"></i>
+                            Editar Item
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -410,7 +442,7 @@
                 const detailValueEl = document.getElementById('detailValue');
                 const valueContainer = document.getElementById('valueContainer');
                 if (detailValueEl && valueContainer) {
-                    detailValueEl.textContent = `R$ ${parseFloat(item.module_data.value).toFixed(2)}`;
+                    detailValueEl.textContent = `€ ${parseFloat(item.module_data.value).toFixed(2)}`;
                     valueContainer.classList.remove('hidden');
                 }
             }
@@ -492,10 +524,56 @@
             }
         }
 
+        // Função para imprimir QR Code
+        async function printQRCode() {
+            if (!currentItem) {
+                alert('Nenhum item carregado para impressão');
+                return;
+            }
+
+            const printButton = document.getElementById('printButton');
+            const qrCodeSizeSelect = document.getElementById('qrCodeSize');
+            const originalText = printButton.innerHTML;
+            
+            try {
+                // Desabilitar botão e mostrar loading
+                printButton.disabled = true;
+                printButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enviando para impressão...';
+                
+                // Obter o tamanho selecionado
+                const selectedSize = qrCodeSizeSelect.value;
+                
+                const response = await fetch(`/api/print/${currentItem.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        qrCodeSize: selectedSize
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('QR Code enviado para impressão com sucesso!');
+                } else {
+                    throw new Error(result.error || 'Erro ao enviar para impressão');
+                }
+            } catch (error) {
+                console.error('Erro ao imprimir QR Code:', error);
+                alert(`Erro ao enviar para impressão: ${error.message}`);
+            } finally {
+                // Restaurar botão
+                printButton.disabled = false;
+                printButton.innerHTML = originalText;
+            }
+        }
+
         // Função para editar item
         function editItem() {
             if (currentItem) {
-                window.location.href = `index.html?edit=${currentItem.id}`;
+                window.location.href = `edit-item.html?id=${currentItem.id}`;
             }
         }
 
@@ -505,7 +583,45 @@
         }
 
         // Carregar dados quando a página carregar
-        document.addEventListener('DOMContentLoaded', loadItemData);
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aguardar o AuthManager inicializar
+            setTimeout(() => {
+                if (!requireAuthentication()) {
+                    return; // Será redirecionado para login
+                }
+                
+                // Mostrar informações do usuário
+                displayUserInfo();
+                
+                // Adicionar botão de logout se não existir
+                addLogoutButtonToHeader();
+                
+                // Carregar dados do item
+                loadItemData();
+                
+                // Adicionar event listener para o botão de impressão
+                const printButton = document.getElementById('printButton');
+                if (printButton) {
+                    printButton.addEventListener('click', printQRCode);
+                }
+            }, 200);
+        });
+
+        // Adicionar botão de logout ao cabeçalho
+        function addLogoutButtonToHeader() {
+            const header = document.querySelector('header');
+            if (!header || header.querySelector('[data-logout-btn]')) return;
+            
+            const logoutBtn = document.createElement('button');
+            logoutBtn.setAttribute('data-logout-btn', 'true');
+            logoutBtn.className = 'ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm';
+            logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt mr-2"></i>Sair';
+            
+            const headerContent = header.querySelector('.container') || header;
+            headerContent.appendChild(logoutBtn);
+        }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
 </body>
 </html>

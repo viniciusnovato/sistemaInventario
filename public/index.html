@@ -145,16 +145,33 @@
                         </div>
                         <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
                     </div>
-                    <div>
+                    <div class="hidden sm:block">
                         <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent">
                             📦 Sistema de Inventário
                         </h1>
                         <p class="text-sm text-secondary-600 dark:text-secondary-400 font-medium">Grupo AreLuna</p>
                     </div>
+                    <div class="sm:hidden">
+                        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent">
+                            📦 Inventário
+                        </h1>
+                    </div>
                 </div>
                 
-                <!-- Stats Section -->
+                <!-- Mobile Menu Button -->
+                <div class="flex items-center">
+                    <button id="mobileMenuToggle" class="p-2 rounded-xl bg-secondary-100 dark:bg-secondary-800 hover:bg-secondary-200 dark:hover:bg-secondary-700 transition-all duration-300">
+                        <i class="fas fa-bars text-secondary-600 dark:text-secondary-400 text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Desktop Stats Section -->
                 <div class="hidden md:flex items-center space-x-4">
+                    <!-- Settings Link -->
+                    <a href="settings.html" class="p-2 rounded-xl bg-secondary-100 dark:bg-secondary-800 hover:bg-secondary-200 dark:hover:bg-secondary-700 transition-all duration-300 hover:scale-110 group" title="Configurações">
+                        <i class="fas fa-cog text-secondary-600 dark:text-secondary-400 group-hover:rotate-90 transition-transform duration-300"></i>
+                    </a>
+                    
                     <!-- Dark Mode Toggle -->
                     <button id="darkModeToggle" class="p-2 rounded-xl bg-secondary-100 dark:bg-secondary-800 hover:bg-secondary-200 dark:hover:bg-secondary-700 transition-all duration-300 hover:scale-110">
                         <i class="fas fa-moon dark:hidden text-secondary-600"></i>
@@ -185,10 +202,82 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 opacity-0 invisible transition-all duration-300"></div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+            <div class="flex flex-col h-full">
+                <!-- Mobile Menu Header -->
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Menu</h2>
+                    <button id="closeMobileMenu" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-times text-gray-600 dark:text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <!-- Mobile Menu Content -->
+                <div class="flex-1 p-6 space-y-6">
+                    <!-- User Info -->
+                    <div class="bg-gradient-to-r from-primary-500 to-primary-600 text-white p-4 rounded-2xl">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold" id="mobileUserEmail">Usuário</p>
+                                <p class="text-sm opacity-90">Logado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gradient-to-r from-primary-500 to-primary-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-boxes text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Total</p>
+                                <p id="mobileTotalItems" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-check-circle text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Ativos</p>
+                                <p id="mobileActiveItems" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Menu Options -->
+                    <div class="space-y-3">
+                        <a href="settings.html" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-cog text-primary-600 dark:text-primary-400"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">Configurações</span>
+                        </a>
+                        
+                        <button id="mobileDarkModeToggle" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors w-full text-left">
+                            <i class="fas fa-moon dark:hidden text-primary-600"></i>
+                            <i class="fas fa-sun hidden dark:block text-yellow-500"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                <span class="dark:hidden">Modo Escuro</span>
+                                <span class="hidden dark:block">Modo Claro</span>
+                            </span>
+                        </button>
+                        
+                        <button id="mobileLogoutBtn" class="flex items-center space-x-3 p-4 rounded-xl bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors w-full text-left">
+                            <i class="fas fa-sign-out-alt text-red-600 dark:text-red-400"></i>
+                            <span class="font-medium text-red-700 dark:text-red-300">Sair</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <!-- Main Container with proper spacing for fixed header -->
-    <div class="pt-24 pb-8">
+    <div class="pt-20 sm:pt-24 pb-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
             <!-- Navigation Tabs -->
@@ -453,7 +542,7 @@
                         </div>
                         
                         <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">💰 Valor (R$)</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">💰 Valor (€)</label>
                             <input type="number" id="itemValue" name="value" step="0.01" min="0"
                                 class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                                 placeholder="Ex: 1500.00">
@@ -564,11 +653,11 @@
                                     <select id="priceRangeFilter" 
                                         class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
                                         <option value="">Todos os preços</option>
-                                        <option value="0-50">R$ 0 - R$ 50</option>
-                                        <option value="50-200">R$ 50 - R$ 200</option>
-                                        <option value="200-1000">R$ 200 - R$ 1.000</option>
-                                        <option value="1000-5000">R$ 1.000 - R$ 5.000</option>
-                                        <option value="5000+">Acima de R$ 5.000</option>
+                                        <option value="0-50">€ 0 - € 50</option>
+                                <option value="50-200">€ 50 - € 200</option>
+                                <option value="200-1000">€ 200 - € 1.000</option>
+                                <option value="1000-5000">€ 1.000 - € 5.000</option>
+                                <option value="5000+">Acima de € 5.000</option>
                                     </select>
                                 </div>
 
@@ -784,6 +873,98 @@
     </div>
 
     <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script>
+        // Proteger página - verificar autenticação
+        document.addEventListener('DOMContentLoaded', () => {
+            // Aguardar o AuthManager inicializar
+            setTimeout(() => {
+                if (!requireAuthentication()) {
+                    return; // Será redirecionado para login
+                }
+                
+                // Mostrar informações do usuário
+                displayUserInfo();
+            }, 200);
+        });
+
+        // Mobile Menu Functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+            const mobileMenu = document.getElementById('mobileMenu');
+            const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+            const closeMobileMenu = document.getElementById('closeMobileMenu');
+            const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+            const mobileDarkModeToggle = document.getElementById('mobileDarkModeToggle');
+            const darkModeToggle = document.getElementById('darkModeToggle');
+
+            // Open mobile menu
+            mobileMenuToggle?.addEventListener('click', () => {
+                mobileMenu.classList.remove('translate-x-full');
+                mobileMenuOverlay.classList.remove('opacity-0', 'invisible');
+                document.body.style.overflow = 'hidden';
+            });
+
+            // Close mobile menu
+            const closeMobileMenuHandler = () => {
+                mobileMenu.classList.add('translate-x-full');
+                mobileMenuOverlay.classList.add('opacity-0', 'invisible');
+                document.body.style.overflow = '';
+            };
+
+            closeMobileMenu?.addEventListener('click', closeMobileMenuHandler);
+            mobileMenuOverlay?.addEventListener('click', closeMobileMenuHandler);
+
+            // Mobile logout
+            mobileLogoutBtn?.addEventListener('click', async () => {
+                try {
+                    await authManager.signOut();
+                    window.location.href = 'login.html';
+                } catch (error) {
+                    console.error('Erro ao fazer logout:', error);
+                    alert('Erro ao fazer logout. Tente novamente.');
+                }
+            });
+
+            // Mobile dark mode toggle
+            mobileDarkModeToggle?.addEventListener('click', () => {
+                darkModeToggle?.click(); // Trigger the existing dark mode functionality
+            });
+
+            // Update mobile user info and stats
+            const updateMobileInfo = () => {
+                const user = authManager.getCurrentUser();
+                if (user) {
+                    const mobileUserEmail = document.getElementById('mobileUserEmail');
+                    if (mobileUserEmail) {
+                        mobileUserEmail.textContent = user.email || 'Usuário';
+                    }
+                }
+
+                // Sync stats with desktop version
+                const totalItems = document.getElementById('totalItems')?.textContent || '0';
+                const activeItems = document.getElementById('activeItems')?.textContent || '0';
+                
+                const mobileTotalItems = document.getElementById('mobileTotalItems');
+                const mobileActiveItems = document.getElementById('mobileActiveItems');
+                
+                if (mobileTotalItems) mobileTotalItems.textContent = totalItems;
+                if (mobileActiveItems) mobileActiveItems.textContent = activeItems;
+            };
+
+            // Update mobile info periodically
+            setInterval(updateMobileInfo, 1000);
+            updateMobileInfo();
+
+            // Close menu on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !mobileMenu.classList.contains('translate-x-full')) {
+                    closeMobileMenuHandler();
+                }
+            });
+        });
+    </script>
     <script src="app.js"></script>
     
     <!-- Scripts relacionados à navegação de abas e tema são gerenciados em app.js -->

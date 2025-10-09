@@ -1057,6 +1057,561 @@ app.post('/api/update-qr-codes', async (req, res) => {
     }
 });
 
+// ========== PRINT QUEUE API ENDPOINTS ==========
+
+// Endpoint para adicionar item à fila de impressão
+app.post('/api/print/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { priority = 1, qrCodeSize = '25mm' } = req.body;
+
+        // Buscar dados do item
+        const { data: item, error: itemError } = await supabase
+            .from('sistemainventario')
+            .select('*')
+            .eq('id', itemId)
+            .eq('module_type', 'inventory')
+            .single();
+
+        if (itemError || !item) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item não encontrado'
+            });
+        }
+
+        // Verificar se já existe um job pendente para este item
+        const { data: existingJob } = await supabase
+            .from('print_queue')
+            .select('id')
+            .eq('item_id', itemId)
+            .eq('status', 'pending')
+            .single();
+
+        if (existingJob) {
+            return res.json({
+                success: true,
+                message: 'Item já está na fila de impressão',
+                job_id: existingJob.id
+            });
+        }
+
+        // Gerar URL simples para o QR code
+        const itemUrl = generateItemLink(itemId);
+
+        // Adicionar à fila de impressão
+        const { data: printJob, error: printError } = await supabase
+            .from('print_queue')
+            .insert({
+                item_id: itemId,
+                qr_code_data: itemUrl, // Usar URL simples em vez da imagem base64
+                item_name: item.name || item.module_data?.name,
+                item_code: item.code || item.id,
+                priority: priority,
+                status: 'pending',
+                qr_code_size: qrCodeSize // Adicionar o tamanho do QR code
+            })
+            .select()
+            .single();
+
+        if (printError) {
+            console.error('Erro ao adicionar à fila de impressão:', printError);
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao adicionar à fila de impressão',
+                details: printError.message
+            });
+        }
+
+        console.log(`Item ${item.name || item.module_data?.name} adicionado à fila de impressão com tamanho QR: ${qrCodeSize}`);
+        
+        res.json({
+            success: true,
+            message: 'Item enviado para impressão',
+            job_id: printJob.id,
+            item_name: item.name || item.module_data?.name,
+            qr_code_size: qrCodeSize
+        });
+
+    } catch (error) {
+        console.error('Erro no endpoint de impressão:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message
+        });
+    }
+});
+
+// Endpoint para consultar status da fila de impressão
+app.get('/api/print-status', async (req, res) => {
+    try {
+        const { job_id, item_id, status } = req.query;
+        
+        let query = supabase.from('print_queue').select('*');
+        
+        if (job_id) {
+            query = query.eq('id', job_id);
+        } else if (item_id) {
+            query = query.eq('item_id', item_id);
+        } else if (status) {
+            query = query.eq('status', status);
+        }
+        
+        query = query.order('created_at', { ascending: false });
+        
+        const { data: jobs, error } = await query;
+        
+        if (error) {
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao consultar fila de impressão',
+                details: error.message
+            });
+        }
+        
+        res.json({
+            success: true,
+            jobs: jobs || []
+        });
+        
+    } catch (error) {
+        console.error('Erro ao consultar status da impressão:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message
+        });
+    }
+});
+
+// Endpoint para atualizar status de job de impressão (usado pelo agente local)
+app.put('/api/print-status/:jobId', async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const { status, error_message } = req.body;
+        
+        const updateData = {
+            status,
+            ...(status === 'printing' && { started_at: new Date().toISOString() }),
+            ...(status === 'completed' && { completed_at: new Date().toISOString() }),
+            ...(status === 'failed' && { error_message })
+        };
+        
+        const { data, error } = await supabase
+            .from('print_queue')
+            .update(updateData)
+            .eq('id', jobId)
+            .select()
+            .single();
+            
+        if (error) {
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao atualizar status',
+                details: error.message
+            });
+        }
+        
+        console.log(`Status do job ${jobId} atualizado para: ${status}`);
+        
+        res.json({
+            success: true,
+            job: data
+        });
+        
+    } catch (error) {
+        console.error('Erro ao atualizar status do job:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message
+        });
+    }
+});
+
+// Endpoint para monitorar status de impressão em tempo real (Server-Sent Events)
+app.get('/api/print-status/stream/:jobId', async (req, res) => {
+    const { jobId } = req.params;
+    
+    // Configurar headers para Server-Sent Events
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    try {
+        // Enviar status inicial
+        const { data: initialJob, error: initialError } = await supabase
+            .from('print_queue')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+
+        if (initialError) {
+            res.write(`data: ${JSON.stringify({ error: 'Job não encontrado' })}\n\n`);
+            res.end();
+            return;
+        }
+
+        res.write(`data: ${JSON.stringify(initialJob)}\n\n`);
+
+        // Se o job já está completo ou falhou, encerrar stream
+        if (initialJob.status === 'completed' || initialJob.status === 'failed') {
+            res.end();
+            return;
+        }
+
+        // Configurar subscription para mudanças no job específico
+        const subscription = supabase
+            .channel(`print_job_${jobId}`)
+            .on('postgres_changes', 
+                { 
+                    event: 'UPDATE', 
+                    schema: 'public', 
+                    table: 'print_queue',
+                    filter: `id=eq.${jobId}`
+                }, 
+                (payload) => {
+                    res.write(`data: ${JSON.stringify(payload.new)}\n\n`);
+                    
+                    // Encerrar stream se job completou ou falhou
+                    if (payload.new.status === 'completed' || payload.new.status === 'failed') {
+                        subscription.unsubscribe();
+                        res.end();
+                    }
+                }
+            )
+            .subscribe();
+
+        // Cleanup quando cliente desconectar
+        req.on('close', () => {
+            subscription.unsubscribe();
+            res.end();
+        });
+
+        // Timeout após 5 minutos
+        setTimeout(() => {
+            subscription.unsubscribe();
+            res.end();
+        }, 5 * 60 * 1000);
+
+    } catch (error) {
+        console.error('Erro no stream de status:', error);
+        res.write(`data: ${JSON.stringify({ error: 'Erro interno do servidor' })}\n\n`);
+        res.end();
+    }
+});
+
+// Endpoint para obter histórico de impressões
+app.get('/api/print-history', async (req, res) => {
+    try {
+        const { page = 1, limit = 20, status } = req.query;
+        const offset = (page - 1) * limit;
+
+        let query = supabase
+            .from('print_queue')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        const { data: jobs, error } = await query;
+
+        if (error) {
+            throw error;
+        }
+
+        // Contar total de registros
+        let countQuery = supabase
+            .from('print_queue')
+            .select('*', { count: 'exact', head: true });
+
+        if (status) {
+            countQuery = countQuery.eq('status', status);
+        }
+
+        const { count, error: countError } = await countQuery;
+
+        if (countError) {
+            throw countError;
+        }
+
+        res.json({
+            success: true,
+            data: jobs,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: count,
+                pages: Math.ceil(count / limit)
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar histórico de impressões:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao buscar histórico de impressões'
+        });
+    }
+});
+
+// Endpoint para estatísticas de impressão
+app.get('/api/print-stats', async (req, res) => {
+    try {
+        const { data: stats, error } = await supabase
+            .from('print_queue')
+            .select('status')
+            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Últimas 24h
+
+        if (error) {
+            throw error;
+        }
+
+        const statusCount = stats.reduce((acc, job) => {
+            acc[job.status] = (acc[job.status] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Buscar total geral
+        const { count: totalJobs, error: totalError } = await supabase
+            .from('print_queue')
+            .select('*', { count: 'exact', head: true });
+
+        if (totalError) {
+            throw totalError;
+        }
+
+        res.json({
+            success: true,
+            data: {
+                last24h: statusCount,
+                total: totalJobs,
+                pending: statusCount.pending || 0,
+                processing: statusCount.processing || 0,
+                completed: statusCount.completed || 0,
+                failed: statusCount.failed || 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar estatísticas de impressão:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao buscar estatísticas de impressão'
+        });
+    }
+});
+
+// Endpoint para cancelar job de impressão
+app.post('/api/print-cancel/:jobId', async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        
+        // Verificar se o job existe e pode ser cancelado
+        const { data: job, error: fetchError } = await supabase
+            .from('print_queue')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+            
+        if (fetchError || !job) {
+            return res.status(404).json({
+                success: false,
+                error: 'Job não encontrado'
+            });
+        }
+        
+        // Verificar se o job pode ser cancelado (apenas pending ou processing)
+        if (!['pending', 'processing'].includes(job.status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Job não pode ser cancelado. Status atual: ${job.status}`
+            });
+        }
+        
+        // Atualizar status para cancelled
+        const { data: updatedJob, error: updateError } = await supabase
+            .from('print_queue')
+            .update({
+                status: 'failed',
+                error_message: 'Cancelado pelo usuário',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId)
+            .select()
+            .single();
+            
+        if (updateError) {
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao cancelar job',
+                details: updateError.message
+            });
+        }
+        
+        console.log(`Job ${jobId} cancelado pelo usuário`);
+        
+        res.json({
+            success: true,
+            message: 'Job cancelado com sucesso',
+            job: updatedJob
+        });
+        
+    } catch (error) {
+        console.error('Erro ao cancelar job:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message
+        });
+    }
+});
+
+// Endpoint para limpar jobs antigos da fila
+app.delete('/api/print-cleanup', async (req, res) => {
+    try {
+        const { days = 7 } = req.query;
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+        
+        const { data, error } = await supabase
+            .from('print_queue')
+            .delete()
+            .in('status', ['completed', 'failed'])
+            .lt('created_at', cutoffDate.toISOString())
+            .select();
+            
+        if (error) {
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao limpar fila',
+                details: error.message
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: `${data?.length || 0} jobs antigos removidos da fila`
+        });
+        
+    } catch (error) {
+        console.error('Erro ao limpar fila:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message
+        });
+    }
+});
+
+// Endpoint para criar a tabela print_queue
+app.post('/api/setup-print-table', async (req, res) => {
+    try {
+        const createTableSQL = `
+            CREATE TABLE IF NOT EXISTS print_queue (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                item_id UUID NOT NULL,
+                qr_code_data TEXT NOT NULL,
+                item_name TEXT NOT NULL,
+                item_code TEXT,
+                priority INTEGER DEFAULT 1,
+                status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+                error_message TEXT,
+                retry_count INTEGER DEFAULT 0,
+                qr_code_size TEXT DEFAULT '128px' CHECK (qr_code_size IN ('10px', '25px', '50px', '75px', '128px')),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                processed_at TIMESTAMP WITH TIME ZONE
+            );
+
+            -- Adicionar coluna qr_code_size se não existir
+            ALTER TABLE print_queue ADD COLUMN IF NOT EXISTS qr_code_size TEXT DEFAULT '128px' CHECK (qr_code_size IN ('10px', '25px', '50px', '75px', '128px'));
+
+            -- Criar índices para melhor performance
+            CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status);
+            CREATE INDEX IF NOT EXISTS idx_print_queue_created_at ON print_queue(created_at);
+            CREATE INDEX IF NOT EXISTS idx_print_queue_item_id ON print_queue(item_id);
+
+            -- Habilitar RLS (Row Level Security)
+            ALTER TABLE print_queue ENABLE ROW LEVEL SECURITY;
+
+            -- Criar política para permitir acesso completo ao service role
+            DROP POLICY IF EXISTS "Enable all access for service role" ON print_queue;
+            CREATE POLICY "Enable all access for service role" ON print_queue
+                FOR ALL USING (true);
+        `;
+
+        // Executar o SQL usando o service role
+        const { data, error } = await supabaseAdmin.rpc('exec_sql', {
+            sql: createTableSQL
+        });
+
+        if (error) {
+            // Se a função exec_sql não existir, tentar criar a tabela diretamente
+            console.log('Tentando criar tabela usando método alternativo...');
+            
+            // Usar uma abordagem mais simples
+            const { error: tableError } = await supabaseAdmin
+                .from('print_queue')
+                .select('id')
+                .limit(1);
+
+            if (tableError && tableError.code === '42P01') {
+                // Tabela não existe, retornar instruções para criação manual
+                return res.json({
+                    success: false,
+                    message: 'Tabela print_queue não existe. Execute o SQL manualmente no Supabase Dashboard.',
+                    sql: createTableSQL,
+                    instructions: [
+                        '1. Acesse o Supabase Dashboard',
+                        '2. Vá para SQL Editor',
+                        '3. Execute o SQL fornecido',
+                        '4. Tente novamente este endpoint'
+                    ]
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Tabela print_queue criada com sucesso!',
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Erro ao criar tabela print_queue:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro interno do servidor',
+            details: error.message,
+            sql: `
+                CREATE TABLE IF NOT EXISTS print_queue (
+                    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                    item_id UUID NOT NULL,
+                    qr_code_data TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    item_code TEXT,
+                    priority INTEGER DEFAULT 1,
+                    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+                    error_message TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    processed_at TIMESTAMP WITH TIME ZONE
+                );
+            `
+        });
+    }
+});
+
 // GET - Endpoint para servir QR Code como imagem
 // Middleware de tratamento de erros 404
 app.use((req, res) => {
