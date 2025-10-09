@@ -27,18 +27,19 @@
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
     <!-- Header -->
     <header class="gradient-bg text-white shadow-lg">
-        <div class="container mx-auto px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
+        <div class="container mx-auto px-4 sm:px-6 py-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
+                <div class="flex items-center space-x-2 sm:space-x-4">
                     <a href="index.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-                        <i class="fas fa-arrow-left text-xl"></i>
-                        <span class="text-lg font-semibold">Voltar ao Inventário</span>
+                        <i class="fas fa-arrow-left text-lg sm:text-xl"></i>
+                        <span class="text-base sm:text-lg font-semibold">Voltar ao Inventário</span>
                     </a>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <h1 class="text-2xl font-bold">
+                <div class="flex items-center justify-between w-full sm:w-auto space-x-2 sm:space-x-4">
+                    <h1 class="text-lg sm:text-2xl font-bold">
                         <i class="fas fa-eye mr-2"></i>
-                        Visualizar Item
+                        <span class="hidden sm:inline">Visualizar Item</span>
+                        <span class="sm:hidden">Item</span>
                     </h1>
                     <a href="settings.html" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110 group" title="Configurações">
                         <i class="fas fa-cog text-white group-hover:rotate-90 transition-transform duration-300"></i>
@@ -49,7 +50,7 @@
     </header>
 
     <!-- Main Content -->
-    <main class="container mx-auto px-6 py-8">
+    <main class="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <!-- Loading State -->
         <div id="loadingState" class="text-center py-12">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -72,14 +73,14 @@
         <div id="itemDetails" class="hidden">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden card-hover">
                 <!-- Item Header -->
-                <div class="gradient-bg text-white p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 id="itemName" class="text-3xl font-bold mb-2"></h2>
+                <div class="gradient-bg text-white p-4 sm:p-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
+                        <div class="flex-1">
+                            <h2 id="itemName" class="text-2xl sm:text-3xl font-bold mb-2"></h2>
                             <span id="itemCategory" class="inline-block bg-white/20 px-3 py-1 rounded-full text-sm font-medium"></span>
                         </div>
-                        <div class="text-right">
-                            <div id="itemStatus" class="text-2xl font-bold mb-1"></div>
+                        <div class="text-left sm:text-right">
+                            <div id="itemStatus" class="text-xl sm:text-2xl font-bold mb-1"></div>
                             <div class="text-sm opacity-90">Status</div>
                         </div>
                     </div>
@@ -93,8 +94,8 @@
                 </div>
 
                 <!-- Item Information Grid -->
-                <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="p-4 sm:p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Basic Info -->
                         <div class="space-y-4">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
@@ -268,19 +269,16 @@
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-between items-center">
-                    <a href="index.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
-                        <i class="fas fa-arrow-left mr-2"></i>
-                        Voltar
-                    </a>
-                    <div class="flex items-center space-x-3">
-                        <!-- QR Code Size Selection -->
-                        <div class="flex items-center space-x-2">
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 sm:px-6 py-4">
+                    <!-- Mobile Layout -->
+                    <div class="block md:hidden space-y-4">
+                        <!-- QR Code Size Selection - Mobile -->
+                        <div class="flex flex-col space-y-2">
                             <label for="qrCodeSize" class="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 <i class="fas fa-expand-arrows-alt mr-1"></i>
                                 Tamanho QR:
                             </label>
-                            <select id="qrCodeSize" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-1 focus:ring-blue-500 focus:border-blue-500">
+                            <select id="qrCodeSize" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 w-full">
                                 <option value="5mm">Micro (5mm)</option>
                                 <option value="10mm">Mini (10mm)</option>
                                 <option value="15mm">Pequeno (15mm)</option>
@@ -295,14 +293,60 @@
                             </select>
                         </div>
                         
-                        <button id="printButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-print mr-2"></i>
-                            Imprimir QR Code
-                        </button>
-                        <a id="editButton" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-edit mr-2"></i>
-                            Editar Item
+                        <!-- Action Buttons - Mobile -->
+                        <div class="grid grid-cols-1 gap-3">
+                            <button id="printButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors text-center w-full">
+                                <i class="fas fa-print mr-2"></i>
+                                Imprimir QR Code
+                            </button>
+                            <a id="editButton" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors text-center block w-full">
+                                <i class="fas fa-edit mr-2"></i>
+                                Editar Item
+                            </a>
+                            <a href="index.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors text-center block w-full">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Voltar
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Layout -->
+                    <div class="hidden md:flex justify-between items-center">
+                        <a href="index.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Voltar
                         </a>
+                        <div class="flex items-center space-x-3">
+                            <!-- QR Code Size Selection - Desktop -->
+                            <div class="flex items-center space-x-2">
+                                <label for="qrCodeSizeDesktop" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <i class="fas fa-expand-arrows-alt mr-1"></i>
+                                    Tamanho QR:
+                                </label>
+                                <select id="qrCodeSizeDesktop" class="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg px-3 py-1 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="5mm">Micro (5mm)</option>
+                                    <option value="10mm">Mini (10mm)</option>
+                                    <option value="15mm">Pequeno (15mm)</option>
+                                    <option value="20mm">Médio (20mm)</option>
+                                    <option value="25mm" selected>Padrão (25mm)</option>
+                                    <option value="30mm">Grande (30mm)</option>
+                                    <option value="35mm">Muito Grande (35mm)</option>
+                                    <option value="40mm">Extra Grande (40mm)</option>
+                                    <option value="45mm">Jumbo (45mm)</option>
+                                    <option value="50mm">Máximo (50mm)</option>
+                                    <option value="55mm">Ultra (55mm)</option>
+                                </select>
+                            </div>
+                            
+                            <button id="printButtonDesktop" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-print mr-2"></i>
+                                Imprimir QR Code
+                            </button>
+                            <a id="editButtonDesktop" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-edit mr-2"></i>
+                                Editar Item
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -531,17 +575,24 @@
                 return;
             }
 
-            const printButton = document.getElementById('printButton');
-            const qrCodeSizeSelect = document.getElementById('qrCodeSize');
+            // Obter o tamanho selecionado (mobile ou desktop)
+            const qrSizeMobile = document.getElementById('qrCodeSize');
+            const qrSizeDesktop = document.getElementById('qrCodeSizeDesktop');
+            const selectedSize = qrSizeMobile?.value || qrSizeDesktop?.value || '25mm';
+
+            // Obter o botão que foi clicado (mobile ou desktop)
+            const printButtonMobile = document.getElementById('printButton');
+            const printButtonDesktop = document.getElementById('printButtonDesktop');
+            const printButton = printButtonMobile?.style.display !== 'none' ? printButtonMobile : printButtonDesktop;
+
+            if (!printButton) return;
+
             const originalText = printButton.innerHTML;
             
             try {
                 // Desabilitar botão e mostrar loading
                 printButton.disabled = true;
                 printButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enviando para impressão...';
-                
-                // Obter o tamanho selecionado
-                const selectedSize = qrCodeSizeSelect.value;
                 
                 const response = await fetch(`/api/print/${currentItem.id}`, {
                     method: 'POST',
@@ -599,10 +650,30 @@
                 // Carregar dados do item
                 loadItemData();
                 
-                // Adicionar event listener para o botão de impressão
+                // Adicionar event listeners para os botões de impressão
                 const printButton = document.getElementById('printButton');
+                const printButtonDesktop = document.getElementById('printButtonDesktop');
+                
                 if (printButton) {
                     printButton.addEventListener('click', printQRCode);
+                }
+                
+                if (printButtonDesktop) {
+                    printButtonDesktop.addEventListener('click', printQRCode);
+                }
+                
+                // Sincronizar os selects de tamanho QR Code
+                const qrCodeSize = document.getElementById('qrCodeSize');
+                const qrCodeSizeDesktop = document.getElementById('qrCodeSizeDesktop');
+                
+                if (qrCodeSize && qrCodeSizeDesktop) {
+                    qrCodeSize.addEventListener('change', function() {
+                        qrCodeSizeDesktop.value = this.value;
+                    });
+                    
+                    qrCodeSizeDesktop.addEventListener('change', function() {
+                        qrCodeSize.value = this.value;
+                    });
                 }
             }, 200);
         });
