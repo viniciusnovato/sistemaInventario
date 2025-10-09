@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pt" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Sistema de Inventário - Grupo AreLuna</title>
+    
+    <!-- Tailwind CSS v3+ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Fallback de estilos (caso o Tailwind CDN falhe) -->
+    <link rel="stylesheet" href="styles-backup.css">
+    
+
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        // Aguarda o Tailwind CSS carregar antes de configurar
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: {
+                                    50: '#eff6ff',
+                                    100: '#dbeafe',
+                                    200: '#bfdbfe',
+                                    300: '#93c5fd',
+                                    400: '#60a5fa',
+                                    500: '#3b82f6',
+                                    600: '#2563eb',
+                                    700: '#1d4ed8',
+                                    800: '#1e40af',
+                                    900: '#1e3a8a',
+                                },
+                                secondary: {
+                                    50: '#f8fafc',
+                                    100: '#f1f5f9',
+                                    200: '#e2e8f0',
+                                    300: '#cbd5e1',
+                                    400: '#94a3b8',
+                                    500: '#64748b',
+                                    600: '#475569',
+                                    700: '#334155',
+                                    800: '#1e293b',
+                                    900: '#0f172a',
+                                }
+                            },
+                            animation: {
+                                'fade-in': 'fadeIn 0.6s ease-out',
+                                'slide-up': 'slideUp 0.5s ease-out',
+                                'bounce-in': 'bounceIn 0.8s ease-out',
+                                'pulse-slow': 'pulse 3s infinite',
+                            },
+                            keyframes: {
+                                fadeIn: {
+                                    '0%': { opacity: '0', transform: 'translateY(20px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' }
+                                },
+                                slideUp: {
+                                    '0%': { opacity: '0', transform: 'translateY(30px)' },
+                                    '100%': { opacity: '1', transform: 'translateY(0)' }
+                                },
+                                bounceIn: {
+                                    '0%': { opacity: '0', transform: 'scale(0.3)' },
+                                    '50%': { opacity: '1', transform: 'scale(1.05)' },
+                                    '70%': { transform: 'scale(0.9)' },
+                                    '100%': { opacity: '1', transform: 'scale(1)' }
+                                }
+                            },
+                            backdropBlur: {
+                                xs: '2px',
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    
+    <!-- Custom Styles -->
+    <style>
+        /* Garantir visibilidade das abas */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block !important;
+        }
+        
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Fallback de background e cor de texto independente do modo */
+        html {
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        body {
+            background-color: #f8fafc !important; /* cinza claro */
+            color: #111827; /* texto escuro para boa leitura */
+        }
+        html, body { min-height: 100vh; }
+
+        /* Fallback para utilitário .hidden do Tailwind */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900 min-h-screen font-sans antialiased" style="background-color:#f8fafc !important; color:#111827;">
+    
+    <!-- Fixed Header with Glassmorphism -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-blue-200/20 dark:border-gray-700/20 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <!-- Logo Section -->
+                <div class="flex items-center space-x-4 animate-fade-in">
+                    <div class="relative">
+                        <div class="bg-gradient-to-br from-primary-500 to-primary-700 p-3 rounded-2xl shadow-lg">
+                            <i class="fas fa-boxes text-white text-2xl"></i>
+                        </div>
+                        <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent">
+                            📦 Sistema de Inventário
+                        </h1>
+                        <p class="text-sm text-secondary-600 dark:text-secondary-400 font-medium">Grupo AreLuna</p>
+                    </div>
+                </div>
+                
+                <!-- Stats Section -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Dark Mode Toggle -->
+                    <button id="darkModeToggle" class="p-2 rounded-xl bg-secondary-100 dark:bg-secondary-800 hover:bg-secondary-200 dark:hover:bg-secondary-700 transition-all duration-300 hover:scale-110">
+                        <i class="fas fa-moon dark:hidden text-secondary-600"></i>
+                        <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                    
+                    <!-- Total Items -->
+                    <div class="bg-gradient-to-r from-primary-500 to-primary-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-boxes text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Total de Itens</p>
+                                <p id="totalItems" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Active Items -->
+                    <div class="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-check-circle text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Ativos</p>
+                                <p id="activeItems" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container with proper spacing for fixed header -->
+    <div class="pt-24 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Navigation Tabs -->
+            <nav class="mb-8 animate-slide-up">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-2">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <button class="nav-tab active group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="dashboard">
+                            <i class="fas fa-chart-pie group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">📊 Dashboard</span>
+                            <span class="sm:hidden">Dashboard</span>
+                        </button>
+                        <button class="nav-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="add-item">
+                            <i class="fas fa-plus-circle group-hover:rotate-90 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">➕ Adicionar</span>
+                            <span class="sm:hidden">Adicionar</span>
+                        </button>
+                        <button class="nav-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="inventory">
+                            <i class="fas fa-warehouse group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">🏪 Inventário</span>
+                            <span class="sm:hidden">Inventário</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Tab Contents -->
+            
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                    
+                    <!-- Companies Card -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] group">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight">
+                                <i class="fas fa-building text-primary-600 dark:text-primary-400 mr-3 group-hover:scale-110 transition-transform duration-300"></i>
+                                🏢 Empresas
+                            </h3>
+                            <div class="bg-gradient-to-r from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 text-primary-700 dark:text-primary-300 px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                                6 empresas
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30 rounded-2xl border border-purple-200/50 dark:border-purple-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">Vespasian Ventures</span>
+                            </div>
+                            <div class="flex items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">Instituto AreLuna</span>
+                            </div>
+                            <div class="flex items-center p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-2xl border border-indigo-200/50 dark:border-indigo-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">ProStoral</span>
+                            </div>
+                            <div class="flex items-center p-4 bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/30 rounded-2xl border border-pink-200/50 dark:border-pink-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-pink-500 to-pink-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">Pinklegion</span>
+                            </div>
+                            <div class="flex items-center p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/30 dark:to-orange-900/30 rounded-2xl border border-yellow-200/50 dark:border-yellow-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">Papagaio Fotogénico</span>
+                            </div>
+                            <div class="flex items-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-2xl border border-green-200/50 dark:border-green-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                <div class="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-4 animate-pulse-slow"></div>
+                                <span class="text-gray-700 dark:text-gray-200 font-semibold">Nuvens Autóctones</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Distribution Card -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] group">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight">
+                                <i class="fas fa-chart-pie text-primary-600 dark:text-primary-400 mr-3 group-hover:rotate-12 transition-transform duration-300"></i>
+                                📈 Categorias
+                            </h3>
+                        </div>
+                        <div id="categoryStats" class="space-y-4">
+                            <!-- Categories will be populated by JavaScript -->
+                            <div class="animate-pulse space-y-3">
+                                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full w-3/4"></div>
+                                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded-full w-1/2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Items Card -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] group">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight">
+                                <i class="fas fa-clock text-primary-600 dark:text-primary-400 mr-3 group-hover:rotate-12 transition-transform duration-300"></i>
+                                🕒 Recentes
+                            </h3>
+                        </div>
+                        <div id="recentItems" class="space-y-4">
+                            <!-- Recent items will be populated by JavaScript -->
+                            <div class="text-center py-8">
+                                <i class="fas fa-box-open text-4xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                                <p class="text-gray-500 dark:text-gray-400 font-medium">Nenhum item recente</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR Code Management Section -->
+                <div class="mt-8 animate-fade-in">
+                    <div class="bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-900/20 dark:to-blue-900/20 backdrop-blur-xl rounded-3xl shadow-xl border border-purple-200/30 dark:border-purple-700/30 p-8">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center tracking-tight mb-2">
+                                    <i class="fas fa-qrcode text-purple-600 dark:text-purple-400 mr-3"></i>
+                                    🔄 Gerenciamento de QR Codes
+                                </h3>
+                                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                                    Atualize todos os QR codes existentes para o novo formato com links diretos
+                                </p>
+                            </div>
+                            <button id="updateQRCodesBtn" onclick="updateAllQRCodes()" 
+                                class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-sync-alt"></i>
+                                <span>Atualizar QR Codes</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Progress and Status -->
+                        <div id="qrUpdateStatus" class="hidden">
+                            <div class="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-4 mb-4">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                                    <span class="text-gray-700 dark:text-gray-300 font-medium">Atualizando QR codes...</span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
+                                    <div id="qrUpdateProgress" class="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                                
+                                <!-- Logs em tempo real -->
+                                <div id="qrUpdateLogs" class="bg-gray-900 dark:bg-gray-950 rounded-xl p-4 max-h-64 overflow-y-auto">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <i class="fas fa-terminal text-green-400 text-sm"></i>
+                                        <span class="text-green-400 font-mono text-sm font-bold">Logs de Atualização</span>
+                                    </div>
+                                    <div id="logContent" class="font-mono text-xs space-y-1">
+                                        <div class="text-gray-400">Iniciando processo de atualização...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="qrUpdateResult" class="hidden">
+                            <!-- Results will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Item Tab -->
+            <div id="add-item" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8 animate-fade-in">
+                    <div class="flex items-center mb-8">
+                        <i class="fas fa-plus-circle text-3xl text-primary-600 dark:text-primary-400 mr-4"></i>
+                        <h2 class="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight">➕ Adicionar Novo Item</h2>
+                    </div>
+                    
+                    <form id="addItemForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📝 Nome do Item</label>
+                            <input type="text" id="itemName" name="name" required 
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Digite o nome do item...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📋 Descrição</label>
+                            <input type="text" id="itemDescription" name="description"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Descrição do item...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">🏢 Empresa</label>
+                            <select id="itemCompany" name="company" required 
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                <option value="">Selecione uma empresa...</option>
+                                <option value="Vespasian Ventures">Vespasian Ventures</option>
+                                <option value="Instituto AreLuna">Instituto AreLuna</option>
+                                <option value="ProStoral">ProStoral</option>
+                                <option value="Pinklegion">Pinklegion</option>
+                                <option value="Papagaio Fotogénico">Papagaio Fotogénico</option>
+                                <option value="Nuvens Autóctones">Nuvens Autóctones</option>
+                            </select>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">🏷️ Categoria</label>
+                            <div class="relative">
+                                <select id="itemCategory" name="categoria_id" required 
+                                    class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                    <option value="">Selecione uma categoria...</option>
+                                    <!-- Categorias serão carregadas dinamicamente -->
+                                </select>
+                                <button type="button" id="addCategoryBtn" 
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded-lg text-xs transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">👤 Colaborador</label>
+                            <div class="relative">
+                                <select id="itemCollaborator" name="colaborador_id" 
+                                    class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                    <option value="">Selecione um colaborador...</option>
+                                    <!-- Colaboradores serão carregados dinamicamente -->
+                                </select>
+                                <button type="button" id="addCollaboratorBtn" 
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded-lg text-xs transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📍 Localização</label>
+                            <input type="text" id="itemLocation" name="location"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Sala, andar, prédio...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📊 Status</label>
+                            <select id="itemStatus" name="status" required 
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                <option value="Ativo">✅ Ativo</option>
+                                <option value="Inativo">❌ Inativo</option>
+                                <option value="Manutenção">🔧 Manutenção</option>
+                            </select>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">🏷️ Marca</label>
+                            <input type="text" id="itemBrand" name="brand"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Ex: Samsung, Dell, HP...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📱 Modelo</label>
+                            <input type="text" id="itemModel" name="model"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Ex: Galaxy S21, Inspiron 15...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">🔢 Número de Série</label>
+                            <input type="text" id="itemSerial" name="serial_number"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Ex: SN123456789...">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">💰 Valor (R$)</label>
+                            <input type="number" id="itemValue" name="value" step="0.01" min="0"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Ex: 1500.00">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📅 Data de Compra</label>
+                            <input type="date" id="itemPurchaseDate" name="purchase_date"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">🛡️ Data de Garantia</label>
+                            <input type="date" id="itemWarrantyDate" name="warranty_date"
+                                class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📸 Imagem do Item</label>
+                            <div class="relative">
+                                <input type="file" id="itemImage" name="image" accept="image/*"
+                                    class="hidden" onchange="handleImagePreview(this)">
+                                <button type="button" id="selectImageBtn"
+                                    class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600/70 flex items-center justify-center gap-2">
+                                    <i class="fas fa-camera"></i>
+                                    <span id="imageButtonText">Selecionar Imagem</span>
+                                </button>
+                                <div id="imagePreview" class="mt-2 hidden">
+                                    <img id="previewImg" class="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-600" alt="Preview">
+                                    <button type="button" onclick="removeImagePreview()" 
+                                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors">
+                                        ×
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="md:col-span-2 lg:col-span-3 pt-4">
+                            <button type="submit" 
+                                class="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] focus:ring-4 focus:ring-primary-500/20">
+                                <i class="fas fa-plus-circle mr-3"></i>
+                                ➕ Adicionar Item ao Inventário
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventory" class="tab-content">
+                <div class="space-y-6 animate-fade-in">
+                    <!-- Advanced Search and Filters -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-6">
+                        <!-- Main Search Bar -->
+                        <div class="flex flex-col lg:flex-row gap-4 items-center mb-6">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                    <input type="text" id="searchInput" 
+                                        class="w-full pl-12 pr-12 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                                        placeholder="🔍 Buscar por nome, descrição, categoria ou fornecedor...">
+                                    <button id="clearSearch" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 hidden">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <button id="toggleAdvancedFilters" 
+                                class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                                <i class="fas fa-filter"></i>
+                                <span>Filtros Avançados</span>
+                                <i id="filterToggleIcon" class="fas fa-chevron-down transition-transform duration-300"></i>
+                            </button>
+                        </div>
+
+                        <!-- Advanced Filters Panel -->
+                        <div id="advancedFiltersPanel" class="hidden border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                <!-- Category Filter -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">📂 Categoria</label>
+                                    <select id="categoryFilter" 
+                                        class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                        <option value="">Todas as categorias</option>
+                                        <option value="Eletrônicos">Eletrônicos</option>
+                                        <option value="Periféricos">Periféricos</option>
+                                        <option value="Equipamentos">Equipamentos</option>
+                                        <option value="Papelaria">Papelaria</option>
+                                        <option value="Cabos">Cabos</option>
+                                    </select>
+                                </div>
+
+                                <!-- Status Filter -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">📊 Status</label>
+                                    <select id="statusFilter" 
+                                        class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                        <option value="">Todos os status</option>
+                                        <option value="active">✅ Ativo</option>
+                                        <option value="inactive">❌ Inativo</option>
+                                        <option value="maintenance">🔧 Manutenção</option>
+                                    </select>
+                                </div>
+
+                                <!-- Price Range -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">💰 Faixa de Preço</label>
+                                    <select id="priceRangeFilter" 
+                                        class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                        <option value="">Todos os preços</option>
+                                        <option value="0-50">R$ 0 - R$ 50</option>
+                                        <option value="50-200">R$ 50 - R$ 200</option>
+                                        <option value="200-1000">R$ 200 - R$ 1.000</option>
+                                        <option value="1000-5000">R$ 1.000 - R$ 5.000</option>
+                                        <option value="5000+">Acima de R$ 5.000</option>
+                                    </select>
+                                </div>
+
+                                <!-- Stock Level -->
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">📦 Estoque</label>
+                                    <select id="stockFilter" 
+                                        class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                        <option value="">Todos os níveis</option>
+                                        <option value="low">🔴 Estoque baixo (≤ 10)</option>
+                                        <option value="medium">🟡 Estoque médio (11-50)</option>
+                                        <option value="high">🟢 Estoque alto (> 50)</option>
+                                        <option value="zero">⚫ Sem estoque (0)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Sort Options -->
+                            <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">🔄 Ordenar por:</label>
+                                    <select id="sortBy" 
+                                        class="px-4 py-2 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100">
+                                        <option value="name">Nome (A-Z)</option>
+                                        <option value="name-desc">Nome (Z-A)</option>
+                                        <option value="price">Preço (Menor)</option>
+                                        <option value="price-desc">Preço (Maior)</option>
+                                        <option value="quantity">Quantidade (Menor)</option>
+                                        <option value="quantity-desc">Quantidade (Maior)</option>
+                                        <option value="created">Mais Antigos</option>
+                                        <option value="created-desc">Mais Recentes</option>
+                                    </select>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <button id="clearAllFilters" 
+                                        class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-all duration-300 hover:scale-105">
+                                        <i class="fas fa-eraser"></i>
+                                        <span>Limpar Filtros</span>
+                                    </button>
+                                    
+                                    <div id="resultsCount" class="text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-xl">
+                                        <i class="fas fa-list-ul mr-1"></i>
+                                        <span id="itemCount">0</span> itens encontrados
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Filter Tags -->
+                        <div id="activeFilters" class="hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Filtros ativos:</span>
+                                <div id="filterTags" class="flex gap-2 flex-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Inventory Grid -->
+                    <div id="inventoryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Items will be populated by JavaScript -->
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div id="paginationContainer" class="hidden mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <span>Mostrando</span>
+                            <span id="paginationInfo" class="font-medium">1-20 de 100</span>
+                            <span>itens</span>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <button id="prevPageBtn" 
+                                class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                                disabled>
+                                <i class="fas fa-chevron-left text-xs"></i>
+                                <span class="hidden sm:inline">Anterior</span>
+                            </button>
+                            
+                            <div id="pageNumbers" class="flex items-center gap-1">
+                                <!-- Page numbers will be populated by JavaScript -->
+                            </div>
+                            
+                            <button id="nextPageBtn" 
+                                class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
+                                <span class="hidden sm:inline">Próxima</span>
+                                <i class="fas fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <label for="itemsPerPage" class="text-sm text-gray-600 dark:text-gray-400">Itens por página:</label>
+                            <select id="itemsPerPage" 
+                                class="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option value="10">10</option>
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="emptyState" class="text-center py-16 hidden">
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-12">
+                            <i class="fas fa-box-open text-6xl text-gray-300 dark:text-gray-600 mb-6 animate-bounce-in"></i>
+                            <h3 class="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-4">📦 Nenhum item encontrado</h3>
+                            <p class="text-gray-500 dark:text-gray-400 mb-6">Adicione itens ao inventário ou ajuste os filtros de busca.</p>
+                            <button onclick="switchTab('add-item')" 
+                                class="bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold py-3 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                                <i class="fas fa-plus-circle mr-2"></i>
+                                Adicionar Primeiro Item
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="fixed inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 hidden" style="display: none;">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-primary-200 dark:border-primary-800 border-t-primary-600 dark:border-t-primary-400 rounded-full animate-spin mb-4"></div>
+            <p class="text-gray-600 dark:text-gray-300 font-semibold">⏳ Carregando...</p>
+        </div>
+    </div>
+
+    <!-- Modal para Adicionar Categoria -->
+    <div id="categoryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-layer-group mr-2"></i>
+                    Nova Categoria
+                </h3>
+                <button id="closeCategoryModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="categoryForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Categoria</label>
+                        <input type="text" id="categoryName" name="nome" required 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: Eletrônicos, Móveis...">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancelCategoryBtn" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Criar Categoria
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Adicionar Colaborador -->
+    <div id="collaboratorModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-user mr-2"></i>
+                    Novo Colaborador
+                </h3>
+                <button id="closeCollaboratorModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="collaboratorForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Colaborador</label>
+                        <input type="text" id="collaboratorName" name="nome" required 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: João Silva">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                        <input type="email" id="collaboratorEmail" name="email" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="joao@empresa.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cargo</label>
+                        <input type="text" id="collaboratorRole" name="cargo" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            placeholder="Ex: Analista, Gerente...">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancelCollaboratorBtn" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Criar Colaborador
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+    
+    <!-- Scripts relacionados à navegação de abas e tema são gerenciados em app.js -->
+    </body>
+    </html>
