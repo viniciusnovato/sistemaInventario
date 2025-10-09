@@ -3,10 +3,6 @@
   "name": "sistema-inventario-areluna",
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
-    },
-    {
       "src": "/(.*\\.(js|css|html|png|jpg|jpeg|gif|svg|ico|json|woff|woff2|ttf|eot))",
       "dest": "/public/$1"
     },
@@ -22,12 +18,5 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "functions": {
-    "server.js": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  },
-  "regions": ["gru1"],
-  "framework": null
+  "regions": ["gru1"]
 }
