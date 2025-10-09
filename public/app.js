@@ -808,9 +808,9 @@ const AdvancedSearch = {
         });
         
         // Advanced filters toggle
-        const toggleBtn = DOMElements.get('toggleAdvancedFilters');
-        const panel = DOMElements.get('advancedFiltersPanel');
-        const icon = DOMElements.get('filterToggleIcon');
+        const toggleBtn = document.getElementById('toggleAdvancedFilters');
+        const panel = document.getElementById('advancedFiltersPanel');
+        const icon = document.getElementById('filterToggleIcon');
         
         // Initially hide the panel properly
         if (panel) {
@@ -821,26 +821,33 @@ const AdvancedSearch = {
             panel.style.transition = 'all 0.3s ease-out';
         }
         
-        toggleBtn?.addEventListener('click', () => {
-            const isHidden = panel.classList.contains('hidden');
-            
-            if (isHidden) {
-                // Show panel
-                panel.classList.remove('hidden');
-                panel.style.maxHeight = '500px';
-                panel.style.opacity = '1';
-                if (icon) icon.style.transform = 'rotate(180deg)';
-            } else {
-                // Hide panel
-                panel.style.maxHeight = '0px';
-                panel.style.opacity = '0';
-                if (icon) icon.style.transform = 'rotate(0deg)';
+        if (toggleBtn && panel && icon) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 
-                setTimeout(() => {
-                    panel.classList.add('hidden');
-                }, 300);
-            }
-        });
+                const isHidden = panel.classList.contains('hidden');
+                
+                if (isHidden) {
+                    // Show panel
+                    panel.classList.remove('hidden');
+                    requestAnimationFrame(() => {
+                        panel.style.maxHeight = '500px';
+                        panel.style.opacity = '1';
+                        icon.style.transform = 'rotate(180deg)';
+                    });
+                } else {
+                    // Hide panel
+                    panel.style.maxHeight = '0px';
+                    panel.style.opacity = '0';
+                    icon.style.transform = 'rotate(0deg)';
+                    
+                    setTimeout(() => {
+                        panel.classList.add('hidden');
+                    }, 300);
+                }
+            });
+        }
         
         // Filter controls
         const filterElements = [
