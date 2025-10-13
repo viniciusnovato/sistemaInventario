@@ -1,1743 +1,5 @@
-// ===== CONFIGURAÇÃO GLOBAL E ESTADO DA APLICAÇÃO =====
-const APP_CONFIG = {
-    API_BASE_URL: '',
-    VERSION: '2.0.0',
-    THEME_KEY: 'inventory-theme',
-    ANIMATION_DURATION: 300,
-    DEBOUNCE_DELAY: 300,
-    NOTIFICATION_DURATION: 5000
-};
-
-// Estado global da aplicação
-const AppState = {
-    currentItems: [],
-    currentTab: 'dashboard',
-    isLoading: false,
-    isDarkMode: localStorage.getItem(APP_CONFIG.THEME_KEY) === 'dark',
-    filters: {
-        search: '',
-        category: '',
-        company: '',
-        status: ''
-    },
-    stats: null,
-    categories: [],
-    collaborators: []
-};
-
-// Cache de elementos DOM para melhor performance
-const DOMElements = {
-    // Inicialização lazy dos elementos
-    _cache: new Map(),
-    
-    get(selector) {
-        if (!this._cache.has(selector)) {
-            this._cache.set(selector, document.querySelector(selector));
-        }
-        return this._cache.get(selector);
-    },
-    
-    getAll(selector) {
-        const cacheKey = `all:${selector}`;
-        if (!this._cache.has(cacheKey)) {
-            this._cache.set(cacheKey, document.querySelectorAll(selector));
-        }
-        return this._cache.get(cacheKey);
-    },
-    
-    // Elementos principais
-    get tabButtons() { return this.getAll('.nav-tab'); },
-    get tabContents() { return this.getAll('.tab-content'); },
-    get totalItems() { return this.get('#totalItems'); },
-    get activeItems() { return this.get('#activeItems'); },
-    get categoryStats() { return this.get('#categoryStats'); },
-    get recentItems() { return this.get('#recentItems'); },
-    get addItemForm() { return this.get('#addItemForm'); },
-    get editItemForm() { return this.get('#editItemForm'); },
-    get searchInput() { return this.get('#searchInput'); },
-    get filterCategory() { return this.get('#filterCategory'); },
-    get filterCompany() { return this.get('#filterCompany'); },
-    get filterStatus() { return this.get('#filterStatus'); },
-    get inventoryGrid() { return this.get('#inventoryGrid'); },
-
-    get loading() { return this.get('#loading'); },
-    get darkModeToggle() { return this.get('#darkModeToggle'); },
-    get themeIcon() { return this.get('#themeIcon'); }
-};
-
-// ===== INICIALIZAÇÃO DA APLICAÇÃO =====
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-/**
- * Inicializa a aplicação com todas as funcionalidades modernas
- */
-async function initializeApp() {
-    try {
-        console.log('🚀 Iniciando aplicação...');
-        showLoading(true);
-        
-        // Inicializar tema
-        console.log('🎨 Inicializando tema...');
-        initializeTheme();
-        
-        // Configurar event listeners
-        console.log('👂 Configurando event listeners...');
-        setupEventListeners();
-        
-        // Inicializar sistema de busca avançada
-        console.log('🔍 Inicializando busca avançada...');
-        AdvancedSearch.init();
-        
-        // Inicializar sistema de drag & drop
-        console.log('🖱️ Inicializando drag & drop...');
-        DragDropSystem.init();
-        
-        // Carregar dados iniciais
-        console.log('📊 Carregando dados iniciais...');
-        await loadItems();
-        await loadStats();
-        
-        // Carregar dados dos dropdowns
-        console.log('📋 Carregando dados dos dropdowns...');
-        await loadDropdownData();
-        
-        // Definir aba padrão
-        console.log('📋 Definindo aba padrão...');
-        switchTab('dashboard');
-        
-        // Atualizar interface
-        console.log('🖼️ Atualizando interface...');
-        updateDashboard();
-        updateInventoryDisplay();
-        
-        // Animação de entrada
-        console.log('✨ Aplicando animações...');
-        animateAppEntry();
-        
-        showLoading(false);
-        ToastSystem.success('✅ Sistema inicializado com sucesso!');
-        console.log('🎉 Sistema de Inventário v2.0 - Inicializado com sucesso!');
-    } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
-        ToastSystem.error('Erro ao inicializar o sistema');
-        showLoading(false);
-    }
-}
-
-/**
- * Inicializa o sistema de tema (dark/light mode)
- */
-function initializeTheme() {
-    const html = document.documentElement;
-    
-    if (AppState.isDarkMode) {
-        html.classList.add('dark');
-    } else {
-        html.classList.remove('dark');
-    }
-    
-    updateThemeIcon();
-}
-
-/**
- * Atualiza o ícone do tema
- */
-function updateThemeIcon() {
-    const themeIcon = DOMElements.themeIcon;
-    if (themeIcon) {
-        themeIcon.className = AppState.isDarkMode ? 'fas fa-sun' : 'fas fa-moon';
-    }
-}
-
-/**
- * Alterna entre tema claro e escuro
- */
-function toggleTheme() {
-    AppState.isDarkMode = !AppState.isDarkMode;
-    localStorage.setItem(APP_CONFIG.THEME_KEY, AppState.isDarkMode ? 'dark' : 'light');
-    
-    const html = document.documentElement;
-    html.classList.toggle('dark', AppState.isDarkMode);
-    
-    updateThemeIcon();
-    
-    // Animação suave de transição
-    html.style.transition = 'background-color 0.3s ease, color 0.3s ease';
-    setTimeout(() => {
-        html.style.transition = '';
-    }, 300);
-    
-    ToastSystem.info(
-        AppState.isDarkMode ? '🌙 Tema escuro ativado' : '☀️ Tema claro ativado'
-    );
-}
-
-/**
- * Animação de entrada da aplicação
- */
-function animateAppEntry() {
-    const elements = document.querySelectorAll('.animate-fade-in, .animate-slide-up, .animate-bounce-in');
-    elements.forEach((el, index) => {
-        el.style.animationDelay = `${index * 0.1}s`;
-    });
-}
-
-/**
- * Configura todos os event listeners da aplicação
- */
-function setupEventListeners() {
-    // Tab navigation com animações suaves
-    DOMElements.tabButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const tabName = btn.dataset.tab;
-            if (tabName && tabName !== AppState.currentTab) {
-                switchTab(tabName);
-            }
-        });
-    });
-    
-    // Dark mode toggle
-    const darkModeToggle = DOMElements.darkModeToggle;
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('click', toggleTheme);
-    }
-    
-    // Forms com validação moderna
-    const addItemForm = DOMElements.addItemForm;
-    if (addItemForm) {
-        addItemForm.addEventListener('submit', handleAddItem);
-        setupFormValidation(addItemForm);
-    }
-    
-    const editItemForm = DOMElements.editItemForm;
-    if (editItemForm) {
-        editItemForm.addEventListener('submit', handleEditItem);
-        setupFormValidation(editItemForm);
-    }
-    
-    // Search e filters com debounce otimizado
-    const searchInput = DOMElements.searchInput;
-    if (searchInput) {
-        searchInput.addEventListener('input', debounce(handleSearch, APP_CONFIG.DEBOUNCE_DELAY));
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSearch();
-            }
-        });
-    }
-    
-    // Filtros com feedback visual
-    [DOMElements.filterCategory, DOMElements.filterCompany, DOMElements.filterStatus].forEach(filter => {
-        if (filter) {
-            filter.addEventListener('change', (e) => {
-                addFilterAnimation(e.target);
-                handleSearch();
-            });
-        }
-    });
-    // Keyboard shortcuts
-    document.addEventListener('keydown', handleKeyboardShortcuts);
-    
-    // Scroll animations
-    setupScrollAnimations();
-    
-    // Image selection button
-    const selectImageBtn = document.getElementById('selectImageBtn');
-    if (selectImageBtn) {
-        selectImageBtn.addEventListener('click', function() {
-            const fileInput = document.getElementById('itemImage');
-            if (fileInput) {
-                fileInput.click();
-            }
-        });
-    }
-
-    // Setup dropdown event listeners
-    setupDropdownEventListeners();
-}
-
-/**
- * Configura validação de formulários em tempo real
- */
-function setupFormValidation(form) {
-    const inputs = form.querySelectorAll('input[required], select[required]');
-    
-    inputs.forEach(input => {
-        input.addEventListener('blur', validateField);
-        input.addEventListener('input', clearFieldError);
-    });
-}
-
-/**
- * Valida um campo individual
- */
-function validateField(e) {
-    const field = e.target;
-    const value = field.value.trim();
-    
-    if (field.hasAttribute('required') && !value) {
-        showFieldError(field, 'Este campo é obrigatório');
-        return false;
-    }
-    
-    if (field.type === 'email' && value && !isValidEmail(value)) {
-        showFieldError(field, 'Email inválido');
-        return false;
-    }
-    
-    if (field.type === 'number' && value && isNaN(value)) {
-        showFieldError(field, 'Valor numérico inválido');
-        return false;
-    }
-    
-    clearFieldError(field);
-    return true;
-}
-
-/**
- * Mostra erro em um campo
- */
-function showFieldError(field, message) {
-    clearFieldError(field);
-    
-    field.classList.add('error');
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'field-error text-red-500 text-sm mt-1 animate-fade-in';
-    errorDiv.textContent = message;
-    
-    field.parentNode.appendChild(errorDiv);
-}
-
-/**
- * Remove erro de um campo
- */
-function clearFieldError(field) {
-    if (field) {
-        field.classList.remove('error');
-        const errorDiv = field.parentNode?.querySelector('.field-error');
-        if (errorDiv) {
-            errorDiv.remove();
-        }
-    }
-}
-
-/**
- * Adiciona animação aos filtros
- */
-function addFilterAnimation(element) {
-    element.classList.add('animate-pulse');
-    setTimeout(() => {
-        element.classList.remove('animate-pulse');
-    }, 300);
-}
-
-/**
- * Configura animações de scroll
- */
-function setupScrollAnimations() {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-    
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('animate-fade-in');
-            }
-        });
-    }, observerOptions);
-    
-    // Observar elementos que devem animar no scroll
-    document.querySelectorAll('.inventory-item, .dashboard-card').forEach(el => {
-        observer.observe(el);
-    });
-}
-
-/**
- * Manipula atalhos de teclado
- */
-function handleKeyboardShortcuts(e) {
-    // Ctrl/Cmd + K para busca
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        const searchInput = DOMElements.searchInput;
-        if (searchInput) {
-            searchInput.focus();
-            searchInput.select();
-        }
-    }
-    
-    // Ctrl/Cmd + N para novo item
-    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault();
-        switchTab('add-item');
-    }
-    
-    // Ctrl/Cmd + D para dashboard
-    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-        e.preventDefault();
-        switchTab('dashboard');
-    }
-}
-
-/**
- * Valida email
- */
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
-
-// Tab Management
-/**
- * Troca entre abas com animações suaves
- */
-function switchTab(tabName) {
-    if (!tabName || tabName === AppState.currentTab) return;
-    
-    // Mostrar loading se necessário
-    if (tabName === 'dashboard' || tabName === 'inventory') {
-        showLoading(true);
-    }
-    
-    // Atualizar estado
-    const previousTab = AppState.currentTab;
-    AppState.currentTab = tabName;
-    
-    // Atualizar navegação com animação
-    DOMElements.tabButtons.forEach(btn => {
-        const isActive = btn.dataset.tab === tabName;
-        btn.classList.toggle('active', isActive);
-        btn.setAttribute('aria-selected', isActive);
-        
-        // Adicionar animação de clique
-        if (isActive) {
-            btn.classList.add('animate-bounce-in');
-            setTimeout(() => btn.classList.remove('animate-bounce-in'), 300);
-        }
-    });
-    
-    // Animação de saída do conteúdo anterior
-    const previousContent = document.getElementById(previousTab);
-    if (previousContent && previousContent.classList.contains('active')) {
-        previousContent.classList.add('animate-slide-out');
-        setTimeout(() => {
-            previousContent.classList.remove('active');
-            previousContent.classList.remove('animate-slide-out');
-        }, 200);
-    }
-    
-    // Animação de entrada do novo conteúdo
-    setTimeout(() => {
-        DOMElements.tabContents.forEach(content => {
-            const isActive = content.id === tabName;
-            
-            if (isActive) {
-                content.classList.add('active');
-                content.classList.add('animate-slide-in');
-                setTimeout(() => content.classList.remove('animate-slide-in'), 300);
-            } else {
-                content.classList.remove('active');
-            }
-        });
-        
-        // Ações específicas por aba
-        handleTabSpecificActions(tabName);
-    }, 200);
-}
-
-/**
- * Executa ações específicas para cada aba
- */
-function handleTabSpecificActions(tabName) {
-    switch (tabName) {
-        case 'dashboard':
-            updateDashboard().then(() => {
-                showLoading(false);
-                animateDashboardCards();
-            });
-            break;
-        case 'inventory':
-            updateInventoryDisplay();
-            showLoading(false);
-            animateInventoryItems();
-            break;
-        case 'add-item':
-            resetAddItemForm();
-            focusFirstInput();
-            break;
-    }
-}
-
-/**
- * Anima os cards do dashboard
- */
-function animateDashboardCards() {
-    const cards = document.querySelectorAll('.dashboard-card');
-    cards.forEach((card, index) => {
-        setTimeout(() => {
-            card.classList.add('animate-slide-up');
-        }, index * 100);
-    });
-}
-
-/**
- * Anima os itens do inventário
- */
-function animateInventoryItems() {
-    const items = document.querySelectorAll('.inventory-item');
-    items.forEach((item, index) => {
-        setTimeout(() => {
-            item.classList.add('animate-fade-in');
-        }, index * 50);
-    });
-}
-
-/**
- * Foca no primeiro input do formulário
- */
-function focusFirstInput() {
-    setTimeout(() => {
-        const firstInput = document.querySelector('#add-item input:not([type="hidden"])');
-        if (firstInput) {
-            firstInput.focus();
-        }
-    }, 300);
-}
-
-/**
- * Reseta o formulário de adicionar item
- */
-function resetAddItemForm() {
-    const form = DOMElements.addItemForm;
-    if (form) {
-        form.reset();
-        // Limpar erros de validação
-        const fieldErrors = form.querySelectorAll('.field-error');
-        if (fieldErrors) {
-            fieldErrors.forEach(error => {
-                if (error && error.remove) {
-                    error.remove();
-                }
-            });
-        }
-        const errorFields = form.querySelectorAll('.error');
-        if (errorFields) {
-            errorFields.forEach(field => {
-                if (field && field.classList) {
-                    field.classList.remove('error');
-                }
-            });
-        }
-    }
-}
-
-
-
-// API Functions
-async function apiRequest(endpoint, options = {}) {
-    try {
-        const response = await fetch(`${APP_CONFIG.API_BASE_URL}/api${endpoint}`, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-        
-        return data;
-    } catch (error) {
-        console.error(`API Error (${endpoint}):`, error);
-        throw error;
-    }
-}
-
-async function loadItems() {
-    try {
-        console.log('🔄 Iniciando carregamento de itens...');
-        const response = await apiRequest('/items');
-        console.log('📡 Resposta da API recebida:', response);
-        
-        // A API retorna um objeto com 'data' e 'count'
-        AppState.currentItems = response.data || [];
-        console.log('✅ Itens carregados no AppState:', AppState.currentItems.length);
-        console.log('📋 Primeiros 3 itens:', AppState.currentItems.slice(0, 3));
-        
-        return AppState.currentItems;
-    } catch (error) {
-        console.error('❌ Erro ao carregar itens:', error);
-        showNotification('Erro ao carregar itens', 'error');
-        return [];
-    }
-}
-
-async function loadStats() {
-    try {
-        const response = await apiRequest('/stats');
-        return response.data;
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
-        return null;
-    }
-}
-
-async function searchItems(query = '', category = '', company = '', status = '') {
-    try {
-        const params = new URLSearchParams();
-        if (query) params.append('q', query);
-        if (category) params.append('category', category);
-        if (company) params.append('company', company);
-        if (status) params.append('status', status);
-        
-        const response = await apiRequest(`/search?${params.toString()}`);
-        return response.data || [];
-    } catch (error) {
-        console.error('Erro na busca:', error);
-        showNotification('Erro na busca', 'error');
-        return [];
-    }
-}
-
-// Item Management
-async function handleAddItem(e) {
-    e.preventDefault();
-    
-    // Prevent multiple submissions
-    const submitButton = e.target.querySelector('button[type="submit"]');
-    if (submitButton.disabled) return;
-    
-    submitButton.disabled = true;
-    const originalText = submitButton.innerHTML;
-    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adicionando...';
-    
-    try {
-        showLoading(true);
-        
-        const formData = new FormData(e.target);
-        
-        // Não converter imagem para base64, enviar como FormData para o servidor
-        const response = await fetch('/api/items', {
-            method: 'POST',
-            body: formData // Enviar FormData diretamente
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao adicionar item');
-        }
-        
-        showNotification('Item adicionado com sucesso!', 'success');
-        e.target.reset();
-        removeImagePreview();
-        
-        // Recarregar dados
-        await loadItems();
-        await loadStats();
-        updateDashboard();
-        updateInventoryDisplay();
-        
-    } catch (error) {
-        console.error('Erro ao adicionar item:', error);
-        showNotification(error.message || 'Erro ao adicionar item', 'error');
-    } finally {
-        showLoading(false);
-        // Re-enable submit button
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalText;
-    }
-}
-
-async function handleEditItem(e) {
-    e.preventDefault();
-    
-    try {
-        showLoading(true);
-        
-        const itemId = document.getElementById('editItemId').value;
-        console.log('📝 Editando item ID:', itemId);
-        
-        // Coletar dados do formulário manualmente
-        const formData = {
-            name: document.getElementById('editItemName').value,
-            description: document.getElementById('editItemDescription').value,
-            company: document.getElementById('editItemCompany').value,
-            category: document.getElementById('editItemCategory').value,
-            location: document.getElementById('editItemLocation').value,
-            status: document.getElementById('editItemStatus').value,
-            serial_number: document.getElementById('editItemSerial').value
-        };
-        
-        console.log('📋 Dados do formulário:', formData);
-        
-        // Verificar se há imagem para upload
-        const imageInput = document.getElementById('editItemImage');
-        const hasNewImage = imageInput && imageInput.files && imageInput.files.length > 0;
-        
-        let requestData;
-        if (hasNewImage) {
-            // Se há nova imagem, usar FormData
-            requestData = new FormData();
-            Object.keys(formData).forEach(key => {
-                requestData.append(key, formData[key]);
-            });
-            requestData.append('image', imageInput.files[0]);
-        } else {
-            // Se não há nova imagem, usar JSON
-            requestData = JSON.stringify(formData);
-        }
-        
-        const response = await fetch(`/api/items/${itemId}`, {
-            method: 'PUT',
-            headers: hasNewImage ? {} : {
-                'Content-Type': 'application/json'
-            },
-            body: requestData
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao atualizar item');
-        }
-        
-        showNotification('Item atualizado com sucesso!', 'success');
-        
-        // Recarregar dados
-        await loadItems();
-        await loadStats();
-        updateDashboard();
-        updateInventoryDisplay();
-        
-    } catch (error) {
-        console.error('Erro ao editar item:', error);
-        showNotification(error.message || 'Erro ao editar item', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function deleteItem(itemId) {
-    console.log('🗑️ deleteItem chamada com ID:', itemId);
-    if (!confirm('Tem certeza que deseja excluir este item?')) {
-        console.log('❌ Exclusão cancelada pelo usuário');
-        return;
-    }
-    
-    try {
-        showLoading(true);
-        
-        await apiRequest(`/items/${itemId}`, {
-            method: 'DELETE'
-        });
-        
-        showNotification('Item excluído com sucesso!', 'success');
-        
-        // Recarregar dados
-        await loadItems();
-        await loadStats();
-        updateDashboard();
-        updateInventoryDisplay();
-        
-    } catch (error) {
-        console.error('Erro ao excluir item:', error);
-        showNotification(error.message || 'Erro ao excluir item', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Advanced Search and Filter System
-const AdvancedSearch = {
-    filters: {
-        search: '',
-        category: '',
-        status: '',
-        priceMin: '',
-        priceMax: '',
-        stock: '',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
-    },
-    
-    pagination: {
-        currentPage: 1,
-        itemsPerPage: 20,
-        totalPages: 1,
-        totalItems: 0
-    },
-    
-    items: [],
-    
-    init() {
-        this.setupEventListeners();
-        this.loadItems();
-    },
-    
-    setupEventListeners() {
-        // Search input with debounce
-        const searchInput = DOMElements.get('searchInput');
-        const clearSearch = DOMElements.get('clearSearch');
-        
-        let searchTimeout;
-        searchInput?.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.filters.search = e.target.value.toLowerCase();
-                this.pagination.currentPage = 1; // Reset to first page
-                this.updateClearButton();
-                this.loadItems();
-            }, 300);
-        });
-        
-        clearSearch?.addEventListener('click', () => {
-            searchInput.value = '';
-            this.filters.search = '';
-            this.pagination.currentPage = 1;
-            this.updateClearButton();
-            this.loadItems();
-        });
-        
-        // Advanced filters toggle
-        const toggleBtn = document.getElementById('toggleAdvancedFilters');
-        const panel = document.getElementById('advancedFiltersPanel');
-        const icon = document.getElementById('filterToggleIcon');
-        
-        // Initially hide the panel properly
-        if (panel) {
-            panel.classList.add('hidden');
-            panel.style.maxHeight = '0px';
-            panel.style.opacity = '0';
-            panel.style.overflow = 'hidden';
-            panel.style.transition = 'all 0.3s ease-out';
-        }
-        
-        if (toggleBtn && panel && icon) {
-            toggleBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const isHidden = panel.classList.contains('hidden');
-                
-                if (isHidden) {
-                    // Show panel
-                    panel.classList.remove('hidden');
-                    requestAnimationFrame(() => {
-                        panel.style.maxHeight = '500px';
-                        panel.style.opacity = '1';
-                        icon.style.transform = 'rotate(180deg)';
-                    });
-                } else {
-                    // Hide panel
-                    panel.style.maxHeight = '0px';
-                    panel.style.opacity = '0';
-                    icon.style.transform = 'rotate(0deg)';
-                    
-                    setTimeout(() => {
-                        panel.classList.add('hidden');
-                    }, 300);
-                }
-            });
-        }
-        
-        // Filter controls
-        const filterElements = [
-            'categoryFilter', 'statusFilter', 'priceRangeFilter', 
-            'stockFilter', 'sortBy'
-        ];
-        
-        filterElements.forEach(id => {
-            const element = DOMElements.get(id);
-            element?.addEventListener('change', (e) => {
-                const filterKey = id.replace('Filter', '').replace('sortBy', 'sortBy');
-                
-                if (id === 'priceRangeFilter') {
-                    const [min, max] = e.target.value.split('-');
-                    this.filters.priceMin = min || '';
-                    this.filters.priceMax = max === '+' ? '' : max || '';
-                } else if (id === 'sortBy') {
-                    const [field, order] = e.target.value.includes('-desc') 
-                        ? [e.target.value.replace('-desc', ''), 'desc']
-                        : [e.target.value, 'asc'];
-                    this.filters.sortBy = field;
-                    this.filters.sortOrder = order;
-                } else {
-                    this.filters[filterKey] = e.target.value;
-                }
-                
-                this.pagination.currentPage = 1; // Reset to first page
-                this.loadItems();
-            });
-        });
-        
-        // Clear all filters
-        const clearAllBtn = DOMElements.get('clearAllFilters');
-        clearAllBtn?.addEventListener('click', () => {
-            this.clearAllFilters();
-        });
-        
-        // Pagination controls
-        const prevBtn = DOMElements.get('prevPageBtn');
-        const nextBtn = DOMElements.get('nextPageBtn');
-        const itemsPerPageSelect = DOMElements.get('itemsPerPage');
-        
-        prevBtn?.addEventListener('click', () => {
-            if (this.pagination.currentPage > 1) {
-                this.pagination.currentPage--;
-                this.loadItems();
-            }
-        });
-        
-        nextBtn?.addEventListener('click', () => {
-            if (this.pagination.currentPage < this.pagination.totalPages) {
-                this.pagination.currentPage++;
-                this.loadItems();
-            }
-        });
-        
-        itemsPerPageSelect?.addEventListener('change', (e) => {
-            this.pagination.itemsPerPage = parseInt(e.target.value);
-            this.pagination.currentPage = 1;
-            this.loadItems();
-        });
-        
-        // Action buttons event listener
-        const grid = DOMElements.get('inventoryGrid');
-        grid?.addEventListener('click', (e) => {
-            const button = e.target.closest('button[data-action]');
-            if (button) {
-                const action = button.dataset.action;
-                const itemId = button.dataset.itemId;
-                
-                if (action === 'view') {
-                    openViewModal(itemId);
-                } else if (action === 'edit') {
-                    openEditModal(itemId);
-                } else if (action === 'delete') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    deleteItem(itemId);
-                }
-            }
-        });
-        
-        // Page number clicks
-        const pageNumbersContainer = DOMElements.get('pageNumbers');
-        pageNumbersContainer?.addEventListener('click', (e) => {
-            const pageBtn = e.target.closest('[data-page]');
-            if (pageBtn) {
-                const page = parseInt(pageBtn.dataset.page);
-                if (page !== this.pagination.currentPage) {
-                    this.pagination.currentPage = page;
-                    this.loadItems();
-                }
-            }
-        });
-    },
-    
-    updateClearButton() {
-        const clearBtn = DOMElements.get('clearSearch');
-        const searchInput = DOMElements.get('searchInput');
-        
-        if (searchInput?.value.trim()) {
-            clearBtn?.classList.remove('hidden');
-        } else {
-            clearBtn?.classList.add('hidden');
-        }
-    },
-    
-    async loadItems() {
-        try {
-            showLoading(true);
-            
-            // Construir parâmetros da query
-            const params = new URLSearchParams({
-                page: this.pagination.currentPage,
-                limit: this.pagination.itemsPerPage,
-                sortBy: this.filters.sortBy,
-                sortOrder: this.filters.sortOrder
-            });
-            
-            // Adicionar filtros não vazios
-            if (this.filters.search) params.append('search', this.filters.search);
-            if (this.filters.category) params.append('category', this.filters.category);
-            if (this.filters.status) params.append('status', this.filters.status);
-            if (this.filters.priceMin) params.append('priceMin', this.filters.priceMin);
-            if (this.filters.priceMax) params.append('priceMax', this.filters.priceMax);
-            if (this.filters.stock) params.append('stock', this.filters.stock);
-            
-            const response = await fetch(`/api/items?${params.toString()}`);
-            if (response.ok) {
-                const data = await response.json();
-                this.items = data.data || [];
-                this.pagination = {
-                    ...this.pagination,
-                    ...data.pagination
-                };
-                this.updateDisplay();
-                this.updatePaginationControls();
-                this.updateActiveFilters();
-            } else {
-                throw new Error('Erro ao carregar itens');
-            }
-        } catch (error) {
-            console.error('Erro ao carregar itens:', error);
-            ToastSystem.show('Erro ao carregar itens', 'error');
-        } finally {
-            showLoading(false);
-        }
-    },
-    
-    updateDisplay() {
-        const grid = DOMElements.get('inventoryGrid');
-        const emptyState = DOMElements.get('emptyState');
-        const itemCount = DOMElements.get('itemCount');
-        const paginationContainer = DOMElements.get('paginationContainer');
-        
-        // Update count
-        if (itemCount) {
-            itemCount.textContent = this.pagination.totalItems;
-        }
-        
-        if (this.items.length === 0) {
-            grid?.classList.add('hidden');
-            emptyState?.classList.remove('hidden');
-            paginationContainer?.classList.add('hidden');
-        } else {
-            grid?.classList.remove('hidden');
-            emptyState?.classList.add('hidden');
-            paginationContainer?.classList.remove('hidden');
-            this.renderItems();
-        }
-    },
-    
-    updatePaginationControls() {
-        const prevBtn = DOMElements.get('prevPageBtn');
-        const nextBtn = DOMElements.get('nextPageBtn');
-        const paginationInfo = DOMElements.get('paginationInfo');
-        const pageNumbers = DOMElements.get('pageNumbers');
-        
-        // Update navigation buttons
-        if (prevBtn) {
-            prevBtn.disabled = this.pagination.currentPage <= 1;
-        }
-        if (nextBtn) {
-            nextBtn.disabled = this.pagination.currentPage >= this.pagination.totalPages;
-        }
-        
-        // Update pagination info
-        if (paginationInfo) {
-            const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage + 1;
-            const end = Math.min(start + this.items.length - 1, this.pagination.totalItems);
-            paginationInfo.textContent = `${start}-${end} de ${this.pagination.totalItems}`;
-        }
-        
-        // Update page numbers
-        if (pageNumbers) {
-            pageNumbers.innerHTML = this.generatePageNumbers();
-        }
-    },
-    
-    generatePageNumbers() {
-        const { currentPage, totalPages } = this.pagination;
-        const pages = [];
-        
-        // Always show first page
-        if (totalPages > 0) {
-            pages.push(1);
-        }
-        
-        // Calculate range around current page
-        const start = Math.max(2, currentPage - 2);
-        const end = Math.min(totalPages - 1, currentPage + 2);
-        
-        // Add ellipsis if needed
-        if (start > 2) {
-            pages.push('...');
-        }
-        
-        // Add pages around current
-        for (let i = start; i <= end; i++) {
-            if (i !== 1 && i !== totalPages) {
-                pages.push(i);
-            }
-        }
-        
-        // Add ellipsis if needed
-        if (end < totalPages - 1) {
-            pages.push('...');
-        }
-        
-        // Always show last page
-        if (totalPages > 1) {
-            pages.push(totalPages);
-        }
-        
-        return pages.map(page => {
-            if (page === '...') {
-                return '<span class="px-2 py-1 text-gray-400">...</span>';
-            }
-            
-            const isActive = page === currentPage;
-            const classes = isActive 
-                ? 'px-3 py-1 bg-primary-600 text-white rounded-lg font-medium'
-                : 'px-3 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer';
-            
-            return `<button class="${classes}" data-page="${page}">${page}</button>`;
-        }).join('');
-    },
-    
-    renderItems() {
-        const grid = DOMElements.get('inventoryGrid');
-        if (!grid) return;
-        
-        grid.innerHTML = this.items.map(item => this.createItemCard(item)).join('');
-        
-        // Tornar os cards arrastáveis após renderização
-        const cards = grid.querySelectorAll('.inventory-item');
-        cards.forEach((card, index) => {
-            const item = this.items[index];
-            if (item) {
-                DragDropSystem.makeDraggable(card, item);
-            }
-            
-            // Add stagger animation
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            
-            setTimeout(() => {
-                card.style.transition = 'all 0.3s ease-out';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 50);
-        });
-    },
-    
-    createItemCard(item) {
-        const statusColors = {
-            active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            inactive: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            maintenance: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-        };
-        
-        const stockLevel = parseInt(item.quantity) || 0;
-        const stockColor = stockLevel === 0 ? 'text-red-500' : 
-                          stockLevel <= 10 ? 'text-yellow-500' : 'text-green-500';
-        
-        // Verificar se o item tem QR code
-        const hasQRCode = item.module_data && item.module_data.qr_code && item.module_data.qr_code_image;
-        
-        return `
-            <div class="inventory-item bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl border border-white/20 dark:border-gray-700/20 p-6 transition-all duration-300 hover:scale-105">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">${item.name || 'Sem nome'}</h3>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">${item.description || 'Sem descrição'}</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        ${hasQRCode ? `
-                            <button data-action="view-qr" data-item-id="${item.id}" 
-                                class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 hover:scale-105" 
-                                title="Ver QR Code">
-                                <i class="fas fa-qrcode"></i>
-                            </button>
-                        ` : ''}
-                        <span class="px-3 py-1 rounded-full text-xs font-medium ${statusColors[item.status] || statusColors.active}">
-                            ${item.status === 'active' ? '✅ Ativo' : 
-                              item.status === 'inactive' ? '❌ Inativo' : 
-                              item.status === 'maintenance' ? '🔧 Manutenção' : '✅ Ativo'}
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">📂 Categoria:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">${item.category || 'N/A'}</span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">💰 Preço:</span>
-                        <span class="text-sm font-bold text-primary-600 dark:text-primary-400">
-                            € ${parseFloat(item.price || 0).toFixed(2)}
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">📦 Estoque:</span>
-                        <span class="text-sm font-bold ${stockColor}">${stockLevel} unidades</span>
-                    </div>
-                </div>
-                
-                <div class="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <!-- Mobile layout: stacked buttons -->
-                    <div class="flex flex-col gap-2 w-full sm:hidden">
-                        <button data-action="view" data-item-id="${item.id}" 
-                            class="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                            <i class="fas fa-eye"></i>
-                            <span>Visualizar</span>
-                        </button>
-                        <div class="flex gap-2">
-                            <button data-action="edit" data-item-id="${item.id}" 
-                                class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                                <i class="fas fa-edit"></i>
-                                <span>Editar</span>
-                            </button>
-                            <button data-action="delete" data-item-id="${item.id}" 
-                                class="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Desktop layout: horizontal buttons -->
-                    <div class="hidden sm:flex gap-2 w-full">
-                        <button data-action="view" data-item-id="${item.id}" 
-                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                            <i class="fas fa-eye"></i>
-                            <span class="hidden md:inline">Visualizar</span>
-                        </button>
-                        <button data-action="edit" data-item-id="${item.id}" 
-                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                            <i class="fas fa-edit"></i>
-                            <span class="hidden md:inline">Editar</span>
-                        </button>
-                        <button data-action="delete" data-item-id="${item.id}" 
-                            class="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    },
-    
-    updateActiveFilters() {
-        const activeFiltersDiv = DOMElements.get('activeFilters');
-        const filterTagsDiv = DOMElements.get('filterTags');
-        
-        if (!activeFiltersDiv || !filterTagsDiv) return;
-        
-        const activeTags = [];
-        
-        if (this.filters.search) {
-            activeTags.push({ key: 'search', label: `Busca: "${this.filters.search}"`, value: this.filters.search });
-        }
-        
-        if (this.filters.category) {
-            activeTags.push({ key: 'category', label: `Categoria: ${this.filters.category}`, value: this.filters.category });
-        }
-        
-        if (this.filters.status) {
-            const statusLabels = { active: 'Ativo', inactive: 'Inativo', maintenance: 'Manutenção' };
-            activeTags.push({ key: 'status', label: `Status: ${statusLabels[this.filters.status]}`, value: this.filters.status });
-        }
-        
-        if (this.filters.priceRange) {
-            activeTags.push({ key: 'priceRange', label: `Preço: ${this.filters.priceRange}`, value: this.filters.priceRange });
-        }
-        
-        if (this.filters.stock) {
-            const stockLabels = { 
-                zero: 'Sem estoque', 
-                low: 'Estoque baixo', 
-                medium: 'Estoque médio', 
-                high: 'Estoque alto' 
-            };
-            activeTags.push({ key: 'stock', label: `Estoque: ${stockLabels[this.filters.stock]}`, value: this.filters.stock });
-        }
-        
-        if (activeTags.length > 0) {
-            activeFiltersDiv.classList.remove('hidden');
-            filterTagsDiv.innerHTML = activeTags.map(tag => `
-                <span class="inline-flex items-center gap-2 px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 text-xs font-medium rounded-full">
-                    ${tag.label}
-                    <button onclick="AdvancedSearch.removeFilter('${tag.key}')" 
-                        class="hover:bg-primary-200 dark:hover:bg-primary-800 rounded-full p-0.5 transition-colors duration-200">
-                        <i class="fas fa-times text-xs"></i>
-                    </button>
-                </span>
-            `).join('');
-        } else {
-            activeFiltersDiv.classList.add('hidden');
-        }
-    },
-    
-    removeFilter(key) {
-        this.filters[key] = '';
-        
-        // Update UI elements
-        const elementMap = {
-            search: 'searchInput',
-            category: 'categoryFilter',
-            status: 'statusFilter',
-            priceRange: 'priceRangeFilter',
-            stock: 'stockFilter'
-        };
-        
-        const element = DOMElements.get(elementMap[key]);
-        if (element) {
-            element.value = '';
-        }
-        
-        this.updateClearButton();
-        this.applyFilters();
-    },
-    
-    clearAllFilters() {
-        // Reset all filters
-        Object.keys(this.filters).forEach(key => {
-            if (key !== 'sortBy' && key !== 'sortOrder') {
-                this.filters[key] = '';
-            }
-        });
-        
-        // Reset pagination
-        this.pagination.currentPage = 1;
-        
-        // Reset UI elements
-        const elements = [
-            'searchInput', 'categoryFilter', 'statusFilter', 
-            'priceRangeFilter', 'stockFilter'
-        ];
-        
-        elements.forEach(id => {
-            const element = DOMElements.get(id);
-            if (element) element.value = '';
-        });
-        
-        this.updateClearButton();
-        this.loadItems();
-        
-        ToastSystem.show('Filtros limpos com sucesso', 'info');
-    }
-};
-
-// Search and Filter
-async function handleSearch() {
-    try {
-        const query = DOMElements.get('searchInput')?.value || '';
-    const category = DOMElements.get('filterCategory')?.value || '';
-    const company = DOMElements.get('filterCompany')?.value || '';
-    const status = DOMElements.get('filterStatus')?.value || '';
-        
-        const filteredItems = await searchItems(query, category, company, status);
-        displayInventoryItems(filteredItems);
-    } catch (error) {
-        console.error('Erro na busca:', error);
-    }
-}
-
-// Dashboard Updates
-async function updateDashboard() {
-    try {
-        console.log('📊 Atualizando dashboard...');
-        const stats = await loadStats();
-        
-        if (stats) {
-            console.log('📈 Dados carregados:', stats);
-            
-            // Armazenar stats no AppState
-            AppState.stats = stats;
-            
-            // Update header stats
-            if (DOMElements.totalItems) {
-                DOMElements.totalItems.textContent = stats.total;
-            }
-            if (DOMElements.activeItems) {
-                // Contar itens ativos corretamente
-                const activeCount = (stats.byStatus?.active || 0) + (stats.byStatus?.Ativo || 0);
-                DOMElements.activeItems.textContent = activeCount;
-            }
-            
-            // Update category stats
-            updateCategoryStats(stats.byCategory);
-            
-            // Update company stats with real data
-            updateCompanyStats(stats.byCompany);
-            
-            // Update recent items
-            updateRecentItems();
-            
-            console.log('✅ Dashboard atualizado com sucesso');
-        } else {
-            console.warn('⚠️ Nenhum dado de estatísticas encontrado');
-        }
-    } catch (error) {
-        console.error('❌ Erro ao atualizar dashboard:', error);
-    }
-}
-
-function updateCategoryStats(categoryData) {
-    console.log('📊 updateCategoryStats chamada com:', categoryData);
-    
-    if (!DOMElements.get('#categoryStats')) {
-        console.log('❌ Elemento categoryStats não encontrado');
-        return;
-    }
-    
-    // Mapear categorias reais para exibição
-    const realCategories = categoryData || {};
-    console.log('📈 Categorias processadas:', realCategories);
-    console.log('🔢 Número de categorias:', Object.keys(realCategories).length);
-    
-    DOMElements.get('#categoryStats').innerHTML = '';
-    
-    // Se não há dados, mostrar mensagem
-    if (Object.keys(realCategories).length === 0) {
-        console.log('⚠️ Nenhuma categoria encontrada, exibindo mensagem padrão');
-        DOMElements.get('#categoryStats').innerHTML = `
-            <div class="text-center py-4">
-                <i class="fas fa-chart-pie text-2xl text-gray-300 dark:text-gray-600 mb-2"></i>
-                <p class="text-gray-500 dark:text-gray-400 text-sm">Nenhuma categoria encontrada</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Exibir categorias reais
-    console.log('✅ Exibindo categorias:', Object.entries(realCategories));
-    Object.entries(realCategories).forEach(([category, count]) => {
-        console.log(`🏷️ Criando categoria: ${category} com ${count} itens`);
-        const statDiv = document.createElement('div');
-        statDiv.className = 'flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]';
-        statDiv.innerHTML = `
-            <div class="flex items-center">
-                <div class="w-3 h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mr-3"></div>
-                <span class="text-gray-700 dark:text-gray-200 font-medium">${category}</span>
-            </div>
-            <span class="bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-bold">${count}</span>
-        `;
-        DOMElements.get('#categoryStats').appendChild(statDiv);
-        console.log(`✅ Categoria ${category} adicionada ao DOM`);
-    });
-    
-    console.log('🎯 updateCategoryStats concluída');
-}
-
-// Nova função para atualizar estatísticas de empresas
-function updateCompanyStats(companyData) {
-    const companiesContainer = document.querySelector('#dashboard .space-y-4');
-    if (!companiesContainer) return;
-    
-    const realCompanies = companyData || {};
-    
-    // Limpar empresas existentes
-    companiesContainer.innerHTML = '';
-    
-    // Lista de empresas padrão com cores
-    const defaultCompanies = [
-        { name: 'Vespasian Ventures', color: 'from-purple-500 to-purple-600', bg: 'from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30', border: 'border-purple-200/50 dark:border-purple-700/50' },
-        { name: 'Instituto AreLuna', color: 'from-blue-500 to-blue-600', bg: 'from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30', border: 'border-blue-200/50 dark:border-blue-700/50' },
-        { name: 'ProStoral', color: 'from-indigo-500 to-indigo-600', bg: 'from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30', border: 'border-indigo-200/50 dark:border-indigo-700/50' },
-        { name: 'Pinklegion', color: 'from-pink-500 to-pink-600', bg: 'from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/30', border: 'border-pink-200/50 dark:border-pink-700/50' },
-        { name: 'Papagaio Fotogénico', color: 'from-yellow-500 to-yellow-600', bg: 'from-yellow-50 to-orange-50 dark:from-yellow-900/30 dark:to-orange-900/30', border: 'border-yellow-200/50 dark:border-yellow-700/50' },
-        { name: 'Nuvens Autóctones', color: 'from-green-500 to-green-600', bg: 'from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30', border: 'border-green-200/50 dark:border-green-700/50' }
-    ];
-    
-    // Exibir empresas com dados reais quando disponíveis
-    defaultCompanies.forEach(company => {
-        const count = realCompanies[company.name] || 0;
-        const companyDiv = document.createElement('div');
-        companyDiv.className = `flex items-center justify-between p-4 bg-gradient-to-r ${company.bg} rounded-2xl border ${company.border} hover:shadow-lg transition-all duration-300 hover:scale-[1.02]`;
-        companyDiv.innerHTML = `
-            <div class="flex items-center">
-                <div class="w-4 h-4 bg-gradient-to-r ${company.color} rounded-full mr-4 animate-pulse-slow"></div>
-                <span class="text-gray-700 dark:text-gray-200 font-semibold">${company.name}</span>
-            </div>
-            <span class="bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-bold">${count} itens</span>
-        `;
-        companiesContainer.appendChild(companyDiv);
-    });
-}
-
-function updateRecentItems() {
-    console.log('🕒 updateRecentItems chamada');
-    
-    // Buscar diretamente o elemento sem cache
-    const recentItemsElement = document.querySelector('#recentItems');
-    
-    if (!recentItemsElement) {
-        console.log('❌ Elemento recentItems não encontrado');
-        return;
-    }
-    
-    console.log('✅ Elemento recentItems encontrado');
-    console.log('📦 AppState.currentItems:', AppState.currentItems.length);
-    
-    // Ordenar itens por data mais recente (updated_at ou created_at)
-    const sortedItems = [...AppState.currentItems].sort((a, b) => {
-        const dateA = new Date(a.updated_at || a.created_at || 0);
-        const dateB = new Date(b.updated_at || b.created_at || 0);
-        return dateB - dateA; // Ordem decrescente (mais recente primeiro)
-    });
-    
-    console.log('📅 Itens ordenados por data:', sortedItems.slice(0, 3).map(item => ({
-        name: item.name,
-        updated_at: item.updated_at,
-        created_at: item.created_at
-    })));
-    
-    const recentItems = sortedItems.slice(0, 5);
-    console.log('🔢 Itens recentes selecionados:', recentItems.length);
-    
-    recentItemsElement.innerHTML = '';
-    
-    if (recentItems.length === 0) {
-        console.log('⚠️ Nenhum item recente encontrado');
-        recentItemsElement.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-box-open text-4xl text-gray-300 dark:text-gray-600 mb-4"></i>
-                <p class="text-gray-500 dark:text-gray-400 font-medium">Nenhum item recente</p>
-            </div>
-        `;
-        return;
-    }
-    
-    console.log('✅ Criando cards para itens recentes:', recentItems.length);
-    
-    recentItems.forEach(item => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-2xl border border-gray-200/50 dark:border-gray-600/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer';
-        itemDiv.onclick = () => openViewModal(item.id);
-        itemDiv.innerHTML = `
-            <div class="flex items-center">
-                <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-4">
-                    <i class="fas fa-box text-white text-sm"></i>
-                </div>
-                <div>
-                    <div class="font-semibold text-gray-800 dark:text-gray-200">${item.name}</div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400">${item.company || 'Sem empresa'} • ${formatCategory(item.category)}</div>
-                </div>
-            </div>
-            <div class="text-right">
-                <div class="text-sm font-bold text-green-600 dark:text-green-400">€ ${(item.unit_price || 0).toFixed(2)}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">${item.quantity || 0} unidades</div>
-            </div>
-        `;
-        recentItemsElement.appendChild(itemDiv);
-    });
-}
-
-// Inventory Display
-function updateInventoryDisplay() {
-    console.log('🔄 Atualizando exibição do inventário...');
-    console.log('📦 Itens no AppState:', AppState.currentItems.length);
-    displayInventoryItems(AppState.currentItems);
-}
-
-function displayInventoryItems(items) {
-    console.log('🎨 Renderizando itens:', items.length);
-    
-    // Teste direto sem cache
-    const inventoryGridDirect = document.querySelector('#inventoryGrid');
-    console.log('🔍 Teste direto - inventoryGrid encontrado:', !!inventoryGridDirect);
-    
-    // Teste com cache
-    const inventoryGridCache = DOMElements.get('inventoryGrid');
-    console.log('🔍 Teste com cache - inventoryGrid encontrado:', !!inventoryGridCache);
-    
-    if (!inventoryGridDirect) {
-        console.error('❌ Elemento inventoryGrid não encontrado diretamente!');
-        return;
-    }
-    
-    console.log('✅ Elemento inventoryGrid encontrado');
-    inventoryGridDirect.innerHTML = '';
-    
-    if (items.length === 0) {
-        console.log('📭 Nenhum item para exibir');
-        inventoryGridDirect.innerHTML = `
-            <div class="no-items">
-                <i class="fas fa-box-open" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
-                <p>Nenhum item encontrado</p>
-            </div>
-        `;
-        return;
-    }
-    
-    console.log('🔨 Criando cards para', items.length, 'itens');
-    items.forEach((item, index) => {
-        console.log(`🏗️ Criando card ${index + 1}:`, item.name);
-        const itemCard = createInventoryItemCard(item);
-        inventoryGridDirect.appendChild(itemCard);
-    });
-    
-    console.log('✅ Todos os cards foram adicionados ao DOM');
-    
-    // Configurar event listeners para os botões de ação
-    setupItemActionListeners();
-}
-
-// Configurar event listeners para os botões de ação dos itens
-function setupItemActionListeners() {
-    console.log('🔧 Configurando event listeners para botões de ação');
-    
-    // Event delegation para botões de ação
-    const inventoryGrid = document.querySelector('#inventoryGrid');
-    if (!inventoryGrid) {
-        console.error('❌ inventoryGrid não encontrado para configurar event listeners');
-        return;
-    }
-    
-    // Remove listeners existentes para evitar duplicação
-    inventoryGrid.removeEventListener('click', handleItemActions);
-    
-    // Adiciona novo listener
-    inventoryGrid.addEventListener('click', handleItemActions);
-    
-    console.log('✅ Event listeners configurados com sucesso');
-}
-
-// Handler para ações dos itens (view, edit, delete)
-function handleItemActions(e) {
-    const button = e.target.closest('button[data-action]');
-    if (!button) return;
-    
-    const action = button.dataset.action;
-    const itemId = button.dataset.itemId;
-    
-    console.log(`🎯 Ação ${action} para item ${itemId}`);
-    
-    switch (action) {
-        case 'view':
-            openViewModal(itemId);
-            break;
-        case 'view-qr':
-            openViewModal(itemId);
-            break;
-        case 'edit':
-            openEditModal(itemId);
-            break;
-        case 'delete':
-            e.preventDefault();
-            e.stopPropagation();
-            if (confirm('Tem certeza que deseja excluir este item?')) {
-                deleteItem(itemId);
-            }
-            break;
-        default:
-            console.warn('⚠️ Ação desconhecida:', action);
-    }
-}
-
-function createInventoryItemCard(item) {
-    console.log('🏗️ Criando card para item:', item.name, 'ID:', item.id);
-    
-    const card = document.createElement('div');
-    card.className = 'inventory-item';
-    
-    // Verificar se o item tem QR code
-    let hasQRCode = false;
-    if (item.module_data) {
-        try {
-            const moduleData = typeof item.module_data === 'string' ? 
-                JSON.parse(item.module_data) : item.module_data;
-            hasQRCode = !!(moduleData.qr_code && moduleData.qr_code_image);
-        } catch (e) {
-            console.log('Erro ao parsear module_data para item:', item.name, e);
-        }
-    }
-    
-    card.innerHTML = `
-        <div class="item-header">
-            <div>
-                <div class="item-name">${item.name}</div>
-                <span class="item-category">${formatCategory(item.category)}</span>
-            </div>
-        </div>
-        
-        <div class="item-details">
-            <div class="item-detail">
-                <span class="item-detail-label">Empresa:</span>
-                <span class="item-detail-value">${item.company}</span>
-            </div>
-            ${item.location ? `
-                <div class="item-detail">
-                    <span class="item-detail-label">Localização:</span>
-                    <span class="item-detail-value">${item.location}</span>
-                </div>
-            ` : ''}
-            ${item.brand ? `
-                <div class="item-detail">
-                    <span class="item-detail-label">Marca:</span>
-                    <span class="item-detail-value">${item.brand}</span>
-                </div>
-            ` : ''}
-            ${item.model ? `
-                <div class="item-detail">
-                    <span class="item-detail-label">Modelo:</span>
-                    <span class="item-detail-value">${item.model}</span>
-                </div>
-            ` : ''}
-            ${item.value ? `
-                <div class="item-detail">
-                    <span class="item-detail-label">Valor:</span>
-                    <span class="item-detail-value">€${parseFloat(item.value).toFixed(2)}</span>
-                </div>
-            ` : ''}
-            <div class="item-detail">
-                <span class="item-detail-label">Status:</span>
-                <span class="item-status ${item.status}">${formatStatus(item.status)}</span>
-            </div>
-        </div>
-        
-        <div class="item-actions">
-            <!-- Mobile layout: stacked buttons -->
-            <div class="flex flex-col gap-2 w-full sm:hidden">
-                <button class="btn-small btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                    <span>Visualizar</span>
-                </button>
-                <div class="flex gap-2">
-                    ${hasQRCode ? `
-                        <button class="btn-small btn-qr flex-1" data-action="view-qr" data-item-id="${item.id}" title="Ver QR Code">
-                            <i class="fas fa-qrcode"></i>
-                            <span>QR</span>
-                        </button>
-                    ` : ''}
-                    <button class="btn-small btn-edit flex-1" data-action="edit" data-item-id="${item.id}" title="Editar">
-                        <i class="fas fa-edit"></i>
-                        <span>Editar</span>
-                    </button>
-                    <button class="btn-small btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Desktop layout: horizontal buttons -->
-            <div class="hidden sm:flex gap-2">
-                <button class="btn-small btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
-                    <i class="fas fa-eye"></i>
-                </button>
-                ${hasQRCode ? `
-                    <button class="btn-small btn-qr" data-action="view-qr" data-item-id="${item.id}" title="Ver QR Code">
-                        <i class="fas fa-qrcode"></i>
-                    </button>
-                ` : ''}
-                <button class="btn-small btn-edit" data-action="edit" data-item-id="${item.id}" title="Editar">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-small btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `;
-    
-    console.log('✅ Card criado para:', item.name, hasQRCode ? 'com QR code' : 'sem QR code');
-    return card;
-}
+// Inicializar cliente Supabase (usando configurações do auth.js)
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // View Modal
 let currentViewItemId = null;
@@ -1755,6 +17,131 @@ function openEditModal(itemId) {
     
     // Redirecionar para a página de edição com o ID do item
     window.location.href = `edit-item.html?id=${itemId}`;
+}
+
+// Sistema de Navegação entre Abas
+const TabSystem = {
+    currentTab: 'dashboard',
+    
+    init() {
+        this.setupEventListeners();
+        this.showTab(this.currentTab);
+    },
+    
+    setupEventListeners() {
+        // Adicionar event listeners para os botões de navegação
+        const navTabs = document.querySelectorAll('.nav-tab');
+        navTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = tab.getAttribute('data-tab');
+                if (tabName) {
+                    this.switchTab(tabName);
+                }
+            });
+        });
+    },
+    
+    switchTab(tabName) {
+        console.log('🔄 Mudando para aba:', tabName);
+        
+        // Remover classe active de todos os botões
+        const navTabs = document.querySelectorAll('.nav-tab');
+        navTabs.forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Esconder todos os conteúdos das abas
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        // Ativar o botão da aba atual
+        const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        
+        // Mostrar o conteúdo da aba atual
+        const activeContent = document.getElementById(tabName);
+        if (activeContent) {
+            activeContent.classList.add('active');
+        }
+        
+        // Atualizar aba atual
+        this.currentTab = tabName;
+        
+        // Executar ações específicas da aba
+        this.onTabChange(tabName);
+    },
+    
+    showTab(tabName) {
+        this.switchTab(tabName);
+    },
+    
+    onTabChange(tabName) {
+        // Ações específicas quando uma aba é ativada
+        switch(tabName) {
+            case 'dashboard':
+                // Recarregar dados do dashboard se necessário
+                if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                    window.AdvancedSearch.loadItems();
+                }
+                break;
+            case 'inventory':
+                // Recarregar inventário se necessário
+                if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                    window.AdvancedSearch.loadItems();
+                }
+                break;
+            case 'add-item':
+                // Carregar categorias e colaboradores nos dropdowns
+                this.loadAddItemDropdowns();
+                
+                // Focar no primeiro campo do formulário
+                const firstInput = document.querySelector('#add-item input, #add-item select');
+                if (firstInput) {
+                    setTimeout(() => firstInput.focus(), 100);
+                }
+                break;
+        }
+    },
+
+    async loadAddItemDropdowns() {
+        try {
+            console.log('📋 Carregando dropdowns da aba adicionar item...');
+            const dropdownData = await loadDropdownData();
+            
+            // Popular dropdowns
+            populateCategoriesDropdown(dropdownData.categories, 'itemCategory');
+            populateCollaboratorsDropdown(dropdownData.collaborators, 'itemCollaborator');
+            
+            // Configurar event listeners se ainda não foram configurados
+            setupDropdownEventListeners();
+            
+            console.log('✅ Dropdowns carregados com sucesso!');
+        } catch (error) {
+            console.error('❌ Erro ao carregar dropdowns:', error);
+        }
+    }
+};
+
+// Função global para compatibilidade
+function switchTab(tabName) {
+    TabSystem.switchTab(tabName);
+}
+
+// Exportar para uso global
+window.TabSystem = TabSystem;
+window.switchTab = switchTab;
+
+/**
+ * Função para editar item - alias para openEditModal
+ */
+function handleEditItem(itemId) {
+    console.log('🔧 Editando item:', itemId);
+    openEditModal(itemId);
 }
 
 
@@ -1790,6 +177,55 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+
+/**
+ * Utilitário para manipulação de elementos DOM
+ */
+const DOMElements = {
+    /**
+     * Obtém um elemento DOM por seletor
+     */
+    get(selector) {
+        return document.querySelector(selector);
+    },
+
+    /**
+     * Obtém todos os elementos DOM por seletor
+     */
+    getAll(selector) {
+        return document.querySelectorAll(selector);
+    },
+
+    /**
+     * Verifica se um elemento existe
+     */
+    exists(selector) {
+        return document.querySelector(selector) !== null;
+    },
+
+    /**
+     * Cria um elemento DOM
+     */
+    create(tagName, attributes = {}, textContent = '') {
+        const element = document.createElement(tagName);
+        
+        Object.keys(attributes).forEach(key => {
+            if (key === 'className') {
+                element.className = attributes[key];
+            } else if (key === 'innerHTML') {
+                element.innerHTML = attributes[key];
+            } else {
+                element.setAttribute(key, attributes[key]);
+            }
+        });
+
+        if (textContent) {
+            element.textContent = textContent;
+        }
+
+        return element;
+    }
+};
 
 function showLoading(show) {
     if (DOMElements.get('loading')) {
@@ -1876,7 +312,7 @@ const ToastSystem = {
                 ` : ''}
             </div>
             <button class="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" 
-                    onclick="ToastSystem.hide('${id}')">
+                    data-action="close-toast" data-toast-id="${id}">
                 <i class="fas fa-times text-sm"></i>
             </button>
         `;
@@ -2262,175 +698,838 @@ function convertFileToBase64(file) {
     });
 }
 
-// Make functions globally available
-// ===== FUNÇÃO DE ATUALIZAÇÃO DE QR CODES =====
-async function updateAllQRCodes() {
-    const button = document.getElementById('updateQRCodesBtn');
-    const statusDiv = document.getElementById('qrUpdateStatus');
-    const resultDiv = document.getElementById('qrUpdateResult');
-    const progressBar = document.getElementById('qrUpdateProgress');
-    const logContent = document.getElementById('logContent');
-    
-    // Função para adicionar log
-    function addLog(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = document.createElement('div');
-        
-        let colorClass = 'text-gray-300';
-        let icon = '•';
-        
-        switch(type) {
-            case 'success':
-                colorClass = 'text-green-400';
-                icon = '✓';
-                break;
-            case 'error':
-                colorClass = 'text-red-400';
-                icon = '✗';
-                break;
-            case 'warning':
-                colorClass = 'text-yellow-400';
-                icon = '⚠';
-                break;
-            case 'info':
-                colorClass = 'text-blue-400';
-                icon = 'ℹ';
-                break;
-        }
-        
-        logEntry.className = `${colorClass} flex items-start space-x-2`;
-        logEntry.innerHTML = `
-            <span class="text-gray-500 text-xs">[${timestamp}]</span>
-            <span class="text-xs">${icon}</span>
-            <span class="text-xs flex-1">${message}</span>
-        `;
-        
-        logContent.appendChild(logEntry);
-        logContent.scrollTop = logContent.scrollHeight;
+/**
+ * Deleta um item do inventário
+ */
+async function deleteItem(itemId) {
+    if (!itemId) {
+        ToastSystem.error('ID do item não fornecido');
+        return;
     }
-    
-    // Desabilitar botão e mostrar status
-    button.disabled = true;
-    statusDiv.classList.remove('hidden');
-    resultDiv.classList.add('hidden');
-    progressBar.style.width = '0%';
-    
-    // Limpar logs anteriores
-    logContent.innerHTML = `
-        <div class="flex items-center space-x-2 mb-2">
-            <i class="fas fa-terminal text-green-400 text-sm"></i>
-            <span class="text-green-400 font-mono text-sm font-bold">Logs de Atualização</span>
-        </div>
-    `;
-    
+
+    // Confirmar exclusão
+    const confirmed = confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.');
+    if (!confirmed) {
+        return;
+    }
+
     try {
-        addLog('Iniciando processo de atualização de QR codes...', 'info');
-        progressBar.style.width = '10%';
+        showLoading(true);
         
-        addLog('Conectando com o servidor...', 'info');
-        
-        const response = await fetch('/api/update-qr-codes', {
-            method: 'POST',
+        const response = await fetch(`/api/items/${itemId}`, {
+            method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             }
         });
-        
-        addLog('Conexão estabelecida, processando itens...', 'success');
-        progressBar.style.width = '50%';
-        
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
-        }
-        
-        addLog('Recebendo dados do servidor...', 'info');
+
         const result = await response.json();
-        progressBar.style.width = '100%';
-        
-        addLog(`Processamento concluído! ${result.updated} itens atualizados`, 'success');
-        addLog(`${result.skipped} itens já estavam atualizados`, 'info');
-        
-        if (result.errors > 0) {
-            addLog(`${result.errors} erros encontrados durante o processo`, 'error');
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Erro ao excluir item');
         }
+
+        ToastSystem.success('Item excluído com sucesso!');
         
-        addLog(`Tempo total de execução: ${result.executionTime}ms`, 'info');
-        
-        // Aguardar um pouco para mostrar o progresso completo
-        setTimeout(() => {
-            statusDiv.classList.add('hidden');
-            resultDiv.classList.remove('hidden');
-            
-            // Mostrar resultados
-            resultDiv.innerHTML = `
-                <div class="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-6">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                            <i class="fas fa-check text-green-600 dark:text-green-400"></i>
-                        </div>
-                        <h4 class="text-lg font-bold text-gray-800 dark:text-gray-100">Atualização Concluída!</h4>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">${result.updated}</div>
-                            <div class="text-sm text-blue-700 dark:text-blue-300">Atualizados</div>
-                        </div>
-                        <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">${result.skipped}</div>
-                            <div class="text-sm text-yellow-700 dark:text-yellow-300">Já atualizados</div>
-                        </div>
-                        <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-red-600 dark:text-red-400">${result.errors}</div>
-                            <div class="text-sm text-red-700 dark:text-red-300">Erros</div>
-                        </div>
-                    </div>
-                    
-                    <div class="text-sm text-gray-600 dark:text-gray-400">
-                        <p><strong>Total processado:</strong> ${result.total} itens</p>
-                        <p><strong>Tempo de execução:</strong> ${result.executionTime}ms</p>
-                    </div>
-                </div>
-            `;
-            
-            // Reabilitar botão
-            button.disabled = false;
-            
-            // Mostrar notificação de sucesso
-            ToastSystem.success(`QR codes atualizados com sucesso! ${result.updated} itens processados.`);
-            
-        }, 1500);
-        
+        // Recarregar a lista de itens
+        if (AdvancedSearch && AdvancedSearch.loadItems) {
+            await AdvancedSearch.loadItems();
+        }
+
     } catch (error) {
-        console.error('Erro ao atualizar QR codes:', error);
-        addLog(`Erro durante a atualização: ${error.message}`, 'error');
-        
-        statusDiv.classList.add('hidden');
-        resultDiv.classList.remove('hidden');
-        
-        resultDiv.innerHTML = `
-            <div class="bg-red-50 dark:bg-red-900/20 rounded-2xl p-6">
-                <div class="flex items-center space-x-3 mb-4">
-                    <div class="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                        <i class="fas fa-times text-red-600 dark:text-red-400"></i>
-                    </div>
-                    <h4 class="text-lg font-bold text-red-800 dark:text-red-100">Erro na Atualização</h4>
-                </div>
-                <p class="text-red-700 dark:text-red-300">${error.message}</p>
-            </div>
-        `;
-        
-        // Reabilitar botão
-        button.disabled = false;
-        
-        // Mostrar notificação de erro
-        ToastSystem.error(`Erro ao atualizar QR codes: ${error.message}`);
+        console.error('Erro ao excluir item:', error);
+        ToastSystem.error(`Erro ao excluir item: ${error.message}`);
+    } finally {
+        showLoading(false);
     }
 }
 
-// ===== DROPDOWN MANAGEMENT =====
+// Make functions globally available
+window.handleImagePreview = handleImagePreview;
+window.removeImagePreview = removeImagePreview;
+window.openEditModal = openEditModal;
+window.openViewModal = openViewModal;
+window.deleteItem = deleteItem;
+// Sistema de busca avançada e exibição de itens
+const AdvancedSearch = {
+    currentItems: [],
+    filteredItems: [],
+    currentPage: 1,
+    itemsPerPage: 20,
+    filters: {
+        search: '',
+        category: '',
+        collaborator: '',
+        status: '',
+        company: ''
+    },
+
+    /**
+     * Inicializa o sistema de busca avançada
+     */
+    init() {
+        this.setupEventListeners();
+        this.loadItems();
+        console.log('🔍 Sistema de busca avançada inicializado');
+    },
+
+    /**
+     * Configura os event listeners para busca e filtros
+     */
+    setupEventListeners() {
+        // Busca principal
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', debounce((e) => {
+                this.filters.search = e.target.value;
+                this.applyFilters();
+            }, 300));
+        }
+
+        // Filtros de categoria
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', (e) => {
+                this.filters.category = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Filtros de colaborador
+        const collaboratorFilter = document.getElementById('collaboratorFilter');
+        if (collaboratorFilter) {
+            collaboratorFilter.addEventListener('change', (e) => {
+                this.filters.collaborator = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Filtros de status
+        const statusFilter = document.getElementById('statusFilter');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', (e) => {
+                this.filters.status = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Itens por página
+        const itemsPerPageSelect = document.getElementById('itemsPerPage');
+        if (itemsPerPageSelect) {
+            itemsPerPageSelect.addEventListener('change', (e) => {
+                this.itemsPerPage = parseInt(e.target.value);
+                this.currentPage = 1;
+                this.updateDisplay();
+            });
+        }
+
+        // Botões de paginação
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        
+        if (prevPageBtn) {
+            prevPageBtn.addEventListener('click', () => {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.updateDisplay();
+                }
+            });
+        }
+
+        if (nextPageBtn) {
+            nextPageBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(this.filteredItems.length / this.itemsPerPage);
+                if (this.currentPage < totalPages) {
+                    this.currentPage++;
+                    this.updateDisplay();
+                }
+            });
+        }
+    },
+
+    /**
+     * Carrega os itens do Supabase
+     */
+    async loadItems() {
+        try {
+            showLoading(true);
+            
+            const { data: items, error } = await supabase
+                .from('sistemainventario')
+                .select(`
+                    *,
+                    categoriassistemainventario:categoria_id(nome),
+                    colaboradoressistemainventario:colaborador_id(nome)
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Erro ao carregar itens:', error);
+                ToastSystem.error('Erro ao carregar itens do inventário');
+                return;
+            }
+
+            // Processar os dados dos itens
+            this.currentItems = items.map(item => {
+                const moduleData = item.module_data || {};
+                
+                return {
+                    ...item,
+                    category: item.categoriassistemainventario?.nome || null,
+                    collaborator: item.colaboradoressistemainventario?.nome || null,
+                    company: item.company || null
+                };
+            });
+
+            this.filteredItems = [...this.currentItems];
+            this.updateDisplay();
+            this.updateStats();
+            this.updateRecentItems();
+
+        } catch (error) {
+            console.error('Erro ao carregar itens:', error);
+            ToastSystem.error('Erro ao conectar com o banco de dados');
+        } finally {
+            showLoading(false);
+        }
+    },
+
+    /**
+     * Aplica os filtros aos itens
+     */
+    applyFilters() {
+        this.filteredItems = this.currentItems.filter(item => {
+            const moduleData = item.module_data || {};
+            
+            // Filtro de busca
+            if (this.filters.search) {
+                const searchTerm = this.filters.search.toLowerCase();
+                const searchableText = [
+                    item.name,
+                    item.category,
+                    item.collaborator,
+                    moduleData.company,
+                    moduleData.location,
+                    moduleData.brand,
+                    moduleData.model,
+                    item.status
+                ].join(' ').toLowerCase();
+                
+                if (!searchableText.includes(searchTerm)) {
+                    return false;
+                }
+            }
+
+            // Filtro de categoria
+            if (this.filters.category && item.categoria_id !== this.filters.category) {
+                return false;
+            }
+
+            // Filtro de colaborador
+            if (this.filters.collaborator && item.colaborador_id !== this.filters.collaborator) {
+                return false;
+            }
+
+            // Filtro de status
+            if (this.filters.status && item.status !== this.filters.status) {
+                return false;
+            }
+
+            return true;
+        });
+
+        this.currentPage = 1;
+        this.updateDisplay();
+        this.updateFilterTags();
+    },
+
+    /**
+     * Atualiza a exibição dos itens
+     */
+    updateDisplay() {
+        const inventoryGrid = document.getElementById('inventoryGrid');
+        const emptyState = document.getElementById('emptyState');
+        
+        if (!inventoryGrid) return;
+
+        // Calcular itens da página atual
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = startIndex + this.itemsPerPage;
+        const pageItems = this.filteredItems.slice(startIndex, endIndex);
+
+        // Limpar grid
+        inventoryGrid.innerHTML = '';
+
+        if (pageItems.length === 0) {
+            // Mostrar estado vazio
+            if (emptyState) {
+                emptyState.classList.remove('hidden');
+            }
+            inventoryGrid.classList.add('hidden');
+        } else {
+            // Ocultar estado vazio
+            if (emptyState) {
+                emptyState.classList.add('hidden');
+            }
+            inventoryGrid.classList.remove('hidden');
+
+            // Renderizar itens
+            pageItems.forEach(item => {
+                const itemCard = this.createItemCard(item);
+                inventoryGrid.appendChild(itemCard);
+            });
+
+            // Configurar drag & drop
+            if (DragDropSystem) {
+                pageItems.forEach(item => {
+                    const itemCard = inventoryGrid.querySelector(`[data-item-id="${item.id}"]`);
+                    if (itemCard) {
+                        DragDropSystem.makeDraggable(itemCard, item);
+                    }
+                });
+            }
+        }
+
+        this.updatePagination();
+    },
+
+    /**
+     * Cria um card de item para o inventário
+     */
+    createItemCard(item) {
+        const moduleData = item.module_data || {};
+        const card = document.createElement('div');
+        card.className = 'inventory-item-card bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-6 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] group relative';
+        card.dataset.itemId = item.id;
+
+        // Status badge color
+        const statusColors = {
+            'ativo': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+            'manutencao': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+            'inativo': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+        };
+
+        card.innerHTML = `
+            <div class="flex flex-col h-full">
+                <!-- Header com nome e categoria -->
+                <div class="mb-4">
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2 line-clamp-2">
+                        ${item.name || 'Item sem nome'}
+                    </h3>
+                    <div class="flex items-center justify-between">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300">
+                            ${item.category || 'Sem categoria'}
+                        </span>
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${statusColors[item.status] || statusColors['inativo']}">
+                            ${formatStatus(item.status)}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Informações do item -->
+                <div class="flex-1 space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                    ${moduleData.company ? `
+                        <div class="flex items-center">
+                            <i class="fas fa-building w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
+                            <span>${moduleData.company}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${item.collaborator ? `
+                        <div class="flex items-center">
+                            <i class="fas fa-user w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
+                            <span>${item.collaborator}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${moduleData.location ? `
+                        <div class="flex items-center">
+                            <i class="fas fa-map-marker-alt w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
+                            <span>${moduleData.location}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${moduleData.brand || moduleData.model ? `
+                        <div class="flex items-center">
+                            <i class="fas fa-tag w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
+                            <span>${[moduleData.brand, moduleData.model].filter(Boolean).join(' - ')}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${moduleData.value ? `
+                        <div class="flex items-center">
+                            <i class="fas fa-dollar-sign w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
+                            <span>€ ${parseFloat(moduleData.value).toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- Ações -->
+                <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                    <!-- Primeira linha: Botão Visualizar -->
+                    <div class="flex justify-center">
+                        <button data-action="view" data-item-id="${item.id}" 
+                            class="flex items-center justify-center w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 hover:scale-105"
+                            title="Visualizar">
+                            <i class="fas fa-eye text-sm mr-2"></i>
+                            <span class="text-sm font-medium">Visualizar</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Segunda linha: Botões Editar e Excluir dividindo a linha -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button data-action="edit" data-item-id="${item.id}" 
+                            class="flex items-center justify-center py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-all duration-200 hover:scale-105"
+                            title="Editar">
+                            <i class="fas fa-edit text-sm mr-2"></i>
+                            <span class="text-sm font-medium">Editar</span>
+                        </button>
+                        
+                        <button data-action="delete" data-item-id="${item.id}" 
+                            class="flex items-center justify-center py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 hover:scale-105"
+                            title="Excluir">
+                            <i class="fas fa-trash text-sm mr-2"></i>
+                            <span class="text-sm font-medium">Excluir</span>
+                        </button>
+                    </div>
+                    
+                    <!-- QR Code button (se disponível) - linha separada -->
+                    ${item.qr_code ? `
+                        <div class="flex justify-center">
+                            <button data-action="qr" data-item-id="${item.id}" 
+                                class="flex items-center justify-center py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 hover:scale-105"
+                                title="QR Code">
+                                <i class="fas fa-qrcode text-sm mr-2"></i>
+                                <span class="text-sm font-medium">QR Code</span>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        // Adicionar event listeners aos botões
+        this.setupCardEventListeners(card);
+
+        return card;
+ },
+
+    /**
+     * Configura event listeners para os botões dos cards
+     */
+    setupCardEventListeners(card) {
+        const buttons = card.querySelectorAll('button[data-action]');
+        
+        buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const action = button.dataset.action;
+                const itemId = button.dataset.itemId;
+                
+                switch (action) {
+                    case 'view':
+                        openViewModal(itemId);
+                        break;
+                    case 'edit':
+                        openEditModal(itemId);
+                        break;
+                    case 'delete':
+                        deleteItem(itemId);
+                        break;
+                    case 'qr':
+                        if (window.showQRCode) {
+                            window.showQRCode(itemId);
+                        }
+                        break;
+                }
+            });
+        });
+    },
+
+    /**
+     * Atualiza as estatísticas
+     */
+    updateStats() {
+        const totalItems = this.currentItems.length;
+        const activeItems = this.currentItems.filter(item => item.status === 'ativo').length;
+        const maintenanceItems = this.currentItems.filter(item => item.status === 'manutencao').length;
+        const inactiveItems = this.currentItems.filter(item => item.status === 'inativo').length;
+
+        // Atualizar elementos do desktop
+        const totalElement = document.getElementById('totalItems');
+        const activeElement = document.getElementById('activeItems');
+        const maintenanceElement = document.getElementById('maintenanceItems');
+        const inactiveElement = document.getElementById('inactiveItems');
+
+        if (totalElement) totalElement.textContent = totalItems;
+        if (activeElement) activeElement.textContent = activeItems;
+        if (maintenanceElement) maintenanceElement.textContent = maintenanceItems;
+        if (inactiveElement) inactiveElement.textContent = inactiveItems;
+
+        // Atualizar elementos do mobile
+        const mobileTotalElement = document.getElementById('mobileTotalItems');
+        const mobileActiveElement = document.getElementById('mobileActiveItems');
+
+        if (mobileTotalElement) mobileTotalElement.textContent = totalItems;
+        if (mobileActiveElement) mobileActiveElement.textContent = activeItems;
+
+        // Atualizar estatísticas por categoria
+        this.updateCategoryStats();
+        
+        // Atualizar contadores por empresa
+        this.updateCompanyCounters();
+    },
+
+    /**
+     * Atualiza as estatísticas por categoria
+     */
+    updateCategoryStats() {
+        const categoryStatsContainer = document.getElementById('categoryStats');
+        if (!categoryStatsContainer) return;
+
+        // Contar itens por categoria
+        const categoryCount = {};
+        this.currentItems.forEach(item => {
+            const category = item.category || 'Sem categoria';
+            categoryCount[category] = (categoryCount[category] || 0) + 1;
+        });
+
+        // Ordenar categorias por quantidade (decrescente)
+        const sortedCategories = Object.entries(categoryCount)
+            .sort(([,a], [,b]) => b - a);
+
+        if (sortedCategories.length === 0) {
+            categoryStatsContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-chart-pie text-4xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                    <p class="text-gray-500 dark:text-gray-400 font-medium">Nenhuma categoria encontrada</p>
+                </div>
+            `;
+            return;
+        }
+
+        categoryStatsContainer.innerHTML = sortedCategories.map(([category, count]) => {
+            const percentage = ((count / this.currentItems.length) * 100).toFixed(1);
+            return `
+                <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-4 h-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full animate-pulse-slow"></div>
+                        <span class="text-gray-700 dark:text-gray-200 font-semibold">${category}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="bg-gradient-to-r from-blue-100 to-indigo-200 dark:from-blue-900 dark:to-indigo-800 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                            ${count} ${count === 1 ? 'item' : 'itens'}
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${percentage}%</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    /**
+     * Atualiza os contadores por empresa
+     */
+    updateCompanyCounters() {
+        // Contar itens por empresa
+        const companyCount = {};
+        this.currentItems.forEach(item => {
+            const moduleData = item.module_data || {};
+            const company = moduleData.company || 'Sem empresa';
+            companyCount[company] = (companyCount[company] || 0) + 1;
+        });
+
+        // Lista de empresas conhecidas com suas cores
+        const companies = [
+            { name: 'Vespasian Ventures', color: 'purple' },
+            { name: 'Instituto AreLuna', color: 'blue' },
+            { name: 'ProStoral', color: 'indigo' },
+            { name: 'Pinklegion', color: 'pink' },
+            { name: 'Papagaio Fotogénico', color: 'yellow' },
+            { name: 'Nuvens Autóctones', color: 'green' }
+        ];
+
+        // Atualizar cada empresa na interface
+        companies.forEach(company => {
+            const count = companyCount[company.name] || 0;
+            const companyElement = document.querySelector(`[data-company="${company.name}"]`);
+            if (companyElement) {
+                const counterElement = companyElement.querySelector('.company-counter');
+                if (counterElement) {
+                    counterElement.textContent = `${count} ${count === 1 ? 'item' : 'itens'}`;
+                }
+            }
+        });
+    },
+
+    /**
+     * Atualiza os itens recentes no dashboard
+     */
+    updateRecentItems() {
+        const recentItemsContainer = document.getElementById('recentItems');
+        if (!recentItemsContainer) return;
+
+        const recentItems = this.currentItems.slice(0, 5);
+
+        if (recentItems.length === 0) {
+            recentItemsContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-box-open text-4xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                    <p class="text-gray-500 dark:text-gray-400 font-medium">Nenhum item recente</p>
+                </div>
+            `;
+            return;
+        }
+
+        recentItemsContainer.innerHTML = recentItems.map(item => {
+            const moduleData = item.module_data || {};
+            return `
+                <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                     data-action="view-item" data-item-id="${item.id}">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-800 dark:text-gray-200 text-sm mb-1">
+                            ${item.name || 'Item sem nome'}
+                        </h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            ${item.category || 'Sem categoria'} ${moduleData.company ? `• ${moduleData.company}` : ''}
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs px-2 py-1 rounded-full ${
+                            item.status === 'ativo' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                            item.status === 'manutencao' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                            item.status === 'inativo' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                        }">
+                            ${formatStatus(item.status)}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    /**
+     * Atualiza a paginação
+     */
+    updatePagination() {
+        const totalPages = Math.ceil(this.filteredItems.length / this.itemsPerPage);
+        const paginationContainer = document.getElementById('paginationContainer');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        const pageNumbers = document.getElementById('pageNumbers');
+
+        if (!paginationContainer) return;
+
+        if (totalPages <= 1) {
+            paginationContainer.classList.add('hidden');
+            return;
+        }
+
+        paginationContainer.classList.remove('hidden');
+
+        // Atualizar informações
+        const startItem = (this.currentPage - 1) * this.itemsPerPage + 1;
+        const endItem = Math.min(this.currentPage * this.itemsPerPage, this.filteredItems.length);
+        
+        if (paginationInfo) {
+            paginationInfo.textContent = `${startItem}-${endItem} de ${this.filteredItems.length}`;
+        }
+
+        // Atualizar botões
+        if (prevPageBtn) {
+            prevPageBtn.disabled = this.currentPage === 1;
+        }
+        
+        if (nextPageBtn) {
+            nextPageBtn.disabled = this.currentPage === totalPages;
+        }
+
+        // Atualizar números das páginas
+        if (pageNumbers) {
+            pageNumbers.innerHTML = '';
+            
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.className = `px-3 py-1 rounded-lg text-sm transition-all duration-200 ${
+                    i === this.currentPage 
+                        ? 'bg-primary-600 text-white' 
+                        : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`;
+                
+                pageBtn.addEventListener('click', () => {
+                    this.currentPage = i;
+                    this.updateDisplay();
+                });
+                
+                pageNumbers.appendChild(pageBtn);
+            }
+        }
+    },
+
+    /**
+     * Atualiza as tags de filtros ativos
+     */
+    updateFilterTags() {
+        const filterTags = document.getElementById('filterTags');
+        if (!filterTags) return;
+
+        filterTags.innerHTML = '';
+
+        Object.entries(this.filters).forEach(([key, value]) => {
+            if (value) {
+                const tag = document.createElement('span');
+                tag.className = 'inline-flex items-center gap-1 px-3 py-1 bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 rounded-full text-sm';
+                
+                let displayValue = value;
+                if (key === 'category' || key === 'collaborator') {
+                    // Buscar nome real da categoria/colaborador
+                    const select = document.getElementById(`${key}Filter`);
+                    if (select) {
+                        const option = select.querySelector(`option[value="${value}"]`);
+                        if (option) displayValue = option.textContent;
+                    }
+                }
+
+                tag.innerHTML = `
+                    ${key}: ${displayValue}
+                    <button data-action="remove-filter" data-filter-key="${key}" class="ml-1 hover:bg-primary-200 dark:hover:bg-primary-800 rounded-full p-0.5">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                `;
+                
+                filterTags.appendChild(tag);
+            }
+        });
+    },
+
+    /**
+     * Remove um filtro específico
+     */
+    removeFilter(filterKey) {
+        this.filters[filterKey] = '';
+        
+        // Limpar o campo correspondente
+        const input = document.getElementById(`${filterKey}Filter`) || document.getElementById('searchInput');
+        if (input) {
+            input.value = '';
+        }
+        
+        this.applyFilters();
+    },
+
+    /**
+     * Limpa todos os filtros
+     */
+    clearAllFilters() {
+        Object.keys(this.filters).forEach(key => {
+            this.filters[key] = '';
+        });
+        
+        // Limpar todos os campos
+        const searchInput = document.getElementById('searchInput');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const collaboratorFilter = document.getElementById('collaboratorFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        
+        if (searchInput) searchInput.value = '';
+        if (categoryFilter) categoryFilter.value = '';
+        if (collaboratorFilter) collaboratorFilter.value = '';
+        if (statusFilter) statusFilter.value = '';
+        
+        this.applyFilters();
+    }
+};
+
+// Exportar para uso global
+window.AdvancedSearch = AdvancedSearch;
+window.DragDropSystem = DragDropSystem;
+window.DOMElements = DOMElements;
+window.handleEditItem = handleEditItem;
+window.updateAllQRCodes = updateAllQRCodes;
+window.loadDropdownData = loadDropdownData;
+window.populateCategoriesDropdown = populateCategoriesDropdown;
+window.populateCollaboratorsDropdown = populateCollaboratorsDropdown;
+window.setupDropdownEventListeners = setupDropdownEventListeners;
+
+// Inicializar o sistema quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+        ToastSystem.init();
+        AdvancedSearch.init();
+        DragDropSystem.init();
+        TabSystem.init(); // Inicializar sistema de abas
+        setupGlobalEventListeners(); // Configurar event listeners globais
+    }
+});
+
+/**
+ * Configura event listeners globais para elementos com data-action
+ */
+function setupGlobalEventListeners() {
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+        
+        const action = target.dataset.action;
+        
+        switch (action) {
+            case 'close-toast':
+                const toastId = target.dataset.toastId;
+                if (toastId) {
+                    ToastSystem.hide(toastId);
+                }
+                break;
+                
+            case 'view-item':
+                const itemId = target.dataset.itemId;
+                if (itemId) {
+                    openViewModal(itemId);
+                }
+                break;
+                
+            case 'remove-filter':
+                const filterKey = target.dataset.filterKey;
+                if (filterKey) {
+                    AdvancedSearch.removeFilter(filterKey);
+                }
+                break;
+                
+            case 'update-qr-codes':
+                updateAllQRCodes();
+                break;
+                
+            case 'remove-image-preview':
+                removeImagePreview();
+                break;
+                
+            case 'switch-tab':
+                const tab = target.dataset.tab;
+                if (tab) {
+                    switchTab(tab);
+                }
+                break;
+        }
+    });
+}
+
+/**
+ * Função para atualizar dados dos dropdowns (categorias e colaboradores)
+ */
 async function loadDropdownData() {
     try {
+        console.log('📋 Carregando dados dos dropdowns...');
+        
         const [categoriesResponse, collaboratorsResponse] = await Promise.all([
             fetch('/api/categories'),
             fetch('/api/collaborators')
@@ -2439,27 +1538,71 @@ async function loadDropdownData() {
         const categoriesData = await categoriesResponse.json();
         const collaboratorsData = await collaboratorsResponse.json();
 
-        if (categoriesData.success) {
-            AppState.categories = categoriesData.data;
-            populateCategoriesDropdown();
-        }
+        const result = {
+            categories: categoriesData.success ? categoriesData.data : [],
+            collaborators: collaboratorsData.success ? collaboratorsData.data : []
+        };
 
-        if (collaboratorsData.success) {
-            AppState.collaborators = collaboratorsData.data;
-            populateCollaboratorsDropdown();
-        }
+        console.log('📋 Dados dos dropdowns carregados:', result);
+        return result;
     } catch (error) {
         console.error('Erro ao carregar dados dos dropdowns:', error);
+        return {
+            categories: [],
+            collaborators: []
+        };
     }
 }
 
-function populateCategoriesDropdown() {
-    const select = document.getElementById('itemCategory');
+/**
+ * Função para atualizar todos os QR codes
+ */
+async function updateAllQRCodes() {
+    try {
+        console.log('🔄 Iniciando atualização de QR codes...');
+        
+        // Mostrar loading
+        ToastSystem.info('🔄 Atualizando QR codes...');
+        
+        // Fazer requisição para atualizar QR codes
+        const response = await fetch('/api/qr-codes/update-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            ToastSystem.success(`✅ ${result.updated || 0} QR codes atualizados com sucesso!`);
+            
+            // Recarregar itens se o AdvancedSearch estiver disponível
+            if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                await window.AdvancedSearch.loadItems();
+            }
+        } else {
+            throw new Error(result.message || 'Erro ao atualizar QR codes');
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar QR codes:', error);
+        ToastSystem.error('❌ Erro ao atualizar QR codes: ' + error.message);
+    }
+}
+
+/**
+ * Função para editar item - alias para openEditModal
+ */
+/**
+ * Função para popular dropdown de categorias
+ */
+function populateCategoriesDropdown(categories = [], selectId = 'itemCategory') {
+    const select = document.getElementById(selectId);
     if (!select) return;
     
     select.innerHTML = '<option value="">Selecione uma categoria</option>';
     
-    AppState.categories.forEach(category => {
+    categories.forEach(category => {
         const option = document.createElement('option');
         option.value = category.id;
         option.textContent = category.nome;
@@ -2475,13 +1618,16 @@ function populateCategoriesDropdown() {
     select.appendChild(createOption);
 }
 
-function populateCollaboratorsDropdown() {
-    const select = document.getElementById('itemCollaborator');
+/**
+ * Função para popular dropdown de colaboradores
+ */
+function populateCollaboratorsDropdown(collaborators = [], selectId = 'itemCollaborator') {
+    const select = document.getElementById(selectId);
     if (!select) return;
     
     select.innerHTML = '<option value="">Selecione um colaborador</option>';
     
-    AppState.collaborators.forEach(collaborator => {
+    collaborators.forEach(collaborator => {
         const option = document.createElement('option');
         option.value = collaborator.id;
         option.textContent = collaborator.nome;
@@ -2497,59 +1643,81 @@ function populateCollaboratorsDropdown() {
     select.appendChild(createOption);
 }
 
+/**
+ * Função para configurar event listeners dos dropdowns
+ */
 function setupDropdownEventListeners() {
-    // Handle category dropdown changes
+    // Category dropdown
     const categorySelect = document.getElementById('itemCategory');
     if (categorySelect) {
         categorySelect.addEventListener('change', function() {
             if (this.value === 'create_new') {
-                document.getElementById('categoryModal').classList.remove('hidden');
+                const modal = document.getElementById('categoryModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
                 this.value = ''; // Reset selection
             }
         });
     }
 
-    // Handle collaborator dropdown changes
+    // Collaborator dropdown
     const collaboratorSelect = document.getElementById('itemCollaborator');
     if (collaboratorSelect) {
         collaboratorSelect.addEventListener('change', function() {
             if (this.value === 'create_new') {
-                document.getElementById('collaboratorModal').classList.remove('hidden');
+                const modal = document.getElementById('collaboratorModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
                 this.value = ''; // Reset selection
             }
         });
     }
 
-    // Modal handlers
+    // Setup modal close event listeners
+    setupModalEventListeners();
+}
+
+/**
+ * Função para configurar event listeners dos modais
+ */
+function setupModalEventListeners() {
+    // Category Modal - Close buttons
     const closeCategoryModal = document.getElementById('closeCategoryModal');
-    if (closeCategoryModal) {
-        closeCategoryModal.addEventListener('click', () => {
-            document.getElementById('categoryModal').classList.add('hidden');
-        });
-    }
-
     const cancelCategoryBtn = document.getElementById('cancelCategoryBtn');
-    if (cancelCategoryBtn) {
+    const categoryModal = document.getElementById('categoryModal');
+
+    if (closeCategoryModal && categoryModal) {
+        closeCategoryModal.addEventListener('click', () => {
+            categoryModal.classList.add('hidden');
+        });
+    }
+
+    if (cancelCategoryBtn && categoryModal) {
         cancelCategoryBtn.addEventListener('click', () => {
-            document.getElementById('categoryModal').classList.add('hidden');
+            categoryModal.classList.add('hidden');
         });
     }
 
+    // Collaborator Modal - Close buttons
     const closeCollaboratorModal = document.getElementById('closeCollaboratorModal');
-    if (closeCollaboratorModal) {
-        closeCollaboratorModal.addEventListener('click', () => {
-            document.getElementById('collaboratorModal').classList.add('hidden');
-        });
-    }
-
     const cancelCollaboratorBtn = document.getElementById('cancelCollaboratorBtn');
-    if (cancelCollaboratorBtn) {
-        cancelCollaboratorBtn.addEventListener('click', () => {
-            document.getElementById('collaboratorModal').classList.add('hidden');
+    const collaboratorModal = document.getElementById('collaboratorModal');
+
+    if (closeCollaboratorModal && collaboratorModal) {
+        closeCollaboratorModal.addEventListener('click', () => {
+            collaboratorModal.classList.add('hidden');
         });
     }
 
-    // Category form submission
+    if (cancelCollaboratorBtn && collaboratorModal) {
+        cancelCollaboratorBtn.addEventListener('click', () => {
+            collaboratorModal.classList.add('hidden');
+        });
+    }
+
+    // Category Form submission
     const categoryForm = document.getElementById('categoryForm');
     if (categoryForm) {
         categoryForm.addEventListener('submit', async (e) => {
@@ -2572,29 +1740,32 @@ function setupDropdownEventListeners() {
                 const result = await response.json();
 
                 if (result.success) {
-                    // Add new category to the list
-                    AppState.categories.push(result.data);
-                    populateCategoriesDropdown();
+                    // Recarregar dropdowns
+                    const dropdownData = await loadDropdownData();
+                    populateCategoriesDropdown(dropdownData.categories, 'itemCategory');
                     
-                    // Select the new category
-                    document.getElementById('itemCategory').value = result.data.id;
+                    // Selecionar a nova categoria
+                    const categorySelect = document.getElementById('itemCategory');
+                    if (categorySelect) {
+                        categorySelect.value = result.data.id;
+                    }
                     
-                    // Close modal and reset form
-                    document.getElementById('categoryModal').classList.add('hidden');
+                    // Fechar modal e resetar form
+                    categoryModal.classList.add('hidden');
                     categoryForm.reset();
                     
-                    showNotification('Categoria criada com sucesso!', 'success');
+                    ToastSystem.success('✅ Categoria criada com sucesso!');
                 } else {
-                    showNotification('Erro ao criar categoria: ' + (result.error || result.message || 'Erro desconhecido'), 'error');
+                    ToastSystem.error('❌ Erro ao criar categoria: ' + result.message);
                 }
             } catch (error) {
                 console.error('Erro ao criar categoria:', error);
-                showNotification('Erro ao criar categoria', 'error');
+                ToastSystem.error('❌ Erro ao criar categoria');
             }
         });
     }
 
-    // Collaborator form submission
+    // Collaborator Form submission
     const collaboratorForm = document.getElementById('collaboratorForm');
     if (collaboratorForm) {
         collaboratorForm.addEventListener('submit', async (e) => {
@@ -2619,41 +1790,116 @@ function setupDropdownEventListeners() {
                 const result = await response.json();
 
                 if (result.success) {
-                    // Add new collaborator to the list
-                    AppState.collaborators.push(result.data);
-                    populateCollaboratorsDropdown();
+                    // Recarregar dropdowns
+                    const dropdownData = await loadDropdownData();
+                    populateCollaboratorsDropdown(dropdownData.collaborators, 'itemCollaborator');
                     
-                    // Select the new collaborator
-                    document.getElementById('itemCollaborator').value = result.data.id;
+                    // Selecionar o novo colaborador
+                    const collaboratorSelect = document.getElementById('itemCollaborator');
+                    if (collaboratorSelect) {
+                        collaboratorSelect.value = result.data.id;
+                    }
                     
-                    // Close modal and reset form
-                    document.getElementById('collaboratorModal').classList.add('hidden');
+                    // Fechar modal e resetar form
+                    collaboratorModal.classList.add('hidden');
                     collaboratorForm.reset();
                     
-                    showNotification('Colaborador criado com sucesso!', 'success');
+                    ToastSystem.success('✅ Colaborador criado com sucesso!');
                 } else {
-                    showNotification('Erro ao criar colaborador: ' + (result.error || result.message || 'Erro desconhecido'), 'error');
+                    ToastSystem.error('❌ Erro ao criar colaborador: ' + result.message);
                 }
             } catch (error) {
                 console.error('Erro ao criar colaborador:', error);
-                showNotification('Erro ao criar colaborador', 'error');
+                ToastSystem.error('❌ Erro ao criar colaborador');
+            }
+        });
+    }
+
+    // Close modals when clicking outside
+    if (categoryModal) {
+        categoryModal.addEventListener('click', (e) => {
+            if (e.target === categoryModal) {
+                categoryModal.classList.add('hidden');
+            }
+        });
+    }
+
+    if (collaboratorModal) {
+        collaboratorModal.addEventListener('click', (e) => {
+            if (e.target === collaboratorModal) {
+                collaboratorModal.classList.add('hidden');
             }
         });
     }
 }
 
-// Make functions globally available
-window.handleImagePreview = handleImagePreview;
-window.removeImagePreview = removeImagePreview;
-window.openEditModal = openEditModal;
-window.openViewModal = openViewModal;
-window.deleteItem = deleteItem;
-window.AdvancedSearch = AdvancedSearch;
-window.DragDropSystem = DragDropSystem;
-window.DOMElements = DOMElements;
-window.handleEditItem = handleEditItem;
-window.updateAllQRCodes = updateAllQRCodes;
-window.loadDropdownData = loadDropdownData;
-window.populateCategoriesDropdown = populateCategoriesDropdown;
-window.populateCollaboratorsDropdown = populateCollaboratorsDropdown;
-window.setupDropdownEventListeners = setupDropdownEventListeners;
+/**
+ * Função para carregar dados dos dropdowns (categorias e colaboradores)
+ */
+async function loadDropdownData() {
+    try {
+        console.log('📋 Carregando dados dos dropdowns...');
+        
+        const [categoriesResponse, collaboratorsResponse] = await Promise.all([
+            fetch('/api/categories'),
+            fetch('/api/collaborators')
+        ]);
+
+        const categoriesData = await categoriesResponse.json();
+        const collaboratorsData = await collaboratorsResponse.json();
+
+        const result = {
+            categories: categoriesData.success ? categoriesData.data : [],
+            collaborators: collaboratorsData.success ? collaboratorsData.data : []
+        };
+
+        console.log('📋 Dados dos dropdowns carregados:', result);
+        return result;
+    } catch (error) {
+        console.error('Erro ao carregar dados dos dropdowns:', error);
+        return {
+            categories: [],
+            collaborators: []
+        };
+    }
+}
+
+/**
+ * Função para atualizar todos os QR codes
+ */
+async function updateAllQRCodes() {
+    try {
+        console.log('🔄 Iniciando atualização de QR codes...');
+        
+        // Mostrar loading
+        ToastSystem.info('🔄 Atualizando QR codes...');
+        
+        // Fazer requisição para atualizar QR codes
+        const response = await fetch('/api/qr-codes/update-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            ToastSystem.success(`✅ ${result.updated || 0} QR codes atualizados com sucesso!`);
+            
+            // Recarregar itens se o AdvancedSearch estiver disponível
+            if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                await window.AdvancedSearch.loadItems();
+            }
+        } else {
+            throw new Error(result.message || 'Erro ao atualizar QR codes');
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar QR codes:', error);
+        ToastSystem.error('❌ Erro ao atualizar QR codes: ' + error.message);
+    }
+}
+
+/**
+ * Função para editar item - alias para openEditModal
+ */

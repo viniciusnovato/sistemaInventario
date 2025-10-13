@@ -244,12 +244,12 @@ function populateForm(item) {
     document.getElementById('itemSerial').value = item.module_data?.serial_number || '';
     document.getElementById('itemValue').value = item.module_data?.value || '';
 
-    // Set category and collaborator after dropdowns are loaded
-    if (item.module_data?.categoria_id) {
-        document.getElementById('itemCategory').value = item.module_data.categoria_id;
+    // Set category and collaborator - corrigindo para usar os campos corretos
+    if (item.categoria_id) {
+        document.getElementById('itemCategory').value = item.categoria_id;
     }
-    if (item.module_data?.colaborador_id) {
-        document.getElementById('itemCollaborator').value = item.module_data.colaborador_id;
+    if (item.colaborador_id) {
+        document.getElementById('itemCollaborator').value = item.colaborador_id;
     }
 
     // Handle dates

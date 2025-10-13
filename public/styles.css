@@ -274,22 +274,41 @@ body {
     }
 }
 
-/* Botões de ação nos cards */
-.inventory-item button[data-action="edit"] {
+/* Botões de ação nos cards - Layout reorganizado */
+.inventory-item button[data-action="view"] {
     background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
     color: white !important;
     border: none !important;
     border-radius: 12px !important;
-    padding: 8px 16px !important;
+    padding: 10px 16px !important;
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    width: 100% !important;
 }
 
-.inventory-item button[data-action="edit"]:hover {
+.inventory-item button[data-action="view"]:hover {
     background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+}
+
+.inventory-item button[data-action="edit"] {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 10px 12px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+    width: 100% !important;
+}
+
+.inventory-item button[data-action="edit"]:hover {
+    background: linear-gradient(135deg, #d97706, #b45309) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4) !important;
 }
 
 .inventory-item button[data-action="delete"] {
@@ -297,10 +316,11 @@ body {
     color: white !important;
     border: none !important;
     border-radius: 12px !important;
-    padding: 8px 12px !important;
+    padding: 10px 12px !important;
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+    width: 100% !important;
 }
 
 .inventory-item button[data-action="delete"]:hover {
@@ -309,21 +329,38 @@ body {
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
 }
 
-.inventory-item button[data-action="view-qr"] {
+.inventory-item button[data-action="qr"] {
     background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
     color: white !important;
     border: none !important;
     border-radius: 12px !important;
-    padding: 8px 12px !important;
+    padding: 10px 16px !important;
     font-weight: 600 !important;
     transition: all 0.3s ease !important;
     box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3) !important;
+    width: 100% !important;
 }
 
-.inventory-item button[data-action="view-qr"]:hover {
+.inventory-item button[data-action="qr"]:hover {
     background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4) !important;
+}
+
+/* Layout responsivo para botões */
+@media (max-width: 640px) {
+    .inventory-item button[data-action] {
+        padding: 8px 12px !important;
+        font-size: 0.875rem !important;
+    }
+    
+    .inventory-item button[data-action] span {
+        font-size: 0.75rem !important;
+    }
+    
+    .inventory-item button[data-action] i {
+        font-size: 0.75rem !important;
+    }
 }
 
 /* Ícones nos botões */
