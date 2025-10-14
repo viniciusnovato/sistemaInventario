@@ -600,18 +600,74 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📸 Imagem do Item</label>
                             <div class="relative">
                                 <input type="file" id="itemImage" name="image" accept="image/*"
-                                    class="hidden" onchange="handleImagePreview(this)">
+                                    class="hidden">
                                 <button type="button" id="selectImageBtn"
                                     class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600/70 flex items-center justify-center gap-2">
                                     <i class="fas fa-camera"></i>
                                     <span id="imageButtonText">Selecionar Imagem</span>
                                 </button>
                                 <div id="imagePreview" class="mt-2 hidden">
-                                    <img id="previewImg" class="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-600" alt="Preview">
-                                    <button type="button" data-action="remove-image-preview"
-                                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors">
-                                        ×
-                                    </button>
+                                    <div class="relative">
+                                        <img id="previewImg" class="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-600" alt="Preview">
+                                        <button type="button" data-action="remove-image-preview"
+                                            class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors">
+                                            ×
+                                        </button>
+                                    </div>
+                                    <div class="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-image text-blue-500"></i>
+                                            <span id="imageFileName" class="text-sm text-gray-700 dark:text-gray-300 font-medium"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Barra de progresso para imagem -->
+                                <div id="imageUploadProgress" class="mt-2 hidden">
+                                    <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                                        <div id="imageProgressBar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span id="imageProgressText" class="text-gray-600 dark:text-gray-400">Processando...</span>
+                                        <span id="imageProgressPercent" class="text-gray-600 dark:text-gray-400">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 tracking-wide">📄 Documento PDF</label>
+                            <div class="relative">
+                                <input type="file" id="itemPdf" name="pdf" accept=".pdf"
+                                    class="hidden">
+                                <button type="button" id="selectPdfBtn"
+                                    class="w-full px-4 py-3 bg-white/70 dark:bg-gray-700/70 border border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 dark:focus:border-primary-400 transition-all duration-300 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600/70 flex items-center justify-center gap-2">
+                                    <i class="fas fa-file-pdf text-red-500"></i>
+                                    <span id="pdfButtonText">Selecionar PDF</span>
+                                </button>
+                                
+                                <!-- Progress Bar -->
+                                <div id="pdfUploadProgress" class="mt-2 hidden">
+                                    <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                                        <div id="pdfProgressBar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                    <div class="flex justify-between items-center text-xs text-gray-600 dark:text-gray-400">
+                                        <span id="pdfProgressText">Preparando upload...</span>
+                                        <span id="pdfProgressPercent">0%</span>
+                                    </div>
+                                </div>
+                                
+                                <div id="pdfPreview" class="mt-2 hidden">
+                                    <div class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-file-pdf text-red-500"></i>
+                                            <span id="pdfFileName" class="text-sm text-gray-700 dark:text-gray-300"></span>
+                                        </div>
+                                        <button type="button" data-action="remove-pdf-preview"
+                                            class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors">
+                                            ×
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -923,6 +979,101 @@
                 // Mostrar informações do usuário
                 displayUserInfo();
             }, 200);
+        });
+
+        // Função para preview de PDF
+        function handlePdfPreview(event) {
+            const input = event.target;
+            const file = input.files && input.files[0];
+            const pdfPreview = document.getElementById('pdfPreview');
+            const pdfFileName = document.getElementById('pdfFileName');
+            const pdfButtonText = document.getElementById('pdfButtonText');
+            const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+            
+            if (file && file.type === 'application/pdf') {
+                // Mostrar barra de progresso
+                pdfUploadProgress.classList.remove('hidden');
+                updateProgressBar(0, 'Arquivo selecionado...');
+                
+                // Simular progresso de validação
+                setTimeout(() => {
+                    updateProgressBar(50, 'Validando arquivo...');
+                    
+                    setTimeout(() => {
+                        updateProgressBar(100, 'Pronto para upload!');
+                        
+                        setTimeout(() => {
+                            // Esconder barra de progresso e mostrar preview
+                            pdfUploadProgress.classList.add('hidden');
+                            pdfFileName.textContent = file.name;
+                            pdfPreview.classList.remove('hidden');
+                            pdfButtonText.textContent = 'PDF Selecionado';
+                        }, 500);
+                    }, 800);
+                }, 500);
+            }
+        }
+
+        // Função para atualizar barra de progresso
+        function updateProgressBar(percent, text) {
+            const progressBar = document.getElementById('pdfProgressBar');
+            const progressText = document.getElementById('pdfProgressText');
+            const progressPercent = document.getElementById('pdfProgressPercent');
+            
+            if (progressBar) progressBar.style.width = percent + '%';
+            if (progressText) progressText.textContent = text;
+            if (progressPercent) progressPercent.textContent = percent + '%';
+        }
+
+        // Event listeners para PDF e Imagem
+        document.addEventListener('DOMContentLoaded', () => {
+            // Botão de selecionar PDF
+            document.getElementById('selectPdfBtn')?.addEventListener('click', () => {
+                document.getElementById('itemPdf').click();
+            });
+
+            // Botão de selecionar Imagem
+            document.getElementById('selectImageBtn')?.addEventListener('click', () => {
+                document.getElementById('itemImage').click();
+            });
+
+            // Input de PDF - quando arquivo é selecionado
+            document.getElementById('itemPdf')?.addEventListener('change', (event) => {
+                handlePdfPreview(event);
+            });
+
+            // Input de Imagem - quando arquivo é selecionado
+            document.getElementById('itemImage')?.addEventListener('change', (event) => {
+                handleImagePreview(event.target);
+            });
+
+            // Botão de remover PDF
+            document.addEventListener('click', (e) => {
+                if (e.target.matches('[data-action="remove-pdf-preview"]')) {
+                    const pdfInput = document.getElementById('itemPdf');
+                    const pdfPreview = document.getElementById('pdfPreview');
+                    const pdfButtonText = document.getElementById('pdfButtonText');
+                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+                    
+                    pdfInput.value = '';
+                    pdfPreview.classList.add('hidden');
+                    pdfUploadProgress.classList.add('hidden');
+                    pdfButtonText.textContent = 'Selecionar PDF';
+                }
+
+                // Botão de remover Imagem
+                if (e.target.matches('[data-action="remove-image-preview"]')) {
+                    const imageInput = document.getElementById('itemImage');
+                    const imagePreview = document.getElementById('imagePreview');
+                    const imageButtonText = document.getElementById('imageButtonText');
+                    const imageUploadProgress = document.getElementById('imageUploadProgress');
+                    
+                    imageInput.value = '';
+                    imagePreview.classList.add('hidden');
+                    imageUploadProgress.classList.add('hidden');
+                    imageButtonText.textContent = 'Selecionar Imagem';
+                }
+            });
         });
 
         // Mobile Menu Functionality

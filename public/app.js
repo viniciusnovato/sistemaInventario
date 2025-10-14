@@ -139,6 +139,147 @@ window.switchTab = switchTab;
 /**
  * Função para editar item - alias para openEditModal
  */
+function editItem(itemId) {
+    openEditModal(itemId);
+}
+
+// Event listener para o formulário de adicionar item
+document.addEventListener('DOMContentLoaded', () => {
+    const addItemForm = document.getElementById('addItemForm');
+    if (addItemForm) {
+        addItemForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const formData = new FormData(addItemForm);
+                
+                // Verificar se há uma imagem selecionada
+                const imageFile = document.getElementById('itemImage')?.files[0];
+                
+                if (imageFile) {
+                    // Mostrar progresso do upload da imagem
+                    const imageUploadProgress = document.getElementById('imageUploadProgress');
+                    const imagePreview = document.getElementById('imagePreview');
+                    
+                    if (imagePreview) imagePreview.classList.add('hidden');
+                    if (imageUploadProgress) imageUploadProgress.classList.remove('hidden');
+                    
+                    updateImageProgressBar(0, 'Iniciando upload da imagem...');
+                    
+                    // Upload da imagem para o Supabase Storage
+                    const imageFileName = `${Date.now()}_${imageFile.name}`;
+                    
+                    updateImageProgressBar(25, 'Enviando imagem...');
+                    
+                    const { data: imageUploadData, error: imageUploadError } = await supabase.storage
+                        .from('item-images')
+                        .upload(imageFileName, imageFile);
+                    
+                    if (imageUploadError) {
+                        if (imageUploadProgress) imageUploadProgress.classList.add('hidden');
+                        if (imagePreview) imagePreview.classList.remove('hidden');
+                        throw new Error('Erro ao fazer upload da imagem: ' + imageUploadError.message);
+                    }
+                    
+                    updateImageProgressBar(75, 'Upload da imagem concluído!');
+                    
+                    // Adicionar o caminho da imagem ao FormData
+                    formData.append('image_path', imageFileName);
+                    
+                    updateImageProgressBar(100, 'Processando imagem...');
+                }
+                
+                // Verificar se há um PDF selecionado
+                const pdfFile = document.getElementById('itemPdf')?.files[0];
+                
+                if (pdfFile) {
+                    // Mostrar progresso do upload
+                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+                    const pdfPreview = document.getElementById('pdfPreview');
+                    
+                    if (pdfPreview) pdfPreview.classList.add('hidden');
+                    if (pdfUploadProgress) pdfUploadProgress.classList.remove('hidden');
+                    
+                    updateProgressBar(0, 'Iniciando upload...');
+                    
+                    // Upload do PDF para o Supabase Storage
+                    const fileName = `${Date.now()}_${pdfFile.name}`;
+                    
+                    updateProgressBar(25, 'Enviando arquivo...');
+                    
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('item-pdfs')
+                        .upload(fileName, pdfFile);
+                    
+                    if (uploadError) {
+                        if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
+                        if (pdfPreview) pdfPreview.classList.remove('hidden');
+                        throw new Error('Erro ao fazer upload do PDF: ' + uploadError.message);
+                    }
+                    
+                    updateProgressBar(75, 'Upload concluído!');
+                    
+                    // Adicionar o caminho do PDF ao FormData
+                    formData.append('pdf_path', fileName);
+                    
+                    updateProgressBar(100, 'Processando...');
+                }
+                
+                // Enviar dados do item
+                const response = await fetch('/api/items', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    ToastSystem.success('✅ Item criado com sucesso!');
+                    addItemForm.reset();
+                    
+                    // Limpar preview da imagem e barra de progresso
+                    const imagePreview = document.getElementById('imagePreview');
+                    const imageButtonText = document.getElementById('imageButtonText');
+                    const imageUploadProgress = document.getElementById('imageUploadProgress');
+                    
+                    if (imagePreview) imagePreview.classList.add('hidden');
+                    if (imageUploadProgress) imageUploadProgress.classList.add('hidden');
+                    if (imageButtonText) imageButtonText.textContent = 'Selecionar Imagem';
+                    
+                    // Limpar preview do PDF e barra de progresso
+                    const pdfPreview = document.getElementById('pdfPreview');
+                    const pdfButtonText = document.getElementById('pdfButtonText');
+                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+                    
+                    if (pdfPreview) pdfPreview.classList.add('hidden');
+                    if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
+                    if (pdfButtonText) pdfButtonText.textContent = 'Selecionar PDF';
+                    
+                    // Recarregar itens se disponível
+                    if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                        await window.AdvancedSearch.loadItems();
+                    }
+                } else {
+                    // Em caso de erro, esconder progresso e mostrar preview novamente
+                    const imageUploadProgress = document.getElementById('imageUploadProgress');
+                    const imagePreview = document.getElementById('imagePreview');
+                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+                    const pdfPreview = document.getElementById('pdfPreview');
+                    
+                    if (imageUploadProgress) imageUploadProgress.classList.add('hidden');
+                    if (imagePreview && imageFile) imagePreview.classList.remove('hidden');
+                    if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
+                    if (pdfPreview && pdfFile) pdfPreview.classList.remove('hidden');
+                    
+                    throw new Error(result.message || 'Erro ao criar item');
+                }
+            } catch (error) {
+                console.error('Erro ao criar item:', error);
+                ToastSystem.error('❌ Erro ao criar item: ' + error.message);
+            }
+        });
+    }
+});
 function handleEditItem(itemId) {
     console.log('🔧 Editando item:', itemId);
     openEditModal(itemId);
@@ -661,20 +802,60 @@ const DragDropSystem = {
 // Global functions for onclick handlers
 // Image handling functions
 function handleImagePreview(input) {
-    const file = input.files[0];
+    const file = input.files && input.files[0];
+    
     if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const preview = document.getElementById('imagePreview');
-            const previewImg = document.getElementById('previewImg');
-            const buttonText = document.getElementById('imageButtonText');
+        // Mostrar barra de progresso
+        const progressDiv = document.getElementById('imageUploadProgress');
+        const preview = document.getElementById('imagePreview');
+        const buttonText = document.getElementById('imageButtonText');
+        
+        // Esconder preview e mostrar progresso
+        if (preview) preview.classList.add('hidden');
+        if (progressDiv) progressDiv.classList.remove('hidden');
+        if (buttonText) buttonText.textContent = 'Processando...';
+        
+        // Simular progresso de carregamento
+        updateImageProgressBar(0, 'Arquivo selecionado...');
+        
+        setTimeout(() => {
+            updateImageProgressBar(30, 'Validando imagem...');
             
-            previewImg.src = e.target.result;
-            preview.classList.remove('hidden');
-            buttonText.textContent = file.name;
-        };
-        reader.readAsDataURL(file);
+            setTimeout(() => {
+                updateImageProgressBar(60, 'Processando imagem...');
+                
+                setTimeout(() => {
+                    updateImageProgressBar(100, 'Pronto para upload!');
+                    
+                    // Após completar o progresso, mostrar o preview
+                    setTimeout(() => {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const previewImg = document.getElementById('previewImg');
+                            const imageFileName = document.getElementById('imageFileName');
+                            
+                            if (previewImg) previewImg.src = e.target.result;
+                            if (imageFileName) imageFileName.textContent = file.name;
+                            if (preview) preview.classList.remove('hidden');
+                            if (progressDiv) progressDiv.classList.add('hidden');
+                            if (buttonText) buttonText.textContent = file.name;
+                        };
+                        reader.readAsDataURL(file);
+                    }, 500);
+                }, 800);
+            }, 600);
+        }, 400);
     }
+}
+
+function updateImageProgressBar(percent, text) {
+    const progressBar = document.getElementById('imageProgressBar');
+    const progressText = document.getElementById('imageProgressText');
+    const progressPercent = document.getElementById('imageProgressPercent');
+    
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.textContent = text;
+    if (progressPercent) progressPercent.textContent = percent + '%';
 }
 
 function removeImagePreview() {
@@ -682,11 +863,15 @@ function removeImagePreview() {
     const previewImg = document.getElementById('previewImg');
     const buttonText = document.getElementById('imageButtonText');
     const fileInput = document.getElementById('itemImage');
+    const progressDiv = document.getElementById('imageUploadProgress');
+    const imageFileName = document.getElementById('imageFileName');
     
     if (preview) preview.classList.add('hidden');
     if (previewImg) previewImg.src = '';
     if (buttonText) buttonText.textContent = 'Selecionar Imagem';
     if (fileInput) fileInput.value = '';
+    if (progressDiv) progressDiv.classList.add('hidden');
+    if (imageFileName) imageFileName.textContent = '';
 }
 
 function convertFileToBase64(file) {
@@ -854,30 +1039,29 @@ const AdvancedSearch = {
         try {
             showLoading(true);
             
-            const { data: items, error } = await supabase
-                .from('sistemainventario')
-                .select(`
-                    *,
-                    categoriassistemainventario:categoria_id(nome),
-                    colaboradoressistemainventario:colaborador_id(nome)
-                `)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Erro ao carregar itens:', error);
+            const response = await fetch('/api/items');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                console.error('Erro ao carregar itens:', result.error);
                 ToastSystem.error('Erro ao carregar itens do inventário');
                 return;
             }
 
             // Processar os dados dos itens
-            this.currentItems = items.map(item => {
+            this.currentItems = result.data.map(item => {
                 const moduleData = item.module_data || {};
                 
                 return {
                     ...item,
-                    category: item.categoriassistemainventario?.nome || null,
-                    collaborator: item.colaboradoressistemainventario?.nome || null,
-                    company: item.company || null
+                    category: item.category || null,
+                    collaborator: item.collaborator || null,
+                    company: moduleData.company || null
                 };
             });
 
@@ -888,7 +1072,7 @@ const AdvancedSearch = {
 
         } catch (error) {
             console.error('Erro ao carregar itens:', error);
-            ToastSystem.error('Erro ao conectar com o banco de dados');
+            ToastSystem.error(`Erro ao carregar itens: ${error.message}`);
         } finally {
             showLoading(false);
         }

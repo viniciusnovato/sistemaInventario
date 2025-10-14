@@ -266,6 +266,37 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Documents Section -->
+                    <div id="documentsSection" class="hidden mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-file-pdf mr-2 text-red-600"></i>
+                            Documentos
+                        </h3>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <p id="documentName" class="text-sm font-medium text-gray-900 dark:text-white">
+                                            Documento PDF
+                                        </p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Clique para visualizar
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button id="viewPdfButton" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        Visualizar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action Buttons -->
@@ -516,6 +547,37 @@
                 detailLastUpdateEl.textContent = new Date(currentItem.updated_at).toLocaleDateString('pt-BR');
             }
 
+            // Documentos PDF
+            if (item.module_data && item.module_data.pdf) {
+                const documentsSection = document.getElementById('documentsSection');
+                const viewPdfButton = document.getElementById('viewPdfButton');
+                const documentName = document.getElementById('documentName');
+                
+                if (documentsSection) {
+                    documentsSection.classList.remove('hidden');
+                    
+                    // Extrair nome real do arquivo PDF da URL
+                    if (documentName) {
+                        try {
+                            const url = new URL(item.module_data.pdf);
+                            const pathname = url.pathname;
+                            const filename = pathname.split('/').pop();
+                            const decodedFilename = decodeURIComponent(filename);
+                            documentName.textContent = decodedFilename || 'Documento PDF';
+                        } catch (error) {
+                            documentName.textContent = 'Documento PDF';
+                        }
+                    }
+                    
+                    // Configurar botão de visualizar PDF
+                    if (viewPdfButton) {
+                        viewPdfButton.onclick = function() {
+                            window.open(item.module_data.pdf, '_blank');
+                        };
+                    }
+                }
+            }
+
             // Atualizar imagem
             const itemImage = document.getElementById('itemImage');
             const itemImageContainer = document.getElementById('itemImageContainer');
@@ -660,6 +722,24 @@
                 
                 if (printButtonDesktop) {
                     printButtonDesktop.addEventListener('click', printQRCode);
+                }
+
+                // Adicionar event listeners para os botões de editar
+                const editButton = document.getElementById('editButton');
+                const editButtonDesktop = document.getElementById('editButtonDesktop');
+                
+                if (editButton) {
+                    editButton.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        editItem();
+                    });
+                }
+                
+                if (editButtonDesktop) {
+                    editButtonDesktop.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        editItem();
+                    });
                 }
                 
                 // Sincronizar os selects de tamanho QR Code

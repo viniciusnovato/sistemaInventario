@@ -91,6 +91,27 @@
                     </div>
                 </div>
 
+                <!-- Current PDF Display -->
+                <div id="currentPdfContainer" class="hidden p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <i class="fas fa-file-pdf mr-1"></i>
+                        Documento PDF Atual
+                    </label>
+                    <div class="flex items-center justify-center space-x-4 p-4 bg-white dark:bg-gray-600 rounded-lg">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                            <div>
+                                <p id="currentPdfName" class="text-sm font-medium text-gray-700 dark:text-gray-300"></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Documento PDF vinculado</p>
+                            </div>
+                        </div>
+                        <a id="currentPdfLink" href="#" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm transition-colors flex items-center space-x-1">
+                            <i class="fas fa-external-link-alt"></i>
+                            <span>Visualizar</span>
+                        </a>
+                    </div>
+                </div>
+
                 <!-- Form Fields -->
                 <div class="p-6 space-y-6">
                     <!-- Basic Information -->
@@ -267,15 +288,96 @@
 
                     <!-- Image Upload -->
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                        <label for="itemImage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
                             <i class="fas fa-camera mr-1"></i>
                             Nova Imagem do Item
                         </label>
-                        <input type="file" id="itemImage" name="image" accept="image/*"
-                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        
+                        <!-- Image Selection Button -->
+                        <div class="mb-4">
+                            <button type="button" id="selectImageBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                                <i class="fas fa-image"></i>
+                                <span id="imageButtonText">Selecionar Imagem</span>
+                            </button>
+                            <input type="file" id="itemImage" name="image" accept="image/*" class="hidden">
+                        </div>
+
+                        <!-- Image Preview -->
+                        <div id="imagePreview" class="hidden mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <i class="fas fa-image mr-1"></i>
+                                    Preview da Imagem
+                                </span>
+                                <button type="button" data-action="remove-image-preview" class="text-red-600 hover:text-red-700 text-sm">
+                                    <i class="fas fa-times mr-1"></i>
+                                    Remover
+                                </button>
+                            </div>
+                            <div class="text-center">
+                                <img id="previewImg" class="max-w-full h-32 object-contain mx-auto rounded-lg shadow-md" alt="Preview da imagem">
+                                <p id="imageFileName" class="mt-2 text-sm text-gray-600 dark:text-gray-400"></p>
+                            </div>
+                        </div>
+
+                        <!-- Image Upload Progress -->
+                        <div id="imageUploadProgress" class="hidden mb-4 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                    <i class="fas fa-upload mr-1"></i>
+                                    Upload da Imagem
+                                </span>
+                                <span id="imageProgressText" class="text-sm text-blue-600 dark:text-blue-400">0%</span>
+                            </div>
+                            <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                <div id="imageProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="imageProgressMessage" class="mt-2 text-sm text-blue-600 dark:text-blue-400">Preparando...</p>
+                        </div>
+
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
                             <i class="fas fa-info-circle mr-1"></i>
                             Deixe em branco para manter a imagem atual
+                        </p>
+                    </div>
+
+                    <!-- PDF Upload -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                            <i class="fas fa-file-pdf mr-1"></i>
+                            Documentos PDF
+                        </label>
+                        
+                        <!-- PDF Selection Button -->
+                        <div class="mb-4">
+                            <button type="button" id="selectPdfBtn" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                                <i class="fas fa-file-pdf"></i>
+                                <span id="pdfButtonText">Adicionar PDF</span>
+                            </button>
+                            <input type="file" id="itemPdf" name="pdf" accept=".pdf" multiple class="hidden">
+                        </div>
+
+                        <!-- PDF Previews Container -->
+                        <div id="pdfPreviewsContainer" class="space-y-3 mb-4"></div>
+
+                        <!-- PDF Upload Progress -->
+                        <div id="pdfUploadProgress" class="hidden mb-4 p-4 bg-red-50 dark:bg-red-900 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-red-700 dark:text-red-300">
+                                    <i class="fas fa-upload mr-1"></i>
+                                    Upload dos PDFs
+                                </span>
+                                <span id="progressText" class="text-sm text-red-600 dark:text-red-400">0%</span>
+                            </div>
+                            <div class="w-full bg-red-200 dark:bg-red-800 rounded-full h-2">
+                                <div id="progressBar" class="bg-red-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="progressMessage" class="mt-2 text-sm text-red-600 dark:text-red-400">Preparando...</p>
+                        </div>
+
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Você pode adicionar múltiplos documentos PDF
                         </p>
                     </div>
                 </div>

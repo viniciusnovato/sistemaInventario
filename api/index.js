@@ -26,10 +26,10 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024 // 5MB
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
         } else {
-            cb(new Error('Apenas arquivos de imagem são permitidos'), false);
+            cb(new Error('Apenas arquivos de imagem e PDF são permitidos'), false);
         }
     }
 });
@@ -87,6 +87,32 @@ async function uploadImageToStorage(file, fileName) {
         return publicUrlData.publicUrl;
     } catch (error) {
         console.error('Erro ao fazer upload da imagem:', error);
+        throw error;
+    }
+}
+
+// Função para fazer upload de PDF para o Supabase Storage
+async function uploadPdfToStorage(file, fileName) {
+    try {
+        const { data, error } = await supabaseAdmin.storage
+            .from('item-pdfs')
+            .upload(fileName, file.buffer, {
+                contentType: file.mimetype,
+                upsert: true
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        // Obter URL pública do PDF
+        const { data: publicUrlData } = supabaseAdmin.storage
+            .from('item-pdfs')
+            .getPublicUrl(fileName);
+
+        return publicUrlData.publicUrl;
+    } catch (error) {
+        console.error('Erro ao fazer upload do PDF:', error);
         throw error;
     }
 }
@@ -303,7 +329,10 @@ app.get('/api/items/:id', async (req, res) => {
 });
 
 // POST - Criar novo item
-app.post('/api/items', upload.single('image'), async (req, res) => {
+app.post('/api/items', upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'pdf', maxCount: 10 } // Permitir até 10 PDFs
+]), async (req, res) => {
     try {
         const {
             name,
@@ -330,18 +359,37 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
         }
 
         let imageUrl = null;
+        let pdfUrls = [];
 
         // Se há uma imagem, fazer upload para o Supabase Storage
-        if (req.file) {
-            const fileName = `${Date.now()}-${req.file.originalname}`;
+        if (req.files && req.files.image && req.files.image[0]) {
+            const imageFile = req.files.image[0];
+            const fileName = `${Date.now()}-${imageFile.originalname}`;
             try {
-                imageUrl = await uploadImageToStorage(req.file, fileName);
+                imageUrl = await uploadImageToStorage(imageFile, fileName);
             } catch (uploadError) {
                 console.error('Erro no upload da imagem:', uploadError);
                 return res.status(500).json({
                     error: 'Erro ao fazer upload da imagem',
                     details: uploadError.message
                 });
+            }
+        }
+
+        // Se há PDFs, fazer upload para o Supabase Storage
+        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            for (const pdfFile of req.files.pdf) {
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${pdfFile.originalname}`;
+                try {
+                    const pdfUrl = await uploadPdfToStorage(pdfFile, fileName);
+                    pdfUrls.push(pdfUrl);
+                } catch (uploadError) {
+                    console.error('Erro no upload do PDF:', uploadError);
+                    return res.status(500).json({
+                        error: 'Erro ao fazer upload do PDF',
+                        details: uploadError.message
+                    });
+                }
             }
         }
 
@@ -356,6 +404,7 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
             status: status.trim(),
             module_type: 'inventory',
             data_type: 'item',
+            pdfs: pdfUrls, // Novo campo para múltiplos PDFs
             module_data: {
                 company: company.trim(),
                 value: value ? parseFloat(value) : null,
@@ -364,7 +413,8 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
                 serial_number: serial_number?.trim() || null,
                 purchase_date: purchase_date || null,
                 warranty_date: warranty_date || null,
-                image: imageUrl
+                image: imageUrl,
+                pdf: pdfUrls.length > 0 ? pdfUrls[0] : null // Manter compatibilidade com PDF único
             },
             metadata: {
                 created_by: 'system',
@@ -451,25 +501,34 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
 });
 
 // PUT - Atualizar item
-app.put('/api/items/:id', upload.single('image'), async (req, res) => {
+app.put('/api/items/:id', upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'pdf', maxCount: 10 } // Permitir até 10 PDFs
+]), async (req, res) => {
     try {
         const { id } = req.params;
-        const {
-            name,
-            description,
-            category,
+        const { 
+            name, 
+            description, 
+            category, 
+            company, 
+            location, 
+            status, 
+            value, 
+            brand, 
+            model, 
+            serial_number, 
+            purchase_date, 
+            warranty_date,
             categoria_id,
-            colaborador_id,
-            company,
-            location,
-            status,
-            value,
-            brand,
-            model,
-            serial_number,
-            purchase_date,
-            warranty_date
+            colaborador_id
         } = req.body;
+
+        // Debug logs
+        console.log('PUT /api/items/:id - Dados recebidos:');
+        console.log('Files:', req.files);
+        console.log('Body:', req.body);
+        console.log('PDFs recebidos:', req.files?.pdf?.length || 0);
 
         // Validação básica - agora aceita categoria_id ou category
         if (!name || (!categoria_id && !category) || !company || !status) {
@@ -478,10 +537,10 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
             });
         }
 
-        // Buscar o item atual para obter a imagem existente
+        // Buscar o item atual para obter a imagem e PDFs existentes
         const { data: currentItem, error: fetchError } = await supabase
             .from('sistemainventario')
-            .select('module_data')
+            .select('module_data, pdfs')
             .eq('id', id)
             .eq('module_type', 'inventory')
             .single();
@@ -500,12 +559,15 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
         }
 
         let imageUrl = currentItem.module_data.image; // Manter imagem existente por padrão
+        let pdfUrls = Array.isArray(currentItem.pdfs) ? [...currentItem.pdfs] : []; // Clonar array de PDFs existentes
+
+        console.log('PDFs existentes no item:', pdfUrls);
 
         // Se há uma nova imagem, fazer upload para o Supabase Storage
-        if (req.file) {
-            const fileName = `${Date.now()}-${req.file.originalname}`;
+        if (req.files && req.files.image && req.files.image[0]) {
+            const fileName = `${Date.now()}-${req.files.image[0].originalname}`;
             try {
-                imageUrl = await uploadImageToStorage(req.file, fileName);
+                imageUrl = await uploadImageToStorage(req.files.image[0], fileName);
                 
                 // Opcional: Remover imagem antiga do storage se existir
                 if (currentItem.module_data.image) {
@@ -526,7 +588,50 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
             }
         }
 
+        // Se há novos PDFs, fazer upload para o Supabase Storage
+        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            console.log('Fazendo upload de novos PDFs:', req.files.pdf.length);
+            for (const pdfFile of req.files.pdf) {
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${pdfFile.originalname}`;
+                try {
+                    const newPdfUrl = await uploadPdfToStorage(pdfFile, fileName);
+                    console.log('PDF uploaded:', newPdfUrl);
+                    pdfUrls.push(newPdfUrl);
+                } catch (uploadError) {
+                    console.error('Erro no upload do PDF:', uploadError);
+                    return res.status(500).json({
+                        error: 'Erro ao fazer upload do PDF',
+                        details: uploadError.message
+                    });
+                }
+            }
+        }
+
+        // Processar remoção de PDFs existentes se especificado
+        const removePdfs = req.body.removePdfs ? JSON.parse(req.body.removePdfs) : [];
+        console.log('PDFs para remover:', removePdfs);
+        if (removePdfs.length > 0) {
+            // Remover PDFs do storage
+            for (const pdfUrl of removePdfs) {
+                try {
+                    const fileName = pdfUrl.split('/').pop();
+                    if (fileName) {
+                        await supabase.storage
+                            .from('item-pdfs')
+                            .remove([fileName]);
+                        console.log('PDF removido do storage:', fileName);
+                    }
+                } catch (error) {
+                    console.warn('Erro ao remover PDF do storage:', error);
+                }
+            }
+            // Remover PDFs da lista
+            pdfUrls = pdfUrls.filter(url => !removePdfs.includes(url));
+            console.log('PDFs após remoção:', pdfUrls);
+        }
+
         const itemData = {
+            pdfs: pdfUrls, // Novo campo para múltiplos PDFs
             module_data: {
                 name: name.trim(),
                 description: description?.trim() || null,
@@ -540,12 +645,15 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
                 serial_number: serial_number?.trim() || null,
                 purchase_date: purchase_date || null,
                 warranty_date: warranty_date || null,
-                image: imageUrl
+                image: imageUrl,
+                pdf: pdfUrls.length > 0 ? pdfUrls[0] : null // Manter compatibilidade com PDF único
             },
             categoria_id: categoria_id || null,
             colaborador_id: colaborador_id || null,
             updated_at: new Date().toISOString()
         };
+
+        console.log('Dados finais para atualização:', JSON.stringify(itemData, null, 2));
 
         const { data, error } = await supabase
             .from('sistemainventario')
@@ -582,11 +690,74 @@ app.put('/api/items/:id', upload.single('image'), async (req, res) => {
     }
 });
 
+// Função para excluir arquivo do Supabase Storage
+async function deleteFileFromStorage(bucket, filePath) {
+    try {
+        if (!filePath) return { success: true };
+        
+        // Extrair apenas o nome do arquivo da URL
+        const fileName = filePath.split('/').pop();
+        
+        const { error } = await supabase.storage
+            .from(bucket)
+            .remove([fileName]);
+            
+        if (error) {
+            console.error(`Erro ao excluir arquivo ${fileName} do bucket ${bucket}:`, error);
+            return { success: false, error };
+        }
+        
+        console.log(`Arquivo ${fileName} excluído com sucesso do bucket ${bucket}`);
+        return { success: true };
+    } catch (error) {
+        console.error('Erro inesperado ao excluir arquivo:', error);
+        return { success: false, error };
+    }
+}
+
 // DELETE - Excluir item
 app.delete('/api/items/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Primeiro, buscar os dados do item para obter URLs dos arquivos
+        const { data: item, error: fetchError } = await supabase
+            .from('sistemainventario')
+            .select('*')
+            .eq('id', id)
+            .eq('module_type', 'inventory')
+            .single();
+
+        if (fetchError) {
+            console.error('Erro ao buscar item:', fetchError);
+            return res.status(404).json({ 
+                error: 'Item não encontrado',
+                details: fetchError.message 
+            });
+        }
+
+        // Excluir arquivos associados se existirem
+        const deletePromises = [];
+        
+        if (item.module_data && item.module_data.image) {
+            deletePromises.push(deleteFileFromStorage('item-images', item.module_data.image));
+        }
+        
+        if (item.module_data && item.module_data.pdf) {
+            deletePromises.push(deleteFileFromStorage('item-pdfs', item.module_data.pdf));
+        }
+
+        // Aguardar exclusão dos arquivos (não bloquear se houver erro)
+        if (deletePromises.length > 0) {
+            const results = await Promise.allSettled(deletePromises);
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    console.error(`Erro ao excluir arquivo ${index}:`, result.reason);
+                }
+            });
+        }
+
+        // Excluir o registro do banco de dados
         const { error } = await supabase
             .from('sistemainventario')
             .delete()
@@ -603,7 +774,7 @@ app.delete('/api/items/:id', async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Item excluído com sucesso'
+            message: 'Item e arquivos associados excluídos com sucesso'
         });
     } catch (err) {
         console.error('Erro inesperado:', err);
