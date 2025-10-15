@@ -27,7 +27,7 @@ const TabSystem = {
         this.setupEventListeners();
         this.showTab(this.currentTab);
     },
-    
+ 
     setupEventListeners() {
         // Adicionar event listeners para os botões de navegação
         const navTabs = document.querySelectorAll('.nav-tab');
@@ -107,6 +107,8 @@ const TabSystem = {
                 break;
         }
     },
+
+
 
     async loadAddItemDropdowns() {
         try {
@@ -940,13 +942,17 @@ const AdvancedSearch = {
     currentItems: [],
     filteredItems: [],
     currentPage: 1,
-    itemsPerPage: 20,
+    itemsPerPage: 10,
+    currentView: 'card', // Controle de visualização
+    sortOrder: 'asc', // Ordenação padrão A-Z
+    sortBy: 'name', // Campo de ordenação padrão
     filters: {
         search: '',
         category: '',
         collaborator: '',
         status: '',
-        company: ''
+        company: '',
+        priceRange: ''
     },
 
     /**
@@ -954,6 +960,7 @@ const AdvancedSearch = {
      */
     init() {
         this.setupEventListeners();
+        this.setupViewToggle();
         this.loadItems();
         console.log('🔍 Sistema de busca avançada inicializado');
     },
@@ -998,6 +1005,40 @@ const AdvancedSearch = {
             });
         }
 
+        // Filtro de empresa
+        const companyFilter = document.getElementById('companyFilter');
+        if (companyFilter) {
+            companyFilter.addEventListener('change', (e) => {
+                this.filters.company = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Filtro de faixa de preço
+        const priceRangeFilter = document.getElementById('priceRangeFilter');
+        if (priceRangeFilter) {
+            priceRangeFilter.addEventListener('change', (e) => {
+                this.filters.priceRange = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Ordenação
+        const sortBy = document.getElementById('sortBy');
+        if (sortBy) {
+            sortBy.addEventListener('change', (e) => {
+                const value = e.target.value;
+                if (value.includes('-desc')) {
+                    this.sortBy = value.replace('-desc', '');
+                    this.sortOrder = 'desc';
+                } else {
+                    this.sortBy = value;
+                    this.sortOrder = 'asc';
+                }
+                this.applyFilters();
+            });
+        }
+
         // Itens por página
         const itemsPerPageSelect = document.getElementById('itemsPerPage');
         if (itemsPerPageSelect) {
@@ -1030,6 +1071,78 @@ const AdvancedSearch = {
                 }
             });
         }
+
+        // Botão de limpar filtros
+        const clearAllFiltersBtn = document.getElementById('clearAllFilters');
+        if (clearAllFiltersBtn) {
+            clearAllFiltersBtn.addEventListener('click', () => {
+                this.clearAllFilters();
+            });
+        }
+
+        // Botão de exportar para Excel
+        const exportToExcelBtn = document.getElementById('exportToExcel');
+        if (exportToExcelBtn) {
+            exportToExcelBtn.addEventListener('click', () => {
+                this.exportToExcel();
+            });
+        }
+    },
+
+    /**
+     * Configura o toggle de visualização entre card e lista
+     */
+    setupViewToggle() {
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        const listViewBtn = document.getElementById('listViewBtn');
+        
+        if (cardViewBtn && listViewBtn) {
+            cardViewBtn.addEventListener('click', () => {
+                this.switchView('card');
+            });
+            
+            listViewBtn.addEventListener('click', () => {
+                this.switchView('list');
+            });
+        }
+    },
+
+    /**
+     * Alterna entre visualizações de card e lista
+     */
+    switchView(viewType) {
+        this.currentView = viewType;
+        
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        const listViewBtn = document.getElementById('listViewBtn');
+        const inventoryGrid = document.getElementById('inventoryGrid');
+        
+        if (viewType === 'card') {
+            // Ativar botão card
+            cardViewBtn.classList.add('bg-blue-600', 'text-white');
+            cardViewBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+            
+            // Desativar botão list
+            listViewBtn.classList.remove('bg-blue-600', 'text-white');
+            listViewBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+            
+            // Aplicar classes de grid para cards
+            inventoryGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+        } else {
+            // Ativar botão list
+            listViewBtn.classList.add('bg-blue-600', 'text-white');
+            listViewBtn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+            
+            // Desativar botão card
+            cardViewBtn.classList.remove('bg-blue-600', 'text-white');
+            cardViewBtn.classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+            
+            // Aplicar classes de lista
+            inventoryGrid.className = 'list-view space-y-4';
+        }
+        
+        // Recarregar a exibição com a nova visualização
+        this.updateDisplay();
     },
 
     /**
@@ -1061,11 +1174,14 @@ const AdvancedSearch = {
                     ...item,
                     category: item.category || null,
                     collaborator: item.collaborator || null,
-                    company: moduleData.company || null
+                    company: moduleData.company || null,
+                    status: moduleData.status || item.status || null
                 };
             });
 
             this.filteredItems = [...this.currentItems];
+            this.populateCategoryFilter();
+            this.populateCompanyFilter();
             this.updateDisplay();
             this.updateStats();
             this.updateRecentItems();
@@ -1076,6 +1192,56 @@ const AdvancedSearch = {
         } finally {
             showLoading(false);
         }
+    },
+
+    /**
+     * Popula o filtro de categorias dinamicamente
+     */
+    populateCategoryFilter() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (!categoryFilter) return;
+
+        // Obter todas as categorias únicas dos itens
+        const categories = [...new Set(this.currentItems
+            .map(item => item.category)
+            .filter(category => category && category.trim() !== '')
+        )].sort();
+
+        // Limpar opções existentes (exceto a primeira)
+        categoryFilter.innerHTML = '<option value="">Todas as categorias</option>';
+
+        // Adicionar opções das categorias encontradas
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            categoryFilter.appendChild(option);
+        });
+    },
+
+    /**
+     * Popula o filtro de empresas dinamicamente
+     */
+    populateCompanyFilter() {
+        const companyFilter = document.getElementById('companyFilter');
+        if (!companyFilter) return;
+
+        // Obter todas as empresas únicas dos itens
+        const companies = [...new Set(this.currentItems
+            .map(item => item.module_data?.company)
+            .filter(company => company && company.trim() !== '')
+        )].sort();
+
+        // Limpar opções existentes (exceto a primeira)
+        companyFilter.innerHTML = '<option value="">Todas as empresas</option>';
+
+        // Adicionar opções das empresas encontradas
+        companies.forEach(company => {
+            const option = document.createElement('option');
+            option.value = company;
+            option.textContent = company;
+            companyFilter.appendChild(option);
+        });
     },
 
     /**
@@ -1105,22 +1271,74 @@ const AdvancedSearch = {
             }
 
             // Filtro de categoria
-            if (this.filters.category && item.categoria_id !== this.filters.category) {
+            if (this.filters.category && item.category !== this.filters.category) {
                 return false;
             }
 
             // Filtro de colaborador
-            if (this.filters.collaborator && item.colaborador_id !== this.filters.collaborator) {
+            if (this.filters.collaborator && item.collaborator !== this.filters.collaborator) {
                 return false;
             }
 
             // Filtro de status
-            if (this.filters.status && item.status !== this.filters.status) {
-                return false;
+            if (this.filters.status) {
+                const itemStatus = moduleData.status || item.status;
+                if (itemStatus !== this.filters.status) {
+                    return false;
+                }
+            }
+
+            // Filtro de empresa
+            if (this.filters.company) {
+                const itemCompany = moduleData.company;
+                if (itemCompany !== this.filters.company) {
+                    return false;
+                }
+            }
+
+            // Filtro de faixa de preço
+            if (this.filters.priceRange) {
+                const price = parseFloat(moduleData.value) || 0;
+                const range = this.filters.priceRange;
+                
+                if (range === '0-50' && (price < 0 || price > 50)) return false;
+                if (range === '50-200' && (price < 50 || price > 200)) return false;
+                if (range === '200-1000' && (price < 200 || price > 1000)) return false;
+                if (range === '1000-5000' && (price < 1000 || price > 5000)) return false;
+                if (range === '5000+' && price < 5000) return false;
             }
 
             return true;
         });
+
+        // Aplicar ordenação
+        if (this.sortBy) {
+            this.filteredItems.sort((a, b) => {
+                const aModuleData = a.module_data || {};
+                const bModuleData = b.module_data || {};
+                
+                switch (this.sortBy) {
+                    case 'name':
+                        return a.name.localeCompare(b.name);
+                    case 'name-desc':
+                        return b.name.localeCompare(a.name);
+                    case 'price':
+                        return (parseFloat(aModuleData.value) || 0) - (parseFloat(bModuleData.value) || 0);
+                    case 'price-desc':
+                        return (parseFloat(bModuleData.value) || 0) - (parseFloat(aModuleData.value) || 0);
+                    case 'quantity':
+                        return (parseInt(aModuleData.quantity) || 0) - (parseInt(bModuleData.quantity) || 0);
+                    case 'quantity-desc':
+                        return (parseInt(bModuleData.quantity) || 0) - (parseInt(aModuleData.quantity) || 0);
+                    case 'created':
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    case 'created-desc':
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    default:
+                        return 0;
+                }
+            });
+        }
 
         this.currentPage = 1;
         this.updateDisplay();
@@ -1133,8 +1351,17 @@ const AdvancedSearch = {
     updateDisplay() {
         const inventoryGrid = document.getElementById('inventoryGrid');
         const emptyState = document.getElementById('emptyState');
+        const itemCount = document.getElementById('itemCount');
         
         if (!inventoryGrid) return;
+
+        // Ordenar itens antes de exibir
+        this.sortItems();
+
+        // Atualizar contador de itens encontrados
+        if (itemCount) {
+            itemCount.textContent = this.filteredItems.length;
+        }
 
         // Calcular itens da página atual
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
@@ -1157,10 +1384,12 @@ const AdvancedSearch = {
             }
             inventoryGrid.classList.remove('hidden');
 
-            // Renderizar itens
+            // Renderizar itens baseado na visualização atual
             pageItems.forEach(item => {
-                const itemCard = this.createItemCard(item);
-                inventoryGrid.appendChild(itemCard);
+                const itemElement = this.currentView === 'card' 
+                    ? this.createItemCard(item) 
+                    : this.createItemListRow(item);
+                inventoryGrid.appendChild(itemElement);
             });
 
             // Configurar drag & drop
@@ -1175,6 +1404,64 @@ const AdvancedSearch = {
         }
 
         this.updatePagination();
+    },
+
+    /**
+     * Ordena os itens filtrados
+     */
+    sortItems() {
+        this.filteredItems.sort((a, b) => {
+            let valueA, valueB;
+            
+            switch (this.sortBy) {
+                case 'name':
+                    valueA = (a.name || '').toLowerCase();
+                    valueB = (b.name || '').toLowerCase();
+                    break;
+                case 'category':
+                    valueA = (a.category || '').toLowerCase();
+                    valueB = (b.category || '').toLowerCase();
+                    break;
+                case 'status':
+                    const moduleDataA = a.module_data || {};
+                    const moduleDataB = b.module_data || {};
+                    valueA = (moduleDataA.status || a.status || '').toLowerCase();
+                    valueB = (moduleDataB.status || b.status || '').toLowerCase();
+                    break;
+                case 'collaborator':
+                    valueA = (a.collaborator || '').toLowerCase();
+                    valueB = (b.collaborator || '').toLowerCase();
+                    break;
+                default:
+                    valueA = (a.name || '').toLowerCase();
+                    valueB = (b.name || '').toLowerCase();
+            }
+            
+            if (this.sortOrder === 'asc') {
+                return valueA.localeCompare(valueB);
+            } else {
+                return valueB.localeCompare(valueA);
+            }
+        });
+    },
+
+    /**
+     * Altera a ordenação
+     */
+    changeSorting(sortBy, sortOrder = null) {
+        if (sortOrder === null) {
+            // Se não especificado, alterna entre asc e desc
+            if (this.sortBy === sortBy) {
+                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortOrder = 'asc';
+            }
+        } else {
+            this.sortOrder = sortOrder;
+        }
+        
+        this.sortBy = sortBy;
+        this.updateDisplay();
     },
 
     /**
@@ -1296,7 +1583,107 @@ const AdvancedSearch = {
         this.setupCardEventListeners(card);
 
         return card;
- },
+    },
+
+    /**
+     * Cria uma linha de item para visualização em lista
+     */
+    createItemListRow(item) {
+        const row = document.createElement('div');
+        
+        // Acessar dados do module_data
+        const moduleData = item.module_data || {};
+        
+        // Verificar se há imagem válida
+        const hasImage = moduleData.image && moduleData.image !== 'undefined' && moduleData.image !== 'null' && moduleData.image.trim() !== '';
+        
+        // Adicionar classe condicional para itens sem imagem
+        row.className = hasImage ? 'list-item' : 'list-item no-image';
+        row.setAttribute('data-item-id', item.id);
+        
+        // Função para exibir valor ou ocultar se não existir
+        const displayValue = (value, fallback = '') => {
+            if (!value || value === 'undefined' || value === 'null' || value === null || value.toString().trim() === '') {
+                return null;
+            }
+            return value.toString().trim();
+        };
+        
+        // Verificar se há dados para mostrar
+        const company = displayValue(moduleData.company);
+        const location = displayValue(moduleData.location);
+        const brand = displayValue(moduleData.brand);
+        const model = displayValue(moduleData.model);
+        const value = moduleData.value && parseFloat(moduleData.value) > 0 ? parseFloat(moduleData.value) : null;
+        
+        // Construir seções condicionalmente
+        let infoSection = '';
+        let metaSection = '';
+        
+        if (company || location || brand) {
+            const infoItems = [];
+            if (company) infoItems.push(`<span class="list-item-company">🏢 ${company}</span>`);
+            if (location) infoItems.push(`<span class="list-item-location">📍 ${location}</span>`);
+            if (brand) infoItems.push(`<span class="list-item-brand">🏷️ ${brand}</span>`);
+            
+            if (infoItems.length > 0) {
+                infoSection = `<div class="list-item-info">${infoItems.join('')}</div>`;
+            }
+        }
+        
+        if (model || value) {
+            const metaItems = [];
+            if (model) metaItems.push(`<span class="list-item-model">📋 ${model}</span>`);
+            if (value) metaItems.push(`<span class="list-item-value">💰 € ${value.toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</span>`);
+            
+            if (metaItems.length > 0) {
+                metaSection = `<div class="list-item-meta">${metaItems.join('')}</div>`;
+            }
+        }
+        
+        row.innerHTML = `
+            ${hasImage ? `
+            <div class="list-item-image">
+                <img src="${moduleData.image}" alt="${item.name}" onerror="this.style.display='none'">
+            </div>
+            ` : ''}
+            <div class="list-item-content">
+                <div class="list-item-main">
+                    <h3 class="list-item-title">${item.name}</h3>
+                    <span class="list-item-category">${formatCategory(item.category)}</span>
+                </div>
+                ${infoSection || metaSection ? `<div class="list-item-details">
+                    ${infoSection}
+                    ${metaSection}
+                </div>` : ''}
+            </div>
+            <div class="list-item-status">
+                <span class="status-badge ${moduleData.status?.toLowerCase() || 'ativo'}">${formatStatus(moduleData.status || 'ativo')}</span>
+                <span class="list-item-quantity">Qtd: ${item.quantity || 1}</span>
+            </div>
+            <div class="list-item-actions">
+                <button class="btn-action btn-view" data-action="view" data-item-id="${item.id}" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn-action btn-edit" data-action="edit" data-item-id="${item.id}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-action btn-delete" data-action="delete" data-item-id="${item.id}" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+                ${moduleData.qr_code ? `
+                    <button class="btn-action btn-qr" data-action="qr" data-item-id="${item.id}" title="QR Code">
+                        <i class="fas fa-qrcode"></i>
+                    </button>
+                ` : ''}
+            </div>
+        `;
+
+        // Adicionar event listeners aos botões
+        this.setupCardEventListeners(row);
+
+        return row;
+    },
 
     /**
      * Configura event listeners para os botões dos cards
@@ -1609,6 +1996,13 @@ const AdvancedSearch = {
             input.value = '';
         }
         
+        // Limpar ordenação se for o caso
+        if (filterKey === 'sort') {
+            this.sortBy = '';
+            const sortBy = document.getElementById('sortBy');
+            if (sortBy) sortBy.value = 'name';
+        }
+        
         this.applyFilters();
     },
 
@@ -1620,18 +2014,105 @@ const AdvancedSearch = {
             this.filters[key] = '';
         });
         
+        // Redefinir ordenação para padrão
+        this.sortBy = 'name';
+        this.sortOrder = 'asc';
+        
         // Limpar todos os campos
         const searchInput = document.getElementById('searchInput');
         const categoryFilter = document.getElementById('categoryFilter');
         const collaboratorFilter = document.getElementById('collaboratorFilter');
         const statusFilter = document.getElementById('statusFilter');
+        const companyFilter = document.getElementById('companyFilter');
+        const priceRangeFilter = document.getElementById('priceRangeFilter');
+        const sortBy = document.getElementById('sortBy');
         
         if (searchInput) searchInput.value = '';
         if (categoryFilter) categoryFilter.value = '';
         if (collaboratorFilter) collaboratorFilter.value = '';
         if (statusFilter) statusFilter.value = '';
+        if (companyFilter) companyFilter.value = '';
+        if (priceRangeFilter) priceRangeFilter.value = '';
+        if (sortBy) sortBy.value = 'name';
         
         this.applyFilters();
+    },
+
+    /**
+     * Exporta os dados filtrados para arquivo XLSX
+     */
+    exportToExcel() {
+        try {
+            if (this.filteredItems.length === 0) {
+                ToastSystem.warning('Nenhum item encontrado para exportar');
+                return;
+            }
+
+            // Preparar dados para exportação com todos os campos disponíveis
+            const exportData = this.filteredItems.map(item => {
+                const moduleData = item.module_data || {};
+                
+                return {
+                    'Nome': item.name || '',
+                    'Descrição': item.description || '',
+                    'Categoria': item.category || '',
+                    'Colaborador': item.collaborator || '',
+                    'Localização': item.location || '',
+                    'Status': item.status || '',
+                    'Empresa': moduleData.company || item.company || '',
+                    'Valor (€)': moduleData.value ? `€ ${parseFloat(moduleData.value).toFixed(2)}` : '',
+                    'Marca': moduleData.brand || item.brand || '',
+                    'Modelo': moduleData.model || item.model || '',
+                    'Número de Série': moduleData.serial_number || item.serial_number || '',
+                    'Data de Compra': moduleData.purchase_date ? new Date(moduleData.purchase_date).toLocaleDateString('pt-BR') : '',
+                    'Data de Garantia': moduleData.warranty_date ? new Date(moduleData.warranty_date).toLocaleDateString('pt-BR') : '',
+                    'Data de Criação': item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '',
+                    'Última Atualização': item.updated_at ? new Date(item.updated_at).toLocaleDateString('pt-BR') : ''
+                };
+            });
+
+            // Criar workbook e worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // Configurar largura das colunas
+            const colWidths = [
+                { wch: 30 }, // Nome
+                { wch: 40 }, // Descrição
+                { wch: 15 }, // Categoria
+                { wch: 20 }, // Colaborador
+                { wch: 15 }, // Localização
+                { wch: 12 }, // Status
+                { wch: 20 }, // Empresa
+                { wch: 12 }, // Valor
+                { wch: 15 }, // Marca
+                { wch: 15 }, // Modelo
+                { wch: 20 }, // Número de Série
+                { wch: 15 }, // Data de Compra
+                { wch: 15 }, // Data de Garantia
+                { wch: 15 }, // Data de Criação
+                { wch: 15 }  // Última Atualização
+            ];
+            ws['!cols'] = colWidths;
+
+            // Adicionar worksheet ao workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Inventário');
+
+            // Gerar nome do arquivo com data e hora
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('pt-BR').replace(/\//g, '-');
+            const timeStr = now.toLocaleTimeString('pt-BR').replace(/:/g, '-');
+            const filename = `inventario_${dateStr}_${timeStr}.xlsx`;
+
+            // Fazer download do arquivo
+            XLSX.writeFile(wb, filename);
+
+            ToastSystem.success(`Arquivo ${filename} exportado com sucesso! ${this.filteredItems.length} itens exportados.`);
+
+        } catch (error) {
+            console.error('Erro ao exportar para Excel:', error);
+            ToastSystem.error('Erro ao exportar arquivo. Tente novamente.');
+        }
     }
 };
 
