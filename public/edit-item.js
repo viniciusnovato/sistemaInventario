@@ -122,7 +122,7 @@ function updatePdfPreviews() {
                     <i class="fas fa-file-pdf mr-1"></i>
                     Documento ${index + 1}
                 </span>
-                <button type="button" onclick="removePdf(${index})" class="text-red-600 hover:text-red-700 text-sm">
+                <button type="button" data-pdf-index="${index}" class="remove-pdf-btn text-red-600 hover:text-red-700 text-sm">
                     <i class="fas fa-times mr-1"></i>
                     Remover
                 </button>
@@ -168,7 +168,7 @@ function displayExistingPdfs(pdfs) {
                         <p class="text-sm text-gray-500 dark:text-gray-400">Documento PDF Existente</p>
                     </div>
                 </div>
-                <button type="button" onclick="removeExistingPdf('${pdfUrl}')" class="text-red-500 hover:text-red-700">
+                <button type="button" data-pdf-url="${pdfUrl}" class="remove-existing-pdf-btn text-red-500 hover:text-red-700">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -571,6 +571,27 @@ continueEditingBtn.addEventListener('click', () => {
     successMessage.classList.add('hidden');
     // Reload the item to get updated data
     loadItem();
+});
+
+// Event delegation para botões de remover PDF
+document.addEventListener('click', function(e) {
+    // Botão de remover PDF novo
+    if (e.target.closest('.remove-pdf-btn')) {
+        const button = e.target.closest('.remove-pdf-btn');
+        const index = parseInt(button.getAttribute('data-pdf-index'));
+        if (!isNaN(index)) {
+            removePdf(index);
+        }
+    }
+    
+    // Botão de remover PDF existente
+    if (e.target.closest('.remove-existing-pdf-btn')) {
+        const button = e.target.closest('.remove-existing-pdf-btn');
+        const pdfUrl = button.getAttribute('data-pdf-url');
+        if (pdfUrl) {
+            removeExistingPdf(pdfUrl);
+        }
+    }
 });
 
 // Initialize

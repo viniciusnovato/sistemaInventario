@@ -273,29 +273,7 @@
                             <i class="fas fa-file-pdf mr-2 text-red-600"></i>
                             Documentos
                         </h3>
-                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-3">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
-                                    </div>
-                                    <div>
-                                        <p id="documentName" class="text-sm font-medium text-gray-900 dark:text-white">
-                                            Documento PDF
-                                        </p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            Clique para visualizar
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <button id="viewPdfButton" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
-                                        <i class="fas fa-eye mr-1"></i>
-                                        Visualizar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Container dinâmico para documentos será inserido aqui pelo JavaScript -->
                     </div>
                 </div>
 
@@ -547,34 +525,83 @@
                 detailLastUpdateEl.textContent = new Date(currentItem.updated_at).toLocaleDateString('pt-BR');
             }
 
-            // Documentos PDF
-            if (item.module_data && item.module_data.pdf) {
+            // Documentos PDF - Suporte para novo campo pdfs e compatibilidade com module_data.pdf
+            let pdfUrls = [];
+            
+            // Verificar novo campo pdfs primeiro
+            if (item.pdfs && Array.isArray(item.pdfs) && item.pdfs.length > 0) {
+                pdfUrls = item.pdfs;
+            } 
+            // Compatibilidade com sistema antigo
+            else if (item.module_data && item.module_data.pdf) {
+                pdfUrls = [item.module_data.pdf];
+            }
+            
+            if (pdfUrls.length > 0) {
                 const documentsSection = document.getElementById('documentsSection');
-                const viewPdfButton = document.getElementById('viewPdfButton');
-                const documentName = document.getElementById('documentName');
                 
                 if (documentsSection) {
                     documentsSection.classList.remove('hidden');
                     
-                    // Extrair nome real do arquivo PDF da URL
-                    if (documentName) {
+                    // Limpar conteúdo anterior
+                    const existingContent = documentsSection.querySelector('.pdf-documents-container');
+                    if (existingContent) {
+                        existingContent.remove();
+                    }
+                    
+                    // Criar container para documentos
+                    const documentsContainer = document.createElement('div');
+                    documentsContainer.className = 'pdf-documents-container space-y-3';
+                    
+                    pdfUrls.forEach((pdfUrl, index) => {
+                        const documentDiv = document.createElement('div');
+                        documentDiv.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4';
+                        
+                        // Extrair nome do arquivo da URL
+                        let fileName = `Documento ${index + 1}`;
                         try {
-                            const url = new URL(item.module_data.pdf);
+                            const url = new URL(pdfUrl);
                             const pathname = url.pathname;
                             const filename = pathname.split('/').pop();
                             const decodedFilename = decodeURIComponent(filename);
-                            documentName.textContent = decodedFilename || 'Documento PDF';
+                            fileName = decodedFilename || fileName;
                         } catch (error) {
-                            documentName.textContent = 'Documento PDF';
+                            // Manter nome padrão se não conseguir extrair
                         }
-                    }
+                        
+                        documentDiv.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                            ${fileName}
+                                        </p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Clique para visualizar
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button data-pdf-url="${pdfUrl}" class="pdf-view-btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        Visualizar
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        documentsContainer.appendChild(documentDiv);
+                    });
                     
-                    // Configurar botão de visualizar PDF
-                    if (viewPdfButton) {
-                        viewPdfButton.onclick = function() {
-                            window.open(item.module_data.pdf, '_blank');
-                        };
+                    // Adicionar container após o título
+                    const title = documentsSection.querySelector('h3');
+                    if (title && title.nextElementSibling) {
+                        title.nextElementSibling.remove(); // Remove o container antigo
                     }
+                    title.insertAdjacentElement('afterend', documentsContainer);
                 }
             }
 
@@ -756,6 +783,17 @@
                     });
                 }
             }, 200);
+        });
+
+        // Event delegation para botões de visualizar PDF
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.pdf-view-btn')) {
+                const button = e.target.closest('.pdf-view-btn');
+                const pdfUrl = button.getAttribute('data-pdf-url');
+                if (pdfUrl) {
+                    window.open(pdfUrl, '_blank');
+                }
+            }
         });
 
         // Adicionar botão de logout ao cabeçalho

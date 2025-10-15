@@ -243,6 +243,41 @@ app.get('/api/items', async (req, res) => {
             });
         }
 
+        // Buscar categorias e colaboradores separadamente
+        const categoryIds = [...new Set((data || []).map(item => item.categoria_id).filter(Boolean))];
+        const collaboratorIds = [...new Set((data || []).map(item => item.colaborador_id).filter(Boolean))];
+
+        let categories = {};
+        let collaborators = {};
+
+        if (categoryIds.length > 0) {
+            const { data: categoryData, error: categoryError } = await supabase
+                .from('categoriassistemainventario')
+                .select('id, nome')
+                .in('id', categoryIds);
+            
+            if (categoryError) {
+                console.error('Erro ao buscar categorias:', categoryError);
+            } else {
+                categories = (categoryData || []).reduce((acc, cat) => {
+                    acc[cat.id] = cat.nome;
+                    return acc;
+                }, {});
+            }
+        }
+
+        if (collaboratorIds.length > 0) {
+            const { data: collaboratorData } = await supabase
+                .from('colaboradoressistemainventario')
+                .select('id, nome')
+                .in('id', collaboratorIds);
+            
+            collaborators = (collaboratorData || []).reduce((acc, col) => {
+                acc[col.id] = col.nome;
+                return acc;
+            }, {});
+        }
+
         // Calcular informações de paginação
         const totalPages = Math.ceil(count / limitNum);
         const hasNextPage = pageNum < totalPages;
@@ -250,7 +285,11 @@ app.get('/api/items', async (req, res) => {
 
         res.json({
             success: true,
-            data: data || [],
+            data: (data || []).map(item => ({
+                ...item,
+                category: categories[item.categoria_id] || null,
+                collaborator: collaborators[item.colaborador_id] || null
+            })),
             pagination: {
                 currentPage: pageNum,
                 totalPages,
@@ -529,6 +568,7 @@ app.put('/api/items/:id', upload.fields([
         console.log('Files:', req.files);
         console.log('Body:', req.body);
         console.log('PDFs recebidos:', req.files?.pdf?.length || 0);
+        console.log('removePdfs recebido:', req.body.removePdfs);
 
         // Validação básica - agora aceita categoria_id ou category
         if (!name || (!categoria_id && !category) || !company || !status) {
@@ -561,7 +601,14 @@ app.put('/api/items/:id', upload.fields([
         let imageUrl = currentItem.module_data.image; // Manter imagem existente por padrão
         let pdfUrls = Array.isArray(currentItem.pdfs) ? [...currentItem.pdfs] : []; // Clonar array de PDFs existentes
 
+        // Migrar PDF do campo antigo para o novo array se necessário
+        if (pdfUrls.length === 0 && currentItem.module_data.pdf) {
+            pdfUrls = [currentItem.module_data.pdf];
+            console.log('Migrando PDF do campo antigo:', currentItem.module_data.pdf);
+        }
+
         console.log('PDFs existentes no item:', pdfUrls);
+        console.log('Tamanho inicial do array pdfUrls:', pdfUrls.length);
 
         // Se há uma nova imagem, fazer upload para o Supabase Storage
         if (req.files && req.files.image && req.files.image[0]) {
@@ -588,15 +635,21 @@ app.put('/api/items/:id', upload.fields([
             }
         }
 
+        // Debug: Verificar o que está sendo recebido
+        console.log('req.files:', req.files);
+        console.log('req.files.pdf:', req.files ? req.files.pdf : 'undefined');
+        
         // Se há novos PDFs, fazer upload para o Supabase Storage
         if (req.files && req.files.pdf && req.files.pdf.length > 0) {
             console.log('Fazendo upload de novos PDFs:', req.files.pdf.length);
+            console.log('Array pdfUrls antes do upload:', pdfUrls);
             for (const pdfFile of req.files.pdf) {
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${pdfFile.originalname}`;
                 try {
                     const newPdfUrl = await uploadPdfToStorage(pdfFile, fileName);
                     console.log('PDF uploaded:', newPdfUrl);
                     pdfUrls.push(newPdfUrl);
+                    console.log('Array pdfUrls após adicionar PDF:', pdfUrls);
                 } catch (uploadError) {
                     console.error('Erro no upload do PDF:', uploadError);
                     return res.status(500).json({
@@ -605,6 +658,7 @@ app.put('/api/items/:id', upload.fields([
                     });
                 }
             }
+            console.log('Array pdfUrls final após todos os uploads:', pdfUrls);
         }
 
         // Processar remoção de PDFs existentes se especificado
