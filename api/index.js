@@ -5,6 +5,7 @@ const compression = require('compression');
 const path = require('path');
 const multer = require('multer');
 const QRCode = require('qrcode');
+const { sanitizeFileName } = require('../sanitize-filename');
 require('dotenv').config();
 
 const { createClient } = require('@supabase/supabase-js');
@@ -403,7 +404,8 @@ app.post('/api/items', upload.fields([
         // Se há uma imagem, fazer upload para o Supabase Storage
         if (req.files && req.files.image && req.files.image[0]) {
             const imageFile = req.files.image[0];
-            const fileName = `${Date.now()}-${imageFile.originalname}`;
+            const sanitizedName = sanitizeFileName(imageFile.originalname);
+            const fileName = `${Date.now()}-${sanitizedName}`;
             try {
                 imageUrl = await uploadImageToStorage(imageFile, fileName);
             } catch (uploadError) {
@@ -418,7 +420,8 @@ app.post('/api/items', upload.fields([
         // Se há PDFs, fazer upload para o Supabase Storage
         if (req.files && req.files.pdf && req.files.pdf.length > 0) {
             for (const pdfFile of req.files.pdf) {
-                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${pdfFile.originalname}`;
+                const sanitizedName = sanitizeFileName(pdfFile.originalname);
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
                 try {
                     const pdfUrl = await uploadPdfToStorage(pdfFile, fileName);
                     pdfUrls.push(pdfUrl);
@@ -612,7 +615,8 @@ app.put('/api/items/:id', upload.fields([
 
         // Se há uma nova imagem, fazer upload para o Supabase Storage
         if (req.files && req.files.image && req.files.image[0]) {
-            const fileName = `${Date.now()}-${req.files.image[0].originalname}`;
+            const sanitizedName = sanitizeFileName(req.files.image[0].originalname);
+            const fileName = `${Date.now()}-${sanitizedName}`;
             try {
                 imageUrl = await uploadImageToStorage(req.files.image[0], fileName);
                 
@@ -644,7 +648,8 @@ app.put('/api/items/:id', upload.fields([
             console.log('Fazendo upload de novos PDFs:', req.files.pdf.length);
             console.log('Array pdfUrls antes do upload:', pdfUrls);
             for (const pdfFile of req.files.pdf) {
-                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${pdfFile.originalname}`;
+                const sanitizedName = sanitizeFileName(pdfFile.originalname);
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
                 try {
                     const newPdfUrl = await uploadPdfToStorage(pdfFile, fileName);
                     console.log('PDF uploaded:', newPdfUrl);

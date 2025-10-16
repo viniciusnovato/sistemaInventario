@@ -169,7 +169,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateImageProgressBar(0, 'Iniciando upload da imagem...');
                     
                     // Upload da imagem para o Supabase Storage
-                    const imageFileName = `${Date.now()}_${imageFile.name}`;
+                    // Sanitizar o nome do arquivo para remover caracteres especiais
+                    const sanitizedFileName = imageFile.name
+                        .normalize('NFD') // Normalizar caracteres acentuados
+                        .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+                        .replace(/[^\w\s.-]/g, '') // Remover emojis e caracteres especiais
+                        .replace(/\s+/g, '_') // Substituir espaços por underscore
+                        .toLowerCase(); // Converter para minúsculas
+                    
+                    const imageFileName = `${Date.now()}_${sanitizedFileName}`;
                     
                     updateImageProgressBar(25, 'Enviando imagem...');
                     
@@ -205,7 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateProgressBar(0, 'Iniciando upload...');
                     
                     // Upload do PDF para o Supabase Storage
-                    const fileName = `${Date.now()}_${pdfFile.name}`;
+                    // Sanitizar o nome do arquivo para remover caracteres especiais
+                    const sanitizedPdfName = pdfFile.name
+                        .normalize('NFD') // Normalizar caracteres acentuados
+                        .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+                        .replace(/[^\w\s.-]/g, '') // Remover emojis e caracteres especiais
+                        .replace(/\s+/g, '_') // Substituir espaços por underscore
+                        .toLowerCase(); // Converter para minúsculas
+                    
+                    const fileName = `${Date.now()}_${sanitizedPdfName}`;
                     
                     updateProgressBar(25, 'Enviando arquivo...');
                     
