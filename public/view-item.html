@@ -491,11 +491,13 @@
                 }
             }
 
-            if (item.module_data && item.module_data.value) {
+            // Exibir valor - usar module_data.value se disponível, senão usar unit_price
+            const itemValue = (item.module_data && item.module_data.value) || item.unit_price;
+            if (itemValue && itemValue > 0) {
                 const detailValueEl = document.getElementById('detailValue');
                 const valueContainer = document.getElementById('valueContainer');
                 if (detailValueEl && valueContainer) {
-                    detailValueEl.textContent = `€ ${parseFloat(item.module_data.value).toFixed(2)}`;
+                    detailValueEl.textContent = `€ ${parseFloat(itemValue).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     valueContainer.classList.remove('hidden');
                 }
             }

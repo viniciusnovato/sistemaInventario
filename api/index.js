@@ -171,7 +171,7 @@ app.get('/api/items', async (req, res) => {
             sortBy = 'created_at',
             sortOrder = 'desc',
             page = 1,
-            limit = 20
+            limit = 100
         } = req.query;
 
         // Construir query base
@@ -229,7 +229,7 @@ app.get('/api/items', async (req, res) => {
 
         // Paginação
         const pageNum = Math.max(1, parseInt(page));
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit))); // Máximo 100 itens por página
+        const limitNum = Math.min(1000, Math.max(1, parseInt(limit))); // Máximo 1000 itens por página
         const offset = (pageNum - 1) * limitNum;
         
         query = query.range(offset, offset + limitNum - 1);

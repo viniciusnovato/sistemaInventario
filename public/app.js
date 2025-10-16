@@ -958,7 +958,7 @@ const AdvancedSearch = {
     currentItems: [],
     filteredItems: [],
     currentPage: 1,
-    itemsPerPage: 10,
+    itemsPerPage: 100,
     currentView: 'card', // Controle de visualização
     sortOrder: 'asc', // Ordenação padrão A-Z
     sortBy: 'name', // Campo de ordenação padrão
@@ -1103,6 +1103,14 @@ const AdvancedSearch = {
                 this.exportToExcel();
             });
         }
+
+        // Botão de exportar para CSV
+        const exportToCSVBtn = document.getElementById('exportToCSV');
+        if (exportToCSVBtn) {
+            exportToCSVBtn.addEventListener('click', () => {
+                this.exportToCSV();
+            });
+        }
     },
 
     /**
@@ -1168,7 +1176,7 @@ const AdvancedSearch = {
         try {
             showLoading(true);
             
-            const response = await fetch('/api/items');
+            const response = await fetch('/api/items?limit=1000');
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -1314,7 +1322,7 @@ const AdvancedSearch = {
 
             // Filtro de faixa de preço
             if (this.filters.priceRange) {
-                const price = parseFloat(moduleData.value) || 0;
+                const price = parseFloat(moduleData.value || item.unit_price) || 0;
                 const range = this.filters.priceRange;
                 
                 if (range === '0-50' && (price < 0 || price > 50)) return false;
@@ -1339,9 +1347,9 @@ const AdvancedSearch = {
                     case 'name-desc':
                         return b.name.localeCompare(a.name);
                     case 'price':
-                        return (parseFloat(aModuleData.value) || 0) - (parseFloat(bModuleData.value) || 0);
+                        return (parseFloat(aModuleData.value || a.unit_price) || 0) - (parseFloat(bModuleData.value || b.unit_price) || 0);
                     case 'price-desc':
-                        return (parseFloat(bModuleData.value) || 0) - (parseFloat(aModuleData.value) || 0);
+                        return (parseFloat(bModuleData.value || b.unit_price) || 0) - (parseFloat(aModuleData.value || a.unit_price) || 0);
                     case 'quantity':
                         return (parseInt(aModuleData.quantity) || 0) - (parseInt(bModuleData.quantity) || 0);
                     case 'quantity-desc':
@@ -1536,17 +1544,17 @@ const AdvancedSearch = {
                         </div>
                     ` : ''}
                     
-                    ${moduleData.brand || moduleData.model ? `
+                    ${(moduleData && (moduleData.brand || moduleData.model)) ? `
                         <div class="flex items-center">
                             <i class="fas fa-tag w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
                             <span>${[moduleData.brand, moduleData.model].filter(Boolean).join(' - ')}</span>
                         </div>
                     ` : ''}
                     
-                    ${moduleData.value ? `
+                    ${(moduleData && moduleData.value) || item.unit_price ? `
                         <div class="flex items-center">
                             <i class="fas fa-dollar-sign w-4 text-primary-600 dark:text-primary-400 mr-2"></i>
-                            <span>€ ${parseFloat(moduleData.value).toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</span>
+                            <span>€ ${parseFloat((moduleData && moduleData.value) || item.unit_price).toLocaleString('pt-PT', { minimumFractionDigits: 2 })}</span>
                         </div>
                     ` : ''}
                 </div>
@@ -1626,11 +1634,12 @@ const AdvancedSearch = {
         };
         
         // Verificar se há dados para mostrar
-        const company = displayValue(moduleData.company);
-        const location = displayValue(moduleData.location);
-        const brand = displayValue(moduleData.brand);
-        const model = displayValue(moduleData.model);
-        const value = moduleData.value && parseFloat(moduleData.value) > 0 ? parseFloat(moduleData.value) : null;
+        const company = displayValue(moduleData && moduleData.company);
+        const location = displayValue(moduleData && moduleData.location);
+        const brand = displayValue(moduleData && moduleData.brand);
+        const model = displayValue(moduleData && moduleData.model);
+        const value = (moduleData && moduleData.value && parseFloat(moduleData.value) > 0) ? parseFloat(moduleData.value) : 
+                     (item.unit_price && parseFloat(item.unit_price) > 0) ? parseFloat(item.unit_price) : null;
         
         // Construir seções condicionalmente
         let infoSection = '';
@@ -2055,6 +2064,84 @@ const AdvancedSearch = {
     },
 
     /**
+     * Exporta os dados filtrados para arquivo CSV
+     */
+    exportToCSV() {
+        try {
+            if (this.filteredItems.length === 0) {
+                ToastSystem.warning('Nenhum item encontrado para exportar');
+                return;
+            }
+
+            // Preparar dados para exportação CSV com ID incluído
+            const exportData = this.filteredItems.map(item => {
+                const moduleData = item.module_data || {};
+                
+                return {
+                    'ID': item.id || '',
+                    'Nome': item.name || '',
+                    'Descrição': item.description || '',
+                    'Categoria': item.category || '',
+                    'Colaborador': item.collaborator || '',
+                    'Localização': item.location || '',
+                    'Status': item.status || '',
+                    'Empresa': moduleData.company || item.company || '',
+                    'Valor (€)': (moduleData.value || item.unit_price) ? `€ ${parseFloat(moduleData.value || item.unit_price).toFixed(2)}` : '',
+                    'Marca': moduleData.brand || item.brand || '',
+                    'Modelo': moduleData.model || item.model || '',
+                    'Número de Série': moduleData.serial_number || item.serial_number || '',
+                    'Data de Compra': moduleData.purchase_date ? new Date(moduleData.purchase_date).toLocaleDateString('pt-BR') : '',
+                    'Data de Garantia': moduleData.warranty_date ? new Date(moduleData.warranty_date).toLocaleDateString('pt-BR') : '',
+                    'Data de Criação': item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '',
+                    'Última Atualização': item.updated_at ? new Date(item.updated_at).toLocaleDateString('pt-BR') : ''
+                };
+            });
+
+            // Converter para CSV
+            const headers = Object.keys(exportData[0]);
+            const csvContent = [
+                headers.join(','),
+                ...exportData.map(row => 
+                    headers.map(header => {
+                        const value = row[header];
+                        // Escapar aspas duplas e envolver em aspas se contém vírgula, quebra de linha ou aspas
+                        if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
+                            return `"${value.replace(/"/g, '""')}"`;
+                        }
+                        return value;
+                    }).join(',')
+                )
+            ].join('\n');
+
+            // Criar e fazer download do arquivo CSV
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            // Gerar nome do arquivo com data e hora
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('pt-BR').replace(/\//g, '-');
+            const timeStr = now.toLocaleTimeString('pt-BR').replace(/:/g, '-');
+            const filename = `inventario_${dateStr}_${timeStr}.csv`;
+            
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(link.href);
+
+            ToastSystem.success(`Arquivo ${filename} exportado com sucesso! ${this.filteredItems.length} itens exportados.`);
+
+        } catch (error) {
+            console.error('Erro ao exportar para CSV:', error);
+            ToastSystem.error('Erro ao exportar arquivo CSV. Tente novamente.');
+        }
+    },
+
+    /**
      * Exporta os dados filtrados para arquivo XLSX
      */
     exportToExcel() {
@@ -2076,7 +2163,7 @@ const AdvancedSearch = {
                     'Localização': item.location || '',
                     'Status': item.status || '',
                     'Empresa': moduleData.company || item.company || '',
-                    'Valor (€)': moduleData.value ? `€ ${parseFloat(moduleData.value).toFixed(2)}` : '',
+                    'Valor (€)': (moduleData.value || item.unit_price) ? `€ ${parseFloat(moduleData.value || item.unit_price).toFixed(2)}` : '',
                     'Marca': moduleData.brand || item.brand || '',
                     'Modelo': moduleData.model || item.model || '',
                     'Número de Série': moduleData.serial_number || item.serial_number || '',

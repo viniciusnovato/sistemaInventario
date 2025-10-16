@@ -416,7 +416,7 @@ function populateForm(item) {
     document.getElementById('itemBrand').value = item.module_data?.brand || '';
     document.getElementById('itemModel').value = item.module_data?.model || '';
     document.getElementById('itemSerial').value = item.module_data?.serial_number || '';
-    document.getElementById('itemValue').value = item.module_data?.value || '';
+    document.getElementById('itemValue').value = item.module_data?.value || item.unit_price || '';
 
     // Set category and collaborator - corrigindo para usar os campos corretos
     if (item.categoria_id) {
