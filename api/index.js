@@ -2551,6 +2551,219 @@ app.get('/api/prostoral/inventory/low-stock', authenticateToken, async (req, res
     }
 });
 
+// ==================== ORDENS DE SERVIÇO ====================
+
+// GET - Listar ordens de serviço
+app.get('/api/prostoral/orders', authenticateToken, async (req, res) => {
+    try {
+        const { status, client_id, search, work_type_id } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_work_orders')
+            .select(`
+                *,
+                client:prostoral_clients(id, full_name, client_type),
+                work_type:prostoral_work_types(id, name, category)
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        if (client_id) {
+            query = query.eq('client_id', client_id);
+        }
+        
+        if (work_type_id) {
+            query = query.eq('work_type_id', work_type_id);
+        }
+        
+        if (search) {
+            query = query.or(`work_order_number.ilike.%${search}%,patient_name.ilike.%${search}%,notes.ilike.%${search}%`);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, orders: data });
+    } catch (error) {
+        console.error('Erro ao buscar ordens de serviço:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar OS por ID
+app.get('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .select(`
+                *,
+                client:prostoral_clients(*),
+                work_type:prostoral_work_types(*),
+                materials:prostoral_work_order_materials(
+                    *,
+                    inventory_item:prostoral_inventory(id, name, code, unit)
+                ),
+                status_history:prostoral_work_order_status_history(*)
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, order: data });
+    } catch (error) {
+        console.error('Erro ao buscar ordem de serviço:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar nova OS
+app.post('/api/prostoral/orders', authenticateToken, async (req, res) => {
+    try {
+        const orderData = {
+            ...req.body,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            created_by: req.user.id,
+            status: req.body.status || 'pending'
+        };
+        
+        // Gerar número de OS
+        const { data: orderNumber, error: numberError } = await supabaseAdmin
+            .rpc('get_next_work_order_number', {
+                p_tenant_id: orderData.tenant_id
+            });
+        
+        if (numberError) throw numberError;
+        
+        orderData.work_order_number = orderNumber;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .insert([orderData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, order: data });
+    } catch (error) {
+        console.error('Erro ao criar ordem de serviço:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT - Atualizar OS
+app.put('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const orderData = {
+            ...req.body,
+            updated_by: req.user.id
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .update(orderData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, order: data });
+    } catch (error) {
+        console.error('Erro ao atualizar ordem de serviço:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH - Atualizar status da OS
+app.patch('/api/prostoral/orders/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, notes } = req.body;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .update({ 
+                status,
+                updated_by: req.user.id
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        // Registrar no histórico (o trigger já faz isso, mas podemos adicionar notas extras)
+        if (notes) {
+            await supabaseAdmin
+                .from('prostoral_work_order_status_history')
+                .insert([{
+                    work_order_id: id,
+                    from_status: data.status,
+                    to_status: status,
+                    notes,
+                    changed_by: req.user.id
+                }]);
+        }
+        
+        res.json({ success: true, order: data });
+    } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE - Cancelar OS
+app.delete('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .update({ 
+                status: 'cancelled',
+                is_active: false,
+                updated_by: req.user.id
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, order: data });
+    } catch (error) {
+        console.error('Erro ao cancelar ordem de serviço:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Tipos de trabalho disponíveis
+app.get('/api/prostoral/work-types', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_work_types')
+            .select('*')
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, workTypes: data });
+    } catch (error) {
+        console.error('Erro ao buscar tipos de trabalho:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
