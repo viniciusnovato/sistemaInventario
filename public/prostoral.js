@@ -12,14 +12,21 @@ class ProstoralApp {
     }
 
     async init() {
-        // Verificar autenticação
-        if (!window.authManager || !window.authManager.isUserAuthenticated()) {
+        // Aguardar authManager estar pronto
+        if (!window.authManager) {
+            console.error('AuthManager não encontrado');
             window.location.href = 'login.html';
             return;
         }
 
-        // Aguardar authManager estar pronto
         await window.authManager.init();
+
+        // Verificar autenticação após inicialização
+        if (!window.authManager.isUserAuthenticated()) {
+            console.log('Usuário não autenticado, redirecionando para login');
+            window.location.href = 'login.html';
+            return;
+        }
 
         // Carregar dados do usuário
         await this.loadUserInfo();
@@ -36,14 +43,10 @@ class ProstoralApp {
 
     async loadUserInfo() {
         const user = window.authManager.user;
-        if (user && user.user_metadata) {
-            document.getElementById('user-name').textContent = user.user_metadata.full_name || user.email;
+        if (user && user.email) {
+            document.getElementById('user-name').textContent = user.email;
+            document.getElementById('user-role').textContent = 'Usuário';
         }
-
-        // Carregar role do usuário
-        const roles = await window.authManager.getUserRoles();
-        const roleNames = roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ');
-        document.getElementById('user-role').textContent = roleNames || 'Usuário';
     }
 
     setupTabs() {
