@@ -3171,6 +3171,243 @@ app.get('/api/prostoral/indirect-costs', authenticateToken, async (req, res) => 
     }
 });
 
+// ==================== GESTÃO DE CONSERTOS ====================
+
+// GET - Listar consertos
+app.get('/api/prostoral/repairs', authenticateToken, async (req, res) => {
+    try {
+        const { status, original_order_id } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_repairs')
+            .select(`
+                *,
+                original_order:original_work_order_id(id, work_order_number, patient_name),
+                repair_order:repair_work_order_id(id, work_order_number, status)
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        if (original_order_id) {
+            query = query.eq('original_work_order_id', original_order_id);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, repairs: data });
+    } catch (error) {
+        console.error('Erro ao buscar consertos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar conserto por ID
+app.get('/api/prostoral/repairs/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_repairs')
+            .select(`
+                *,
+                original_order:original_work_order_id(*),
+                repair_order:repair_work_order_id(*)
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, repair: data });
+    } catch (error) {
+        console.error('Erro ao buscar conserto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar conserto
+app.post('/api/prostoral/repairs', authenticateToken, async (req, res) => {
+    try {
+        const repairData = {
+            ...req.body,
+            created_by: req.user.id,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            status: req.body.status || 'pending'
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_repairs')
+            .insert([repairData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, repair: data });
+    } catch (error) {
+        console.error('Erro ao criar conserto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH - Atualizar status do conserto
+app.patch('/api/prostoral/repairs/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, resolution_notes } = req.body;
+        
+        const updateData = { 
+            status,
+            updated_by: req.user.id
+        };
+        
+        if (status === 'completed') {
+            updateData.resolved_at = new Date().toISOString();
+            updateData.resolution_notes = resolution_notes;
+        }
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_repairs')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, repair: data });
+    } catch (error) {
+        console.error('Erro ao atualizar status do conserto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== GESTÃO DE INTERCORRÊNCIAS ====================
+
+// GET - Listar intercorrências
+app.get('/api/prostoral/incidents', authenticateToken, async (req, res) => {
+    try {
+        const { status, work_order_id, severity } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_incidents')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(id, work_order_number, patient_name),
+                reported_by_user:user_profiles!prostoral_incidents_reported_by_fkey(id, full_name)
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        if (work_order_id) {
+            query = query.eq('work_order_id', work_order_id);
+        }
+        
+        if (severity) {
+            query = query.eq('severity', severity);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, incidents: data });
+    } catch (error) {
+        console.error('Erro ao buscar intercorrências:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar intercorrência por ID
+app.get('/api/prostoral/incidents/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_incidents')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(*),
+                reported_by_user:user_profiles!prostoral_incidents_reported_by_fkey(*),
+                resolved_by_user:user_profiles!prostoral_incidents_resolved_by_fkey(*)
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, incident: data });
+    } catch (error) {
+        console.error('Erro ao buscar intercorrência:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar intercorrência
+app.post('/api/prostoral/incidents', authenticateToken, async (req, res) => {
+    try {
+        const incidentData = {
+            ...req.body,
+            reported_by: req.user.id,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            status: req.body.status || 'open'
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_incidents')
+            .insert([incidentData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, incident: data });
+    } catch (error) {
+        console.error('Erro ao criar intercorrência:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH - Atualizar status da intercorrência
+app.patch('/api/prostoral/incidents/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, resolution_notes } = req.body;
+        
+        const updateData = { 
+            status,
+            resolved_by: status === 'resolved' ? req.user.id : null
+        };
+        
+        if (status === 'resolved') {
+            updateData.resolved_at = new Date().toISOString();
+            updateData.resolution_notes = resolution_notes;
+        }
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_incidents')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, incident: data });
+    } catch (error) {
+        console.error('Erro ao atualizar status da intercorrência:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
