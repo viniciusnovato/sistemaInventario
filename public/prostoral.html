@@ -241,29 +241,29 @@
     <div class="pt-20 sm:pt-24 pb-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            <!-- Navigation Tabs -->
+            <!-- Navigation Tabs - Estilo Menu Horizontal -->
             <nav class="mb-8 animate-slide-up">
-                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-2">
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        <button class="prostoral-tab active group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="dashboard">
-                            <i class="fas fa-chart-line group-hover:rotate-12 transition-transform duration-300"></i>
-                            <span class="hidden sm:inline">Dashboard</span>
+                <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-1">
+                    <div class="flex justify-around items-center">
+                        <button class="prostoral-tab active group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 min-w-[80px]" data-tab="dashboard" title="Dashboard">
+                            <i class="fas fa-chart-line text-2xl mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-xs font-medium">Dashboard</span>
                         </button>
-                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="clients">
-                            <i class="fas fa-users group-hover:rotate-12 transition-transform duration-300"></i>
-                            <span class="hidden sm:inline">Clientes</span>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 min-w-[80px]" data-tab="clients" title="Clientes">
+                            <i class="fas fa-users text-2xl mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-xs font-medium">Clientes</span>
                         </button>
-                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="orders">
-                            <i class="fas fa-clipboard-list group-hover:rotate-12 transition-transform duration-300"></i>
-                            <span class="hidden sm:inline">Ordens</span>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 min-w-[80px]" data-tab="orders" title="Ordens">
+                            <i class="fas fa-clipboard-list text-2xl mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-xs font-medium">Ordens</span>
                         </button>
-                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="kits">
-                            <i class="fas fa-box-open group-hover:rotate-12 transition-transform duration-300"></i>
-                            <span class="hidden sm:inline">Kits</span>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 min-w-[80px]" data-tab="kits" title="Kits">
+                            <i class="fas fa-box-open text-2xl mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-xs font-medium">Kits</span>
                         </button>
-                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="inventory">
-                            <i class="fas fa-boxes group-hover:rotate-12 transition-transform duration-300"></i>
-                            <span class="hidden sm:inline">Estoque</span>
+                        <button class="prostoral-tab group flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 min-w-[80px]" data-tab="inventory" title="Estoque">
+                            <i class="fas fa-boxes text-2xl mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-xs font-medium">Estoque</span>
                         </button>
                     </div>
                 </div>
@@ -497,14 +497,14 @@
                 // Remove active class from all tabs
                 tabs.forEach(t => {
                     t.classList.remove('active');
-                    t.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-emerald-600', 'text-white', 'shadow-lg');
-                    t.classList.add('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+                    t.classList.remove('bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                    t.classList.add('text-gray-600', 'dark:text-gray-400');
                 });
                 
                 // Add active class to clicked tab
                 tab.classList.add('active');
-                tab.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-emerald-600', 'text-white', 'shadow-lg');
-                tab.classList.remove('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+                tab.classList.add('bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                tab.classList.remove('text-gray-600', 'dark:text-gray-400');
                 
                 // Hide all tab contents
                 tabContents.forEach(content => {
@@ -515,6 +515,11 @@
                 const targetContent = document.getElementById(`${targetTab}-content`);
                 if (targetContent) {
                     targetContent.classList.add('active');
+                    
+                    // Carregar dados da aba se necessário
+                    if (targetTab === 'clients' && window.prostoralApp) {
+                        window.prostoralApp.loadClients();
+                    }
                 }
             });
         });
