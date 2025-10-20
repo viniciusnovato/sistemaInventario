@@ -2553,7 +2553,7 @@ app.get('/api/prostoral/orders', authenticateToken, async (req, res) => {
             .from('prostoral_work_orders')
             .select(`
                 *,
-                client:prostoral_clients(id, full_name, client_type),
+                client:prostoral_clients(id, name, clinic_name, dentist_name),
                 work_type:prostoral_work_types(id, name, category)
             `)
             .order('created_at', { ascending: false });
@@ -3410,7 +3410,7 @@ app.get('/api/prostoral/invoices', authenticateToken, async (req, res) => {
             .from('prostoral_invoices')
             .select(`
                 *,
-                client:prostoral_clients(id, full_name, client_type, company_name),
+                client:prostoral_clients(id, name, clinic_name, dentist_name),
                 items:prostoral_invoice_items(
                     *,
                     work_order:prostoral_work_orders(id, work_order_number, patient_name)
@@ -3623,12 +3623,15 @@ app.get('/api/prostoral/dashboard/kpis', authenticateToken, async (req, res) => 
         const paidRevenue = invoices?.filter(inv => inv.status === 'paid')
             .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
         
-        // Estoque baixo
-        const { count: lowStockCount } = await supabaseAdmin
+        // Estoque baixo - buscar itens onde quantity <= min_stock
+        const { data: inventoryItems } = await supabaseAdmin
             .from('prostoral_inventory')
-            .select('id', { count: 'exact' })
-            .eq('tenant_id', tenant_id)
-            .lte('quantity', supabaseAdmin.raw('min_stock'));
+            .select('id, quantity, min_stock')
+            .eq('tenant_id', tenant_id);
+        
+        const lowStockCount = inventoryItems?.filter(item => 
+            item.quantity <= (item.min_stock || 0)
+        ).length || 0;
         
         // Intercorrências abertas
         const { count: openIncidents } = await supabaseAdmin
@@ -3711,7 +3714,7 @@ app.get('/api/prostoral/reports/financial', authenticateToken, async (req, res) 
             .from('prostoral_invoices')
             .select(`
                 *,
-                client:prostoral_clients(id, full_name, company_name)
+                client:prostoral_clients(id, name, clinic_name)
             `)
             .eq('tenant_id', tenant_id);
         
