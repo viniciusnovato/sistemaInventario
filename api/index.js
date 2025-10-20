@@ -2970,6 +2970,124 @@ app.get('/api/prostoral/kits/:id/availability', authenticateToken, async (req, r
     }
 });
 
+// ==================== CONTROLE DE PRODUÇÃO ====================
+
+// POST - Check-in (iniciar trabalho em OS)
+app.post('/api/prostoral/time-tracking/checkin', authenticateToken, async (req, res) => {
+    try {
+        const { work_order_id, notes } = req.body;
+        
+        const trackingData = {
+            work_order_id,
+            technician_id: req.user.id,
+            check_in_time: new Date().toISOString(),
+            notes,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_time_tracking')
+            .insert([trackingData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, tracking: data });
+    } catch (error) {
+        console.error('Erro ao fazer check-in:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH - Check-out (finalizar trabalho)
+app.patch('/api/prostoral/time-tracking/:id/checkout', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { notes } = req.body;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_time_tracking')
+            .update({ 
+                check_out_time: new Date().toISOString(),
+                notes: notes || null
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, tracking: data });
+    } catch (error) {
+        console.error('Erro ao fazer check-out:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Listar registros de tempo
+app.get('/api/prostoral/time-tracking', authenticateToken, async (req, res) => {
+    try {
+        const { work_order_id, technician_id, date_from, date_to } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_time_tracking')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(id, work_order_number, patient_name),
+                technician:user_profiles(id, full_name)
+            `)
+            .order('check_in_time', { ascending: false });
+        
+        if (work_order_id) {
+            query = query.eq('work_order_id', work_order_id);
+        }
+        
+        if (technician_id) {
+            query = query.eq('technician_id', technician_id);
+        }
+        
+        if (date_from) {
+            query = query.gte('check_in_time', date_from);
+        }
+        
+        if (date_to) {
+            query = query.lte('check_in_time', date_to);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, timeTracking: data });
+    } catch (error) {
+        console.error('Erro ao buscar registros de tempo:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Tempo ativo (check-ins sem check-out)
+app.get('/api/prostoral/time-tracking/active', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_time_tracking')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(id, work_order_number, patient_name, client_id)
+            `)
+            .is('check_out_time', null)
+            .eq('technician_id', req.user.id)
+            .order('check_in_time', { ascending: false });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, activeTracking: data });
+    } catch (error) {
+        console.error('Erro ao buscar tempo ativo:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
