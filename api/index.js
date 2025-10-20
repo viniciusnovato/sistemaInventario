@@ -4245,6 +4245,838 @@ app.patch('/api/admin/users/:userId/status', authenticateToken, async (req, res)
     }
 });
 
+// =====================================================
+// ENDPOINTS DO LABORATÓRIO
+// =====================================================
+
+// Get produtos do laboratório
+app.get('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, search, categoria, status, sort = 'nome_material', order = 'asc' } = req.query;
+        const offset = (page - 1) * limit;
+
+        let query = supabase
+            .from('vw_produtos_estoque')
+            .select('*', { count: 'exact' })
+            .is('deleted_at', null);
+
+        if (search) {
+            query = query.or(`nome_material.ilike.%${search}%,marca.ilike.%${search}%,fornecedor.ilike.%${search}%,qr_code.ilike.%${search}%`);
+        }
+        if (categoria) query = query.eq('categoria', categoria);
+        if (status) query = query.eq('status', status);
+        
+        query = query.order(sort, { ascending: order === 'asc' }).range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        res.json({
+            data: data || [],
+            currentPage: parseInt(page),
+            totalPages: Math.ceil((count || 0) / limit),
+            total: count || 0
+        });
+    } catch (error) {
+        console.error('Erro ao buscar produtos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get produto by ID
+app.get('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .eq('id', req.params.id)
+            .is('deleted_at', null)
+            .single();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Produto não encontrado' });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar produto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get produto by QR code or barcode
+app.get('/api/laboratorio/produtos/codigo/:codigo', authenticateToken, async (req, res) => {
+    try {
+        const codigo = decodeURIComponent(req.params.codigo);
+
+        const { data, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .or(`qr_code.eq.${codigo},codigo_barras.eq.${codigo}`)
+            .is('deleted_at', null)
+            .single();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Produto não encontrado' });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar produto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get produto details
+app.get('/api/laboratorio/produtos/:id/detalhes', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .eq('id', req.params.id)
+            .is('deleted_at', null)
+            .single();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Produto não encontrado' });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar detalhes:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create produto
+app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
+    try {
+        const {
+            codigo_barras,
+            categoria,
+            nome_material,
+            marca,
+            fornecedor,
+            referencia_lote,
+            unidade_medida,
+            localizacao,
+            data_validade,
+            descricao,
+            observacoes,
+            quantidade_inicial,
+            quantidade_minima,
+            quantidade_maxima
+        } = req.body;
+
+        const userId = req.user.id;
+
+        // Insert produto
+        const { data: produto, error: produtoError } = await supabaseAdmin
+            .from('produtoslaboratorio')
+            .insert({
+                codigo_barras,
+                categoria,
+                nome_material,
+                marca,
+                fornecedor,
+                referencia_lote,
+                unidade_medida,
+                localizacao,
+                data_validade,
+                descricao,
+                observacoes,
+                criado_por: userId,
+                atualizado_por: userId
+            })
+            .select()
+            .single();
+
+        if (produtoError) throw produtoError;
+
+        // Create estoque if quantidade_inicial is provided
+        if (quantidade_inicial !== undefined && quantidade_inicial !== null) {
+            const { error: estoqueError } = await supabaseAdmin
+                .from('estoquelaboratorio')
+                .insert({
+                    produto_id: produto.id,
+                    quantidade_atual: quantidade_inicial,
+                    quantidade_minima: quantidade_minima || 0,
+                    quantidade_maxima: quantidade_maxima || null,
+                    atualizado_por: userId
+                });
+
+            if (estoqueError) throw estoqueError;
+
+            // Register initial movement if quantity > 0
+            if (parseFloat(quantidade_inicial) > 0) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', userId)
+                    .single();
+
+                await supabaseAdmin
+                    .from('movimentacoeslaboratorio')
+                    .insert({
+                        produto_id: produto.id,
+                        tipo: 'entrada',
+                        quantidade: quantidade_inicial,
+                        responsavel: profile?.full_name || 'Sistema',
+                        motivo: 'Estoque inicial',
+                        registrado_por: userId
+                    });
+            }
+        }
+
+        res.json({ success: true, data: produto });
+    } catch (error) {
+        console.error('Erro ao criar produto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update produto
+app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => {
+    try {
+        const {
+            codigo_barras,
+            categoria,
+            nome_material,
+            marca,
+            fornecedor,
+            referencia_lote,
+            unidade_medida,
+            localizacao,
+            data_validade,
+            descricao,
+            observacoes,
+            ativo,
+            estoque_minimo,
+            quantidade_maxima
+        } = req.body;
+
+        // Update produto
+        const { error: produtoError } = await supabaseAdmin
+            .from('produtoslaboratorio')
+            .update({
+                codigo_barras,
+                categoria,
+                nome_material,
+                marca,
+                fornecedor,
+                referencia_lote,
+                unidade_medida,
+                localizacao,
+                data_validade,
+                descricao,
+                observacoes,
+                ativo,
+                atualizado_por: req.user.id,
+                data_atualizacao: new Date().toISOString()
+            })
+            .eq('id', req.params.id);
+
+        if (produtoError) throw produtoError;
+
+        // Update estoque if estoque_minimo is provided
+        if (estoque_minimo !== undefined) {
+            // Use upsert to handle both insert and update in one operation
+            const { error: estoqueError } = await supabaseAdmin
+                .from('estoquelaboratorio')
+                .upsert({
+                    produto_id: req.params.id,
+                    quantidade_minima: estoque_minimo || 0,
+                    quantidade_maxima: quantidade_maxima || null,
+                    atualizado_por: req.user.id
+                }, {
+                    onConflict: 'produto_id',
+                    ignoreDuplicates: false
+                });
+
+            if (estoqueError) throw estoqueError;
+        }
+
+        res.json({ success: true, message: 'Produto atualizado com sucesso' });
+    } catch (error) {
+        console.error('Erro ao atualizar produto:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get produtos stats
+app.get('/api/laboratorio/produtos/stats', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('status')
+            .is('deleted_at', null);
+
+        if (error) throw error;
+
+        const stats = {
+            total: data.length,
+            ok: data.filter(p => p.status === 'ok').length,
+            alerta: data.filter(p => p.status === 'alerta').length,
+            critico: data.filter(p => p.status === 'critico' || p.status === 'vencido').length
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get movimentações
+app.get('/api/laboratorio/movimentacoes', authenticateToken, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, search, tipo, dataInicio, dataFim } = req.query;
+        const offset = (page - 1) * limit;
+
+        let query = supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*', { count: 'exact' });
+
+        if (search) {
+            query = query.or(`produto_nome.ilike.%${search}%,caso_clinico.ilike.%${search}%,responsavel_nome.ilike.%${search}%`);
+        }
+        if (tipo) query = query.eq('tipo_movimento', tipo);
+        if (dataInicio) query = query.gte('data_movimentacao', dataInicio);
+        if (dataFim) {
+            const dataFimFinal = new Date(dataFim);
+            dataFimFinal.setDate(dataFimFinal.getDate() + 1);
+            query = query.lt('data_movimentacao', dataFimFinal.toISOString().split('T')[0]);
+        }
+
+        query = query.order('data_movimentacao', { ascending: false }).range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        res.json({
+            data: data || [],
+            currentPage: parseInt(page),
+            totalPages: Math.ceil((count || 0) / limit),
+            total: count || 0
+        });
+    } catch (error) {
+        console.error('Erro ao buscar movimentações:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get movimentação by ID
+app.get('/api/laboratorio/movimentacoes/:id', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'Movimentação não encontrada' });
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar movimentação:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Register entrada
+app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req, res) => {
+    try {
+        const {
+            produto_id,
+            quantidade,
+            motivo,
+            observacoes,
+            responsavel
+        } = req.body;
+
+        const userId = req.user.id;
+
+        // Get user profile
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', userId)
+            .single();
+
+        const { data: movimentacao, error } = await supabaseAdmin
+            .from('movimentacoeslaboratorio')
+            .insert({
+                produto_id,
+                tipo: 'entrada',
+                quantidade,
+                responsavel: responsavel || profile?.full_name || 'Sistema',
+                motivo: motivo || 'Compra',
+                observacoes,
+                registrado_por: userId
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, data: movimentacao });
+    } catch (error) {
+        console.error('Erro ao registrar entrada:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Register saida
+app.post('/api/laboratorio/movimentacoes/saida', authenticateToken, async (req, res) => {
+    try {
+        const {
+            produto_id,
+            quantidade,
+            numero_caso,
+            motivo,
+            observacoes,
+            responsavel
+        } = req.body;
+
+        const userId = req.user.id;
+
+        // Check available stock
+        const { data: estoque } = await supabase
+            .from('estoquelaboratorio')
+            .select('quantidade_atual')
+            .eq('produto_id', produto_id)
+            .single();
+
+        if (estoque && estoque.quantidade_atual < quantidade) {
+            return res.status(400).json({
+                error: 'Estoque insuficiente',
+                disponivel: estoque.quantidade_atual,
+                solicitado: quantidade
+            });
+        }
+
+        // Get user profile
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', userId)
+            .single();
+
+        const { data: movimentacao, error } = await supabaseAdmin
+            .from('movimentacoeslaboratorio')
+            .insert({
+                produto_id,
+                tipo: 'saida',
+                quantidade,
+                responsavel: responsavel || profile?.full_name || 'Sistema',
+                numero_caso,
+                motivo: motivo || 'Uso em produção',
+                observacoes,
+                registrado_por: userId
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, data: movimentacao });
+    } catch (error) {
+        console.error('Erro ao registrar saída:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get alertas
+app.get('/api/laboratorio/alertas', authenticateToken, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, tipo, prioridade, status = 'ativos' } = req.query;
+        const offset = (page - 1) * limit;
+
+        let query = supabase
+            .from('vw_alertas_ativos')
+            .select('*', { count: 'exact' });
+
+        if (status !== 'todos') {
+            query = query.eq('resolvido', status === 'resolvidos');
+        }
+        if (tipo) query = query.eq('tipo_alerta', tipo);
+        if (prioridade) query = query.eq('prioridade', prioridade);
+
+        query = query.range(offset, offset + parseInt(limit) - 1);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        res.json({
+            data: data || [],
+            currentPage: parseInt(page),
+            totalPages: Math.ceil((count || 0) / limit),
+            total: count || 0
+        });
+    } catch (error) {
+        console.error('Erro ao buscar alertas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get alertas stats
+app.get('/api/laboratorio/alertas/stats', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('alertaslaboratorio')
+            .select('prioridade')
+            .eq('resolvido', false);
+
+        if (error) throw error;
+
+        const stats = {
+            total: data.length,
+            urgente: data.filter(a => a.prioridade === 'urgente').length,
+            alta: data.filter(a => a.prioridade === 'alta').length,
+            media: data.filter(a => a.prioridade === 'media').length
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Mark alerta as visualizado
+app.put('/api/laboratorio/alertas/:id/visualizar', authenticateToken, async (req, res) => {
+    try {
+        const { error } = await supabaseAdmin
+            .from('alertaslaboratorio')
+            .update({
+                visualizado: true,
+                data_visualizado: new Date().toISOString(),
+                visualizado_por: req.user.id
+            })
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Alerta marcado como visualizado' });
+    } catch (error) {
+        console.error('Erro ao marcar alerta:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Resolve alerta
+app.put('/api/laboratorio/alertas/:id/resolver', authenticateToken, async (req, res) => {
+    try {
+        const { observacoes } = req.body;
+
+        const { error } = await supabaseAdmin
+            .from('alertaslaboratorio')
+            .update({
+                resolvido: true,
+                data_resolvido: new Date().toISOString(),
+                resolvido_por: req.user.id,
+                observacoes
+            })
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Alerta resolvido com sucesso' });
+    } catch (error) {
+        console.error('Erro ao resolver alerta:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get fornecedores list
+app.get('/api/laboratorio/fornecedores', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('produtoslaboratorio')
+            .select('fornecedor')
+            .not('fornecedor', 'is', null)
+            .is('deleted_at', null);
+
+        if (error) throw error;
+
+        const fornecedores = [...new Set(data.map(p => p.fornecedor))].filter(Boolean);
+
+        res.json(fornecedores.map(f => ({ fornecedor: f })));
+    } catch (error) {
+        console.error('Erro ao buscar fornecedores:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Valor do Estoque
+app.get('/api/laboratorio/relatorios/valor-estoque', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase.rpc('calcular_valor_estoque');
+
+        if (error) throw error;
+
+        const valorTotal = data.reduce((sum, item) => sum + parseFloat(item.valor_total || 0), 0);
+
+        res.json({
+            valor_total: valorTotal,
+            produtos: data
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Movimentações por Período
+app.get('/api/laboratorio/relatorios/movimentacoes', authenticateToken, async (req, res) => {
+    try {
+        const { dataInicio, dataFim } = req.query;
+
+        let query = supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*');
+
+        if (dataInicio) query = query.gte('data_movimentacao', dataInicio);
+        if (dataFim) {
+            const dataFimFinal = new Date(dataFim);
+            dataFimFinal.setDate(dataFimFinal.getDate() + 1);
+            query = query.lt('data_movimentacao', dataFimFinal.toISOString().split('T')[0]);
+        }
+
+        query = query.order('data_movimentacao', { ascending: false });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const totalEntradas = data.filter(m => m.tipo_movimento === 'entrada').length;
+        const totalSaidas = data.filter(m => m.tipo_movimento === 'saida').length;
+
+        res.json({
+            movimentacoes: data,
+            total_entradas: totalEntradas,
+            total_saidas: totalSaidas
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Consumo por Responsável
+app.get('/api/laboratorio/relatorios/consumo-responsavel', authenticateToken, async (req, res) => {
+    try {
+        const { dataInicio, dataFim } = req.query;
+
+        let query = supabase
+            .from('movimentacoeslaboratorio')
+            .select('responsavel_nome, tipo_movimento')
+            .is('deleted_at', null);
+
+        if (dataInicio) query = query.gte('data_movimentacao', dataInicio);
+        if (dataFim) {
+            const dataFimFinal = new Date(dataFim);
+            dataFimFinal.setDate(dataFimFinal.getDate() + 1);
+            query = query.lt('data_movimentacao', dataFimFinal.toISOString().split('T')[0]);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const grouped = data.reduce((acc, mov) => {
+            if (!acc[mov.responsavel_nome]) {
+                acc[mov.responsavel_nome] = {
+                    responsavel_nome: mov.responsavel_nome,
+                    total_movimentacoes: 0,
+                    total_entradas: 0,
+                    total_saidas: 0
+                };
+            }
+            acc[mov.responsavel_nome].total_movimentacoes++;
+            if (mov.tipo_movimento === 'entrada') acc[mov.responsavel_nome].total_entradas++;
+            if (mov.tipo_movimento === 'saida') acc[mov.responsavel_nome].total_saidas++;
+            return acc;
+        }, {});
+
+        res.json(Object.values(grouped));
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Consumo por Caso Clínico
+app.get('/api/laboratorio/relatorios/consumo-caso', authenticateToken, async (req, res) => {
+    try {
+        const { dataInicio, dataFim, caso } = req.query;
+
+        let query = supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*')
+            .eq('tipo_movimento', 'saida')
+            .not('caso_clinico', 'is', null);
+
+        if (caso) query = query.ilike('caso_clinico', `%${caso}%`);
+        if (dataInicio) query = query.gte('data_movimentacao', dataInicio);
+        if (dataFim) {
+            const dataFimFinal = new Date(dataFim);
+            dataFimFinal.setDate(dataFimFinal.getDate() + 1);
+            query = query.lt('data_movimentacao', dataFimFinal.toISOString().split('T')[0]);
+        }
+
+        query = query.order('data_movimentacao', { ascending: false });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Top Produtos
+app.get('/api/laboratorio/relatorios/top-produtos', authenticateToken, async (req, res) => {
+    try {
+        const { dataInicio, dataFim, limit = 10 } = req.query;
+
+        let query = supabase
+            .from('movimentacoeslaboratorio')
+            .select('produto_id, quantidade')
+            .eq('tipo_movimento', 'saida')
+            .is('deleted_at', null);
+
+        if (dataInicio) query = query.gte('data_movimentacao', dataInicio);
+        if (dataFim) {
+            const dataFimFinal = new Date(dataFim);
+            dataFimFinal.setDate(dataFimFinal.getDate() + 1);
+            query = query.lt('data_movimentacao', dataFimFinal.toISOString().split('T')[0]);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Group by produto_id
+        const grouped = data.reduce((acc, mov) => {
+            if (!acc[mov.produto_id]) {
+                acc[mov.produto_id] = {
+                    produto_id: mov.produto_id,
+                    quantidade_total: 0,
+                    numero_movimentacoes: 0
+                };
+            }
+            acc[mov.produto_id].quantidade_total += parseFloat(mov.quantidade);
+            acc[mov.produto_id].numero_movimentacoes++;
+            return acc;
+        }, {});
+
+        const sorted = Object.values(grouped).sort((a, b) => b.quantidade_total - a.quantidade_total).slice(0, parseInt(limit));
+
+        // Get product details
+        const produtoIds = sorted.map(p => p.produto_id);
+        const { data: produtos } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .in('id', produtoIds);
+
+        const result = sorted.map(item => {
+            const produto = produtos.find(p => p.id === item.produto_id);
+            return {
+                ...item,
+                produto_nome: produto?.nome_material,
+                categoria: produto?.categoria,
+                unidade_medida: produto?.unidade_medida
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Compras
+app.get('/api/laboratorio/relatorios/compras', authenticateToken, async (req, res) => {
+    try {
+        const { dataInicio, dataFim, fornecedor } = req.query;
+
+        let query = supabase
+            .from('custoslaboratorio')
+            .select(`
+                *,
+                produtoslaboratorio!inner (
+                    id,
+                    nome_material,
+                    unidade_medida
+                )
+            `)
+            .is('deleted_at', null);
+
+        if (fornecedor) query = query.ilike('fornecedor', `%${fornecedor}%`);
+        if (dataInicio) query = query.gte('data_compra', dataInicio);
+        if (dataFim) query = query.lte('data_compra', dataFim);
+
+        query = query.order('data_compra', { ascending: false });
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const compras = data.map(c => ({
+            ...c,
+            produto_nome: c.produtoslaboratorio.nome_material,
+            unidade_medida: c.produtoslaboratorio.unidade_medida
+        }));
+
+        res.json({ compras });
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Entradas do mês
+app.get('/api/laboratorio/relatorios/entradas-mes', authenticateToken, async (req, res) => {
+    try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const { count, error } = await supabase
+            .from('movimentacoeslaboratorio')
+            .select('*', { count: 'exact', head: true })
+            .eq('tipo', 'entrada')
+            .gte('data_movimentacao', startOfMonth.toISOString());
+
+        if (error) throw error;
+
+        res.json({ total: count || 0 });
+    } catch (error) {
+        console.error('Erro ao buscar entradas do mês:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Relatório: Saídas do mês
+app.get('/api/laboratorio/relatorios/saidas-mes', authenticateToken, async (req, res) => {
+    try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const { count, error } = await supabase
+            .from('movimentacoeslaboratorio')
+            .select('*', { count: 'exact', head: true })
+            .eq('tipo', 'saida')
+            .gte('data_movimentacao', startOfMonth.toISOString());
+
+        if (error) throw error;
+
+        res.json({ total: count || 0 });
+    } catch (error) {
+        console.error('Erro ao buscar saídas do mês:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros 404 - deve vir ANTES do error handler
 app.use((req, res, next) => {
     res.status(404).json({ 
