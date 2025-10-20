@@ -3587,6 +3587,269 @@ app.get('/api/prostoral/invoices/:id/pdf', authenticateToken, async (req, res) =
     }
 });
 
+// ==================== DASHBOARD E RELATÓRIOS ====================
+
+// GET - KPIs principais do dashboard
+app.get('/api/prostoral/dashboard/kpis', authenticateToken, async (req, res) => {
+    try {
+        const { date_from, date_to } = req.query;
+        const tenant_id = req.user.tenant_id || '00000000-0000-0000-0000-000000000002';
+        
+        // Total de OS
+        let ordersQuery = supabaseAdmin
+            .from('prostoral_work_orders')
+            .select('id, status', { count: 'exact' })
+            .eq('tenant_id', tenant_id);
+        
+        if (date_from) ordersQuery = ordersQuery.gte('created_at', date_from);
+        if (date_to) ordersQuery = ordersQuery.lte('created_at', date_to);
+        
+        const { count: totalOrders } = await ordersQuery;
+        
+        // OS por status
+        const { data: ordersByStatus } = await supabaseAdmin
+            .from('prostoral_work_orders')
+            .select('status')
+            .eq('tenant_id', tenant_id);
+        
+        const statusCount = ordersByStatus?.reduce((acc, order) => {
+            acc[order.status] = (acc[order.status] || 0) + 1;
+            return acc;
+        }, {});
+        
+        // Faturamento
+        let invoicesQuery = supabaseAdmin
+            .from('prostoral_invoices')
+            .select('total_amount, status')
+            .eq('tenant_id', tenant_id);
+        
+        if (date_from) invoicesQuery = invoicesQuery.gte('issue_date', date_from);
+        if (date_to) invoicesQuery = invoicesQuery.lte('issue_date', date_to);
+        
+        const { data: invoices } = await invoicesQuery;
+        
+        const revenue = invoices?.reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        const paidRevenue = invoices?.filter(inv => inv.status === 'paid')
+            .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        
+        // Estoque baixo
+        const { count: lowStockCount } = await supabaseAdmin
+            .from('prostoral_inventory')
+            .select('id', { count: 'exact' })
+            .eq('tenant_id', tenant_id)
+            .lte('quantity', supabaseAdmin.raw('min_stock'));
+        
+        // Intercorrências abertas
+        const { count: openIncidents } = await supabaseAdmin
+            .from('prostoral_incidents')
+            .select('id', { count: 'exact' })
+            .eq('tenant_id', tenant_id)
+            .eq('status', 'open');
+        
+        res.json({
+            success: true,
+            kpis: {
+                totalOrders: totalOrders || 0,
+                ordersByStatus: statusCount || {},
+                revenue: revenue.toFixed(2),
+                paidRevenue: paidRevenue.toFixed(2),
+                pendingRevenue: (revenue - paidRevenue).toFixed(2),
+                lowStockItems: lowStockCount || 0,
+                openIncidents: openIncidents || 0
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao buscar KPIs:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Relatório de produção
+app.get('/api/prostoral/reports/production', authenticateToken, async (req, res) => {
+    try {
+        const { date_from, date_to, technician_id } = req.query;
+        const tenant_id = req.user.tenant_id || '00000000-0000-0000-0000-000000000002';
+        
+        let query = supabaseAdmin
+            .from('prostoral_time_tracking')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(id, work_order_number, patient_name),
+                technician:user_profiles(id, full_name)
+            `)
+            .eq('work_order.tenant_id', tenant_id)
+            .not('check_out_time', 'is', null);
+        
+        if (date_from) query = query.gte('check_in_time', date_from);
+        if (date_to) query = query.lte('check_in_time', date_to);
+        if (technician_id) query = query.eq('technician_id', technician_id);
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Calcular totais
+        const totalHours = data?.reduce((sum, record) => {
+            const checkIn = new Date(record.check_in_time);
+            const checkOut = new Date(record.check_out_time);
+            const hours = (checkOut - checkIn) / (1000 * 60 * 60);
+            return sum + hours;
+        }, 0) || 0;
+        
+        res.json({
+            success: true,
+            report: {
+                records: data || [],
+                totalHours: totalHours.toFixed(2),
+                totalRecords: data?.length || 0
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório de produção:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Relatório financeiro
+app.get('/api/prostoral/reports/financial', authenticateToken, async (req, res) => {
+    try {
+        const { date_from, date_to, client_id } = req.query;
+        const tenant_id = req.user.tenant_id || '00000000-0000-0000-0000-000000000002';
+        
+        let query = supabaseAdmin
+            .from('prostoral_invoices')
+            .select(`
+                *,
+                client:prostoral_clients(id, full_name, company_name)
+            `)
+            .eq('tenant_id', tenant_id);
+        
+        if (date_from) query = query.gte('issue_date', date_from);
+        if (date_to) query = query.lte('issue_date', date_to);
+        if (client_id) query = query.eq('client_id', client_id);
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Calcular totais
+        const totalRevenue = data?.reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        const paidAmount = data?.filter(inv => inv.status === 'paid')
+            .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        const pendingAmount = data?.filter(inv => inv.status === 'sent')
+            .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        const overdueAmount = data?.filter(inv => inv.status === 'overdue')
+            .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0) || 0;
+        
+        res.json({
+            success: true,
+            report: {
+                invoices: data || [],
+                summary: {
+                    totalRevenue: totalRevenue.toFixed(2),
+                    paidAmount: paidAmount.toFixed(2),
+                    pendingAmount: pendingAmount.toFixed(2),
+                    overdueAmount: overdueAmount.toFixed(2),
+                    totalInvoices: data?.length || 0
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório financeiro:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Relatório de estoque
+app.get('/api/prostoral/reports/inventory', authenticateToken, async (req, res) => {
+    try {
+        const { category, low_stock_only } = req.query;
+        const tenant_id = req.user.tenant_id || '00000000-0000-0000-0000-000000000002';
+        
+        let query = supabaseAdmin
+            .from('prostoral_inventory')
+            .select('*')
+            .eq('tenant_id', tenant_id);
+        
+        if (category) query = query.eq('category', category);
+        if (low_stock_only === 'true') {
+            query = query.lte('quantity', supabaseAdmin.raw('min_stock'));
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Calcular totais
+        const totalValue = data?.reduce((sum, item) => {
+            return sum + (item.quantity * (item.unit_cost || 0));
+        }, 0) || 0;
+        
+        const lowStockItems = data?.filter(item => item.quantity <= (item.min_stock || 0)) || [];
+        
+        res.json({
+            success: true,
+            report: {
+                items: data || [],
+                summary: {
+                    totalItems: data?.length || 0,
+                    totalValue: totalValue.toFixed(2),
+                    lowStockCount: lowStockItems.length
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório de estoque:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Relatório de CMV (Análise de custos)
+app.get('/api/prostoral/reports/cmv', authenticateToken, async (req, res) => {
+    try {
+        const { date_from, date_to } = req.query;
+        const tenant_id = req.user.tenant_id || '00000000-0000-0000-0000-000000000002';
+        
+        let query = supabaseAdmin
+            .from('prostoral_cmv')
+            .select(`
+                *,
+                work_order:prostoral_work_orders(id, work_order_number, patient_name, status)
+            `)
+            .eq('tenant_id', tenant_id);
+        
+        if (date_from) query = query.gte('calculated_at', date_from);
+        if (date_to) query = query.lte('calculated_at', date_to);
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        // Calcular médias
+        const avgMaterialCost = data?.reduce((sum, cmv) => sum + (parseFloat(cmv.direct_materials_cost) || 0), 0) / (data?.length || 1) || 0;
+        const avgLaborCost = data?.reduce((sum, cmv) => sum + (parseFloat(cmv.direct_labor_cost) || 0), 0) / (data?.length || 1) || 0;
+        const avgIndirectCost = data?.reduce((sum, cmv) => sum + (parseFloat(cmv.indirect_costs) || 0), 0) / (data?.length || 1) || 0;
+        const avgTotalCost = data?.reduce((sum, cmv) => sum + (parseFloat(cmv.total_cost) || 0), 0) / (data?.length || 1) || 0;
+        
+        res.json({
+            success: true,
+            report: {
+                records: data || [],
+                summary: {
+                    totalRecords: data?.length || 0,
+                    avgMaterialCost: avgMaterialCost.toFixed(2),
+                    avgLaborCost: avgLaborCost.toFixed(2),
+                    avgIndirectCost: avgIndirectCost.toFixed(2),
+                    avgTotalCost: avgTotalCost.toFixed(2)
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao gerar relatório de CMV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
