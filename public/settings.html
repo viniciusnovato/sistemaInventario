@@ -131,10 +131,13 @@
             }
         }
         
-        .success-message {
-            background: rgba(34, 197, 94, 0.2);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            color: rgb(187, 247, 208);
+        .config-card {
+            transition: all 0.3s ease;
+        }
+        
+        .config-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
@@ -170,238 +173,132 @@
     </header>
     
     <!-- Main Content -->
-    <main class="relative z-10 flex items-center justify-center min-h-[calc(100dvh-4rem)] p-4 sm:p-6">
-        <div class="w-full max-w-sm sm:max-w-md lg:max-w-lg">
+    <main class="relative z-10 py-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto">
             <!-- Page Title -->
-            <div class="text-center mb-6 sm:mb-8 animate-bounce-in">
+            <div class="text-center mb-8 sm:mb-12 animate-bounce-in">
                 <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/20 rounded-full mb-3 sm:mb-4 glass-effect">
                     <i class="fas fa-cog text-2xl sm:text-3xl text-white"></i>
                 </div>
                 <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">Configurações</h1>
-                <p class="text-sm sm:text-base text-white/80">Altere sua senha de acesso</p>
+                <p class="text-sm sm:text-base text-white/80">Configurações do sistema</p>
             </div>
             
-            <!-- Settings Form -->
-            <div class="glass-effect rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl animate-slide-up">
-                <form id="changePasswordForm" class="space-y-4 sm:space-y-6">
-                    <div class="space-y-2">
-                        <label for="currentPassword" class="block text-sm font-semibold text-white/90">
-                            <i class="fas fa-lock mr-2"></i>
-                            Senha Atual
-                        </label>
-                        <div class="relative">
-                            <input type="password" id="currentPassword" name="currentPassword" required
-                                class="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-lg sm:rounded-xl focus:ring-4 focus:ring-white/20 focus:border-white/40 transition-all duration-300 text-white placeholder-white/60 pr-10 sm:pr-12 text-sm sm:text-base"
-                                placeholder="••••••••"
-                                autocomplete="current-password">
-                            <button type="button" class="toggle-password absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors p-1 touch-manipulation"
-                                aria-label="Mostrar/ocultar senha atual">
-                                <i class="fas fa-eye text-sm sm:text-base"></i>
-                            </button>
+            <!-- Configuration Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-up">
+                <!-- Change Password Card -->
+                <a href="settings-password.html" class="config-card glass-effect rounded-2xl p-6 shadow-xl hover:bg-white/15 transition-all block">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-key text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Alterar Senha</h3>
+                            <p class="text-sm text-white/70">Modifique sua senha de acesso</p>
                         </div>
                     </div>
-                    
-                    <div class="space-y-2">
-                        <label for="newPassword" class="block text-sm font-semibold text-white/90">
-                            <i class="fas fa-key mr-2"></i>
-                            Nova Senha
-                        </label>
-                        <div class="relative">
-                            <input type="password" id="newPassword" name="newPassword" required
-                                class="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-lg sm:rounded-xl focus:ring-4 focus:ring-white/20 focus:border-white/40 transition-all duration-300 text-white placeholder-white/60 pr-10 sm:pr-12 text-sm sm:text-base"
-                                placeholder="••••••••"
-                                autocomplete="new-password"
-                                minlength="6">
-                            <button type="button" class="toggle-password absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors p-1 touch-manipulation"
-                                aria-label="Mostrar/ocultar nova senha">
-                                <i class="fas fa-eye text-sm sm:text-base"></i>
-                            </button>
-                        </div>
-                        <p class="text-xs text-white/60 mt-1">Mínimo de 6 caracteres</p>
+                    <div class="flex items-center text-white/60 text-sm">
+                        <span>Acessar</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
                     </div>
-                    
-                    <div class="space-y-2">
-                        <label for="confirmPassword" class="block text-sm font-semibold text-white/90">
-                            <i class="fas fa-check-circle mr-2"></i>
-                            Confirmar Nova Senha
-                        </label>
-                        <div class="relative">
-                            <input type="password" id="confirmPassword" name="confirmPassword" required
-                                class="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-lg sm:rounded-xl focus:ring-4 focus:ring-white/20 focus:border-white/40 transition-all duration-300 text-white placeholder-white/60 pr-10 sm:pr-12 text-sm sm:text-base"
-                                placeholder="••••••••"
-                                autocomplete="new-password">
-                            <button type="button" class="toggle-password absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors p-1 touch-manipulation"
-                                aria-label="Mostrar/ocultar confirmação de senha">
-                                <i class="fas fa-eye text-sm sm:text-base"></i>
-                            </button>
+                </a>
+
+                <!-- User Management Card (Admin Only) -->
+                <a href="user-management.html" id="userManagementCard" class="config-card glass-effect rounded-2xl p-6 shadow-xl hover:bg-white/15 transition-all block">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-users-cog text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Gerenciar Usuários</h3>
+                            <p class="text-sm text-white/70">Criar e gerenciar usuários do sistema</p>
                         </div>
                     </div>
-                    
-                    <!-- Change Password Button -->
-                    <button type="submit" id="changePasswordButton"
-                        class="w-full bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-white/20 backdrop-blur-sm text-sm sm:text-base touch-manipulation">
-                        <i class="fas fa-save mr-2"></i>
-                        Alterar Senha
-                    </button>
-                </form>
-                
-                <!-- Success Message -->
-                <div id="successMessage" class="hidden mt-4 p-3 sm:p-4 success-message rounded-lg sm:rounded-xl text-xs sm:text-sm">
-                    <i class="fas fa-check-circle mr-2"></i>
-                    <span id="successText">Senha alterada com sucesso!</span>
+                    <div class="flex items-center text-white/60 text-sm">
+                        <span>Acessar</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </div>
+                </a>
+
+                <!-- System Info Card -->
+                <div class="config-card glass-effect rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-info-circle text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Informações do Sistema</h3>
+                            <p class="text-sm text-white/70">Versão e detalhes técnicos</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-white/80 text-sm">
+                        <div class="flex justify-between">
+                            <span>Versão:</span>
+                            <span class="font-semibold">1.0.0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Ambiente:</span>
+                            <span class="font-semibold">Produção</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Grupo:</span>
+                            <span class="font-semibold">AreLuna</span>
+                        </div>
+                    </div>
                 </div>
-                
-                <!-- Error Message -->
-                <div id="errorMessage" class="hidden mt-4 p-3 sm:p-4 bg-red-500/20 border border-red-500/30 rounded-lg sm:rounded-xl text-red-100 text-xs sm:text-sm">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    <span id="errorText"></span>
-                </div>
-                
-                <!-- Loading Overlay -->
-                <div id="loadingOverlay" class="hidden absolute inset-0 bg-black/50 rounded-2xl sm:rounded-3xl flex items-center justify-center">
-                    <div class="text-center text-white">
-                        <div class="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-white mx-auto mb-3 sm:mb-4"></div>
-                        <p class="text-sm sm:text-base">Alterando senha...</p>
+
+                <!-- Support Card -->
+                <div class="config-card glass-effect rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
+                            <i class="fas fa-life-ring text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Suporte</h3>
+                            <p class="text-sm text-white/70">Precisa de ajuda?</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-white/80 text-sm">
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope mr-2 text-white/60"></i>
+                            <span>suporte@institutoareluna.pt</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone mr-2 text-white/60"></i>
+                            <span>+351 XXX XXX XXX</span>
+                        </div>
                     </div>
                 </div>
             </div>
             
             <!-- Footer -->
-            <div class="text-center mt-6 sm:mt-8 text-white/60 text-xs sm:text-sm animate-fade-in px-4">
+            <div class="text-center mt-8 text-white/60 text-xs sm:text-sm animate-fade-in">
                 <p>&copy; 2024 Grupo AreLuna. Todos os direitos reservados.</p>
             </div>
         </div>
     </main>
     
     <script>
-        let authManager;
-        
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Initialize AuthManager
-            authManager = new AuthManager();
-            
-            // Protect page and get user info
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication - wait for auth to initialize
             setTimeout(async () => {
-                await authManager.requireAuthentication();
-                
-                const user = await authManager.getCurrentUser();
-                if (user) {
-                    document.getElementById('userEmail').textContent = user.email;
+                if (!isAuthenticated()) {
+                    window.location.href = 'login.html';
+                    return;
                 }
-            }, 100);
+                
+                // Get user info
+                const user = await getCurrentUser();
+                if (user) {
+                    document.getElementById('userEmail').textContent = user.email || 'Usuário';
+                }
+            }, 300);
             
             // Setup logout button
             document.getElementById('logoutButton').addEventListener('click', async function() {
-                await authManager.signOut();
+                await signOut();
             });
-            
-            // Setup password visibility toggles
-            document.querySelectorAll('.toggle-password').forEach(button => {
-                button.addEventListener('click', function() {
-                    const input = this.parentElement.querySelector('input');
-                    const icon = this.querySelector('i');
-                    
-                    if (input.type === 'password') {
-                        input.type = 'text';
-                        icon.classList.remove('fa-eye');
-                        icon.classList.add('fa-eye-slash');
-                    } else {
-                        input.type = 'password';
-                        icon.classList.remove('fa-eye-slash');
-                        icon.classList.add('fa-eye');
-                    }
-                });
-            });
-            
-            // Setup form submission
-            document.getElementById('changePasswordForm').addEventListener('submit', handlePasswordChange);
         });
-        
-        async function handlePasswordChange(event) {
-            event.preventDefault();
-            
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            
-            // Clear previous messages
-            hideMessage('errorMessage');
-            hideMessage('successMessage');
-            
-            // Validate passwords
-            if (newPassword !== confirmPassword) {
-                showError('As senhas não coincidem.');
-                return;
-            }
-            
-            if (newPassword.length < 6) {
-                showError('A nova senha deve ter pelo menos 6 caracteres.');
-                return;
-            }
-            
-            if (currentPassword === newPassword) {
-                showError('A nova senha deve ser diferente da senha atual.');
-                return;
-            }
-            
-            // Show loading
-            showLoading(true);
-            
-            try {
-                // Use AuthManager to change password
-                await authManager.changePassword(currentPassword, newPassword);
-                
-                // Show success message
-                showSuccess('Senha alterada com sucesso!');
-                
-                // Clear form
-                document.getElementById('changePasswordForm').reset();
-                
-            } catch (error) {
-                console.error('Erro ao alterar senha:', error);
-                
-                let errorMessage = 'Erro ao alterar senha. Tente novamente.';
-                
-                if (error.message.includes('Invalid login credentials')) {
-                    errorMessage = 'Senha atual incorreta.';
-                } else if (error.message.includes('Password should be at least')) {
-                    errorMessage = 'A nova senha deve ter pelo menos 6 caracteres.';
-                } else if (error.message.includes('same as the old password')) {
-                    errorMessage = 'A nova senha deve ser diferente da senha atual.';
-                }
-                
-                showError(errorMessage);
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        function showError(message) {
-            document.getElementById('errorText').textContent = message;
-            document.getElementById('errorMessage').classList.remove('hidden');
-        }
-        
-        function showSuccess(message) {
-            document.getElementById('successText').textContent = message;
-            document.getElementById('successMessage').classList.remove('hidden');
-        }
-        
-        function hideMessage(elementId) {
-            document.getElementById(elementId).classList.add('hidden');
-        }
-        
-        function showLoading(show) {
-            const overlay = document.getElementById('loadingOverlay');
-            const button = document.getElementById('changePasswordButton');
-            
-            if (show) {
-                overlay.classList.remove('hidden');
-                button.disabled = true;
-            } else {
-                overlay.classList.add('hidden');
-                button.disabled = false;
-            }
-        }
     </script>
 </body>
 </html>

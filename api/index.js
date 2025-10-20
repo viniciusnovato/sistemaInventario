@@ -179,6 +179,25 @@ app.get('/api/auth/me', authenticateToken, getCurrentUser);
 
 // Rotas da API
 
+// Get current user data (with roles and permissions)
+app.get('/api/user', authenticateToken, async (req, res) => {
+    try {
+        // req.user já contém os dados do usuário, roles e permissions
+        // adicionados pelo authenticateToken middleware
+        res.json({
+            id: req.user.id,
+            email: req.user.email,
+            full_name: req.user.full_name,
+            roles: req.user.roles || [],
+            permissions: req.user.permissions || [],
+            available_modules: req.user.available_modules || []
+        });
+    } catch (error) {
+        console.error('Erro ao buscar dados do usuário:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // GET -// Rota para listar todos os itens
 app.get('/api/items', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {    try {
         const {
@@ -3840,6 +3859,388 @@ app.get('/api/prostoral/reports/cmv', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Erro ao gerar relatório de CMV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// USER MANAGEMENT ROUTES (ADMIN ONLY)
+// ============================================================================
+
+// List all users (Admin only)
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+    try {
+        // Check if user is admin
+        const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
+                       req.user.permissions?.includes('users:manage') ||
+                       req.user.permissions?.includes('admin:all');
+        
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        }
+
+        // Get all users from user_profiles table
+        const { data: userProfiles, error: profilesError } = await supabaseAdmin
+            .from('user_profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (profilesError) {
+            console.error('Erro ao listar perfis de usuários:', profilesError);
+            throw profilesError;
+        }
+
+        // Get roles and auth data for each user
+        const formattedUsers = await Promise.all(userProfiles.map(async (profile) => {
+            // Get user roles
+            const { data: userRoles } = await supabaseAdmin
+                .from('user_roles')
+                .select(`
+                    role_id,
+                    roles (
+                        id,
+                        name,
+                        description
+                    )
+                `)
+                .eq('user_id', profile.user_id)
+                .eq('is_active', true);
+
+            // Get permissions from roles
+            const permissions = new Set();
+            const roles = [];
+            
+            if (userRoles && userRoles.length > 0) {
+                for (const ur of userRoles) {
+                    if (ur.roles) {
+                        roles.push(ur.roles.name);
+                        
+                        // Get permissions for this role
+                        const { data: rolePerms } = await supabaseAdmin
+                            .from('role_permissions')
+                            .select('permission')
+                            .eq('role_id', ur.role_id);
+                        
+                        rolePerms?.forEach(p => {
+                            if (p.permission) permissions.add(p.permission);
+                        });
+                    }
+                }
+            }
+
+            // Get user's auth data from Supabase Auth
+            let email = 'N/A';
+            try {
+                const { data: authData } = await supabaseAdmin.auth.admin.getUserById(profile.user_id);
+                email = authData?.user?.email || email;
+            } catch (authError) {
+                console.error(`Erro ao buscar email do usuário ${profile.user_id}:`, authError);
+            }
+
+            return {
+                id: profile.user_id,
+                email: email,
+                full_name: profile.display_name || profile.first_name || 'Usuário',
+                is_active: profile.is_active !== false,
+                roles: roles,
+                permissions: Array.from(permissions)
+            };
+        }));
+
+        res.json({ success: true, users: formattedUsers });
+    } catch (error) {
+        console.error('Erro ao listar usuários:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all available roles (Admin only)
+app.get('/api/admin/roles', authenticateToken, async (req, res) => {
+    try {
+        // Check if user is admin
+        const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
+                       req.user.permissions?.includes('users:manage') ||
+                       req.user.permissions?.includes('admin:all');
+        
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        }
+
+        // Get all roles
+        const { data: roles, error } = await supabaseAdmin
+            .from('roles')
+            .select('*')
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao listar roles:', error);
+            throw error;
+        }
+
+        res.json({ success: true, roles });
+    } catch (error) {
+        console.error('Erro ao buscar roles:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new user (Admin only)
+app.post('/api/admin/users', authenticateToken, async (req, res) => {
+    try {
+        // Check if user is admin
+        const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
+                       req.user.permissions?.includes('users:manage') ||
+                       req.user.permissions?.includes('admin:all');
+        
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        }
+
+        const { email, password, full_name, is_admin, permissions } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+        }
+
+        // Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: email,
+            password: password,
+            email_confirm: true
+        });
+
+        if (authError) throw authError;
+
+        const userId = authData.user.id;
+
+        // Create user profile
+        const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .insert([{
+                user_id: userId,
+                full_name: full_name || null,
+                is_active: true,
+                tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+            }]);
+
+        if (profileError) {
+            console.error('Erro ao criar perfil:', profileError);
+        }
+
+        // Assign role
+        if (is_admin) {
+            // Get admin role
+            const { data: adminRole } = await supabaseAdmin
+                .from('roles')
+                .select('id')
+                .eq('name', 'admin')
+                .single();
+
+            if (adminRole) {
+                await supabaseAdmin
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userId,
+                        role_id: adminRole.id,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                    }]);
+            }
+        } else if (permissions && permissions.length > 0) {
+            // Create or get a custom role for this user
+            const roleName = `user_${userId.substring(0, 8)}`;
+            const { data: customRole, error: roleError } = await supabaseAdmin
+                .from('roles')
+                .insert([{
+                    name: roleName,
+                    description: `Função personalizada para ${email}`,
+                    tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                }])
+                .select()
+                .single();
+
+            if (customRole && !roleError) {
+                // Assign role to user
+                await supabaseAdmin
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userId,
+                        role_id: customRole.id,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                    }]);
+
+                // Assign permissions to role
+                const permissionInserts = permissions.map(perm => ({
+                    role_id: customRole.id,
+                    permission: perm
+                }));
+
+                await supabaseAdmin
+                    .from('role_permissions')
+                    .insert(permissionInserts);
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Usuário criado com sucesso',
+            user: {
+                id: userId,
+                email: email,
+                full_name: full_name
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao criar usuário:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update user (Admin only)
+app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
+    try {
+        // Check if user is admin
+        const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
+                       req.user.permissions?.includes('users:manage') ||
+                       req.user.permissions?.includes('admin:all');
+        
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        }
+
+        const { userId } = req.params;
+        const { full_name, is_admin, permissions } = req.body;
+
+        // Update profile
+        if (full_name !== undefined) {
+            const { error: profileError } = await supabaseAdmin
+                .from('profiles')
+                .update({ full_name })
+                .eq('user_id', userId);
+
+            if (profileError) {
+                console.error('Erro ao atualizar perfil:', profileError);
+            }
+        }
+
+        // Update roles and permissions
+        // First, remove existing user roles
+        await supabaseAdmin
+            .from('user_roles')
+            .delete()
+            .eq('user_id', userId);
+
+        if (is_admin) {
+            // Assign admin role
+            const { data: adminRole } = await supabaseAdmin
+                .from('roles')
+                .select('id')
+                .eq('name', 'admin')
+                .single();
+
+            if (adminRole) {
+                await supabaseAdmin
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userId,
+                        role_id: adminRole.id,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                    }]);
+            }
+        } else if (permissions && permissions.length > 0) {
+            // Get or create custom role
+            const roleName = `user_${userId.substring(0, 8)}`;
+            
+            // Try to find existing role
+            let { data: existingRole } = await supabaseAdmin
+                .from('roles')
+                .select('id')
+                .eq('name', roleName)
+                .single();
+
+            let roleId;
+            if (existingRole) {
+                roleId = existingRole.id;
+                // Delete existing permissions
+                await supabaseAdmin
+                    .from('role_permissions')
+                    .delete()
+                    .eq('role_id', roleId);
+            } else {
+                // Create new role
+                const { data: newRole } = await supabaseAdmin
+                    .from('roles')
+                    .insert([{
+                        name: roleName,
+                        description: `Função personalizada`,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                    }])
+                    .select()
+                    .single();
+                roleId = newRole?.id;
+            }
+
+            if (roleId) {
+                // Assign role to user
+                await supabaseAdmin
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userId,
+                        role_id: roleId,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                    }]);
+
+                // Assign new permissions
+                const permissionInserts = permissions.map(perm => ({
+                    role_id: roleId,
+                    permission: perm
+                }));
+
+                await supabaseAdmin
+                    .from('role_permissions')
+                    .insert(permissionInserts);
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Usuário atualizado com sucesso'
+        });
+    } catch (error) {
+        console.error('Erro ao atualizar usuário:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Toggle user status (Admin only)
+app.patch('/api/admin/users/:userId/status', authenticateToken, async (req, res) => {
+    try {
+        // Check if user is admin
+        const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
+                       req.user.permissions?.includes('users:manage') ||
+                       req.user.permissions?.includes('admin:all');
+        
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+        }
+
+        const { userId } = req.params;
+        const { is_active } = req.body;
+
+        // Update profile status
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .update({ is_active })
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
+        res.json({ 
+            success: true, 
+            message: `Usuário ${is_active ? 'ativado' : 'desativado'} com sucesso`
+        });
+    } catch (error) {
+        console.error('Erro ao atualizar status do usuário:', error);
         res.status(500).json({ error: error.message });
     }
 });
