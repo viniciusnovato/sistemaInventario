@@ -259,8 +259,15 @@ class ProstoralApp {
     async loadInventory() {
         try {
             const token = await window.authManager.getAccessToken();
+            const search = document.getElementById('inventory-search')?.value || '';
+            const category = document.getElementById('inventory-filter-category')?.value || '';
+            const stock = document.getElementById('inventory-filter-stock')?.value || '';
+
+            let url = `${this.apiBaseUrl}/inventory?`;
+            if (search) url += `search=${encodeURIComponent(search)}&`;
+            if (category) url += `category=${category}&`;
             
-            const response = await fetch(`${this.apiBaseUrl}/inventory`, {
+            const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -271,11 +278,148 @@ class ProstoralApp {
             const data = await response.json();
             this.inventory = data.items || [];
 
-            // TODO: Renderizar estoque
-            console.log('Estoque carregado:', this.inventory);
+            // Filtrar por nível de estoque se necessário
+            let filteredInventory = this.inventory;
+            if (stock === 'low') {
+                filteredInventory = this.inventory.filter(item => item.quantity <= (item.min_stock || 0));
+            } else if (stock === 'out') {
+                filteredInventory = this.inventory.filter(item => item.quantity === 0);
+            } else if (stock === 'available') {
+                filteredInventory = this.inventory.filter(item => item.quantity > (item.min_stock || 0));
+            }
+
+            this.renderInventory(filteredInventory);
         } catch (error) {
             console.error('Erro ao carregar estoque:', error);
+            this.showError('Erro ao carregar estoque');
         }
+    }
+
+    renderInventory(items) {
+        const tbody = document.getElementById('inventory-table-body');
+        
+        if (!items || items.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        Nenhum material encontrado
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+            const categoryLabels = {
+                'ceramic': 'Cerâmica',
+                'resin': 'Resina',
+                'metal': 'Metal',
+                'plaster': 'Gesso',
+                'tools': 'Ferramentas',
+                'consumables': 'Consumíveis',
+                'other': 'Outros'
+            };
+
+            const isLowStock = item.quantity <= (item.min_stock || 0);
+            const isOutOfStock = item.quantity === 0;
+
+            const stockClass = isOutOfStock 
+                ? 'text-red-600 font-bold' 
+                : isLowStock 
+                    ? 'text-yellow-600 font-bold' 
+                    : 'text-gray-900 dark:text-white';
+
+            return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-gray-900 dark:text-white">${item.name}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${item.code || '-'}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                            ${categoryLabels[item.category] || item.category}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="${stockClass}">
+                            ${item.quantity}
+                            ${isLowStock ? '<i class="fas fa-exclamation-triangle ml-1"></i>' : ''}
+                        </div>
+                        ${item.min_stock ? `<div class="text-xs text-gray-500">Mín: ${item.min_stock}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        ${item.unit}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        €${(item.unit_cost || 0).toFixed(2)}
+                    </td>
+                    <td class="px-6 py-4">
+                        <button onclick="prostoralApp.viewQRCode('${item.id}')" class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300">
+                            <i class="fas fa-qrcode text-xl"></i>
+                        </button>
+                    </td>
+                    <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
+                        <button onclick="prostoralApp.adjustStock('${item.id}')" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+                        <button onclick="prostoralApp.editInventory('${item.id}')" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async handleInventorySubmit(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const itemData = Object.fromEntries(formData.entries());
+
+        try {
+            const token = await window.authManager.getAccessToken();
+            
+            const response = await fetch(`${this.apiBaseUrl}/inventory`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(itemData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao criar material');
+            }
+
+            this.showSuccess('Material criado com sucesso!');
+            closeInventoryModal();
+            this.loadInventory();
+        } catch (error) {
+            console.error('Erro ao criar material:', error);
+            this.showError('Erro ao criar material');
+        }
+    }
+
+    adjustStock(id) {
+        console.log('Ajustar estoque:', id);
+        alert('Funcionalidade de ajuste de estoque em desenvolvimento');
+    }
+
+    editInventory(id) {
+        console.log('Editar material:', id);
+        alert('Edição de material em desenvolvimento');
+    }
+
+    viewQRCode(id) {
+        console.log('Ver QR Code:', id);
+        alert('Visualização de QR Code em desenvolvimento');
+    }
+
+    exportInventoryQRCodes() {
+        console.log('Exportar QR Codes');
+        alert('Exportação de QR Codes em desenvolvimento');
     }
 
     async loadOrders() {
@@ -542,6 +686,32 @@ class ProstoralApp {
         const kitForm = document.getElementById('kit-form');
         if (kitForm) {
             kitForm.addEventListener('submit', (e) => this.handleKitSubmit(e));
+        }
+
+        // Busca e filtros de inventário
+        const inventorySearch = document.getElementById('inventory-search');
+        if (inventorySearch) {
+            let debounceTimer;
+            inventorySearch.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => this.loadInventory(), 300);
+            });
+        }
+
+        const inventoryFilterCategory = document.getElementById('inventory-filter-category');
+        const inventoryFilterStock = document.getElementById('inventory-filter-stock');
+        
+        if (inventoryFilterCategory) {
+            inventoryFilterCategory.addEventListener('change', () => this.loadInventory());
+        }
+        if (inventoryFilterStock) {
+            inventoryFilterStock.addEventListener('change', () => this.loadInventory());
+        }
+
+        // Form de inventário
+        const inventoryForm = document.getElementById('inventory-form');
+        if (inventoryForm) {
+            inventoryForm.addEventListener('submit', (e) => this.handleInventorySubmit(e));
         }
     }
 
@@ -934,6 +1104,27 @@ function removeKitMaterial(button) {
             </p>
         `;
     }
+}
+
+function openInventoryModal() {
+    document.getElementById('inventory-modal').classList.remove('hidden');
+    document.getElementById('inventory-modal').classList.add('flex');
+}
+
+function closeInventoryModal() {
+    document.getElementById('inventory-modal').classList.add('hidden');
+    document.getElementById('inventory-modal').classList.remove('flex');
+    document.getElementById('inventory-form').reset();
+}
+
+function openQRScannerModal() {
+    document.getElementById('qr-scanner-modal').classList.remove('hidden');
+    document.getElementById('qr-scanner-modal').classList.add('flex');
+}
+
+function closeQRScannerModal() {
+    document.getElementById('qr-scanner-modal').classList.add('hidden');
+    document.getElementById('qr-scanner-modal').classList.remove('flex');
 }
 
 // Inicializar aplicação
