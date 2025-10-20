@@ -1,724 +1,523 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laboratório ProStoral - Sistema de Gestão</title>
+    <title>🦷 Laboratório ProStoral - Grupo AreLuna</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS v3+ -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Custom CSS -->
+    <!-- Estilos principais -->
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <!-- Configuração -->
+    <!-- Scripts de autenticação e módulos -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="modules.js"></script>
-</head>
-<body class="bg-gray-50 dark:bg-gray-900">
     
-    <!-- Header -->
-    <header class="bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-800 text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="dashboard.html" class="hover:opacity-80 transition-opacity">
-                        <i class="fas fa-arrow-left text-2xl"></i>
-                    </a>
-                    <div>
-                        <h1 class="text-2xl font-bold flex items-center gap-2">
-                            <i class="fas fa-tooth"></i>
-                            Laboratório ProStoral
+    <!-- Tailwind Configuration -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: {
+                                    50: '#ecfdf5',
+                                    100: '#d1fae5',
+                                    200: '#a7f3d0',
+                                    300: '#6ee7b7',
+                                    400: '#34d399',
+                                    500: '#10b981',
+                                    600: '#059669',
+                                    700: '#047857',
+                                    800: '#065f46',
+                                    900: '#064e3b',
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    
+    <!-- Custom Styles -->
+    <style>
+        /* Garantir visibilidade das abas */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block !important;
+        }
+        
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Fallback de background e cor de texto */
+        html {
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        body {
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        html, body { min-height: 100vh; }
+
+        /* Fallback para utilitário .hidden do Tailwind */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-900 dark:via-emerald-900 dark:to-teal-900 min-h-screen font-sans antialiased" style="background-color:#f8fafc !important; color:#111827;">
+    
+    <!-- Fixed Header with Glassmorphism -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-emerald-200/20 dark:border-gray-700/20 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <!-- Logo Section -->
+                <div class="flex items-center space-x-4 animate-fade-in">
+                    <div class="relative">
+                        <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 p-3 rounded-2xl shadow-lg">
+                            <i class="fas fa-tooth text-white text-2xl"></i>
+                        </div>
+                        <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div class="hidden sm:block">
+                        <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-emerald-800 dark:from-emerald-400 dark:to-emerald-600 bg-clip-text text-transparent">
+                            🦷 Laboratório ProStoral
                         </h1>
-                        <p class="text-emerald-100 text-sm">Sistema de Gestão de Próteses Dentárias</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">Grupo AreLuna</p>
+                    </div>
+                    <div class="sm:hidden">
+                        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-emerald-800 dark:from-emerald-400 dark:to-emerald-600 bg-clip-text text-transparent">
+                            🦷 ProStoral
+                        </h1>
                     </div>
                 </div>
                 
-                <div class="flex items-center space-x-4">
-                    <div class="text-right">
-                        <p class="text-sm font-medium" id="user-name">Carregando...</p>
-                        <p class="text-xs text-emerald-100" id="user-role">...</p>
-                    </div>
-                    <button onclick="authManager.signOut()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all">
-                        <i class="fas fa-sign-out-alt"></i>
+                <!-- Mobile Menu Button -->
+                <div class="flex items-center">
+                    <button id="mobileMenuToggle" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300">
+                        <i class="fas fa-bars text-gray-600 dark:text-gray-400 text-xl"></i>
                     </button>
+                </div>
+                
+                <!-- Desktop Stats Section -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Voltar ao Dashboard -->
+                    <a href="dashboard.html" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-110 group" title="Voltar ao Dashboard">
+                        <i class="fas fa-home text-gray-600 dark:text-gray-400"></i>
+                    </a>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="darkModeToggle" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-110">
+                        <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                        <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                    
+                    <!-- Total OS -->
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-clipboard-list text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Total de OS</p>
+                                <p id="totalOrders" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Clientes Ativos -->
+                    <div class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-users text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Clientes</p>
+                                <p id="totalClients" class="text-xl font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 opacity-0 invisible transition-all duration-300"></div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+            <div class="flex flex-col h-full">
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Menu</h2>
+                    <button id="closeMobileMenu" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-times text-gray-600 dark:text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 p-6 space-y-6">
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 rounded-2xl">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold" id="mobileUserEmail">Usuário</p>
+                                <p class="text-sm opacity-90">Logado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-clipboard-list text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Total OS</p>
+                                <p id="mobileTotalOrders" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white p-4 rounded-xl">
+                            <div class="text-center">
+                                <i class="fas fa-users text-2xl mb-2"></i>
+                                <p class="text-xs opacity-90">Clientes</p>
+                                <p id="mobileTotalClients" class="text-lg font-bold">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <a href="dashboard.html" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-home text-emerald-600 dark:text-emerald-400"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">Dashboard Principal</span>
+                        </a>
+                        
+                        <button id="mobileDarkModeToggle" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors w-full text-left">
+                            <i class="fas fa-moon dark:hidden text-emerald-600"></i>
+                            <i class="fas fa-sun hidden dark:block text-yellow-500"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                <span class="dark:hidden">Modo Escuro</span>
+                                <span class="hidden dark:block">Modo Claro</span>
+                            </span>
+                        </button>
+                        
+                        <button id="mobileLogoutBtn" class="flex items-center space-x-3 p-4 rounded-xl bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors w-full text-left">
+                            <i class="fas fa-sign-out-alt text-red-600 dark:text-red-400"></i>
+                            <span class="font-medium text-red-700 dark:text-red-300">Sair</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <div class="bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700">
-        <div class="container mx-auto px-6">
-            <nav class="flex space-x-2 overflow-x-auto py-4" id="prostoral-tabs">
-                <!-- Tabs serão inseridas via JavaScript -->
-            </nav>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <main class="container mx-auto px-6 py-8">
-        
-        <!-- Dashboard View -->
-        <div id="view-dashboard" class="view-content hidden">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                
-                <!-- Card: OS Ativas -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border-l-4 border-blue-500">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="bg-blue-100 dark:bg-blue-900 p-3 rounded-xl">
-                            <i class="fas fa-clipboard-list text-2xl text-blue-600 dark:text-blue-300"></i>
-                        </div>
-                        <span class="text-3xl font-bold text-gray-800 dark:text-white" id="stat-active-orders">0</span>
-                    </div>
-                    <h3 class="text-gray-600 dark:text-gray-300 text-sm font-medium">OS Ativas</h3>
-                </div>
-
-                <!-- Card: Estoque Baixo -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border-l-4 border-red-500">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="bg-red-100 dark:bg-red-900 p-3 rounded-xl">
-                            <i class="fas fa-exclamation-triangle text-2xl text-red-600 dark:text-red-300"></i>
-                        </div>
-                        <span class="text-3xl font-bold text-gray-800 dark:text-white" id="stat-low-stock">0</span>
-                    </div>
-                    <h3 class="text-gray-600 dark:text-gray-300 text-sm font-medium">Itens Estoque Baixo</h3>
-                </div>
-
-                <!-- Card: Clientes Ativos -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border-l-4 border-green-500">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="bg-green-100 dark:bg-green-900 p-3 rounded-xl">
-                            <i class="fas fa-users text-2xl text-green-600 dark:text-green-300"></i>
-                        </div>
-                        <span class="text-3xl font-bold text-gray-800 dark:text-white" id="stat-active-clients">0</span>
-                    </div>
-                    <h3 class="text-gray-600 dark:text-gray-300 text-sm font-medium">Clientes Ativos</h3>
-                </div>
-
-                <!-- Card: Intercorrências -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border-l-4 border-yellow-500">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-xl">
-                            <i class="fas fa-bell text-2xl text-yellow-600 dark:text-yellow-300"></i>
-                        </div>
-                        <span class="text-3xl font-bold text-gray-800 dark:text-white" id="stat-open-issues">0</span>
-                    </div>
-                    <h3 class="text-gray-600 dark:text-gray-300 text-sm font-medium">Intercorrências Abertas</h3>
-                </div>
-
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-                <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">
-                    <i class="fas fa-clock-rotate-left mr-2"></i>
-                    Atividades Recentes
-                </h2>
-                <div id="recent-activity" class="space-y-3">
-                    <p class="text-gray-500 dark:text-gray-400 text-center py-8">
-                        Carregando atividades...
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Clients View -->
-        <div id="view-clients" class="view-content hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-users mr-2"></i>
-                    Gestão de Clientes
-                </h2>
-                <button onclick="openClientModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
-                    <i class="fas fa-plus"></i>
-                    Novo Cliente
-                </button>
-            </div>
-
-            <!-- Search and Filters -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="client-search" placeholder="Buscar cliente..." 
-                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    <select id="client-filter-type" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos os tipos</option>
-                        <option value="clinic">Clínica</option>
-                        <option value="dentist">Dentista</option>
-                        <option value="individual">Individual</option>
-                    </select>
-                    <select id="client-filter-status" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="true">Ativos</option>
-                        <option value="false">Inativos</option>
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Clients Table -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cliente</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contato</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">NIF</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clients-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                    Carregando clientes...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Kits View -->
-        <div id="view-kits" class="view-content hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-box-open mr-2"></i>
-                    Kits de Procedimentos
-                </h2>
-                <button onclick="openKitModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
-                    <i class="fas fa-plus"></i>
-                    Novo Kit
-                </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="kit-search" placeholder="Buscar kit..." 
-                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    <select id="kit-filter-type" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos os tipos de trabalho</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Kits Grid -->
-            <div id="kits-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
-                    Carregando kits...
-                </div>
-            </div>
-        </div>
-
-        <!-- Inventory View -->
-        <div id="view-inventory" class="view-content hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-boxes mr-2"></i>
-                    Gestão de Estoque
-                </h2>
-                <div class="flex gap-3">
-                    <button onclick="openQRScannerModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
-                        <i class="fas fa-qrcode"></i>
-                        Scanner QR
-                    </button>
-                    <button onclick="openInventoryModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
-                        <i class="fas fa-plus"></i>
-                        Novo Material
-                    </button>
-                </div>
-            </div>
-
-            <!-- Filters -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="inventory-search" placeholder="Buscar material..." 
-                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    <select id="inventory-filter-category" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todas as categorias</option>
-                        <option value="ceramic">Cerâmica</option>
-                        <option value="resin">Resina</option>
-                        <option value="metal">Metal</option>
-                        <option value="plaster">Gesso</option>
-                        <option value="tools">Ferramentas</option>
-                        <option value="consumables">Consumíveis</option>
-                        <option value="other">Outros</option>
-                    </select>
-                    <select id="inventory-filter-stock" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos</option>
-                        <option value="low">Estoque Baixo</option>
-                        <option value="available">Disponível</option>
-                        <option value="out">Esgotado</option>
-                    </select>
-                    <button onclick="prostoralApp.exportInventoryQRCodes()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
-                        <i class="fas fa-download"></i>
-                        Exportar QR Codes
-                    </button>
-                </div>
-            </div>
-
-            <!-- Inventory Table -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Material</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Categoria</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estoque</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unidade</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Custo Unit.</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QR Code</th>
-                                <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr>
-                                <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                    Carregando materiais...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Orders View -->
-        <div id="view-orders" class="view-content hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-clipboard-list mr-2"></i>
-                    Ordens de Serviço
-                </h2>
-                <button onclick="openOrderModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
-                    <i class="fas fa-plus"></i>
-                    Nova OS
-                </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="order-search" placeholder="Buscar OS..." 
-                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    <select id="order-filter-status" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos os status</option>
-                        <option value="pending">Pendente</option>
-                        <option value="in_production">Em Produção</option>
-                        <option value="quality_check">Controle de Qualidade</option>
-                        <option value="ready">Pronto</option>
-                        <option value="delivered">Entregue</option>
-                        <option value="cancelled">Cancelado</option>
-                    </select>
-                    <select id="order-filter-client" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos os clientes</option>
-                    </select>
-                    <select id="order-filter-type" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                        <option value="">Todos os tipos</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Orders Table -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nº OS</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cliente</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Paciente</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Prazo</th>
-                                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr>
-                                <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                    Carregando ordens de serviço...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Client Modal -->
-    <div id="client-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-user-plus mr-2"></i>
-                    Novo Cliente
-                </h3>
-            </div>
+    <!-- Main Container with proper spacing for fixed header -->
+    <div class="pt-20 sm:pt-24 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            <form id="client-form" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Tipo de Cliente *
-                        </label>
-                        <select name="client_type" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+            <!-- Navigation Tabs -->
+            <nav class="mb-8 animate-slide-up">
+                <div class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/20 p-2">
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <button class="prostoral-tab active group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="dashboard">
+                            <i class="fas fa-chart-line group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">Dashboard</span>
+                        </button>
+                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="clients">
+                            <i class="fas fa-users group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">Clientes</span>
+                        </button>
+                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="orders">
+                            <i class="fas fa-clipboard-list group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">Ordens</span>
+                        </button>
+                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="kits">
+                            <i class="fas fa-box-open group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">Kits</span>
+                        </button>
+                        <button class="prostoral-tab group flex items-center justify-center space-x-2 px-6 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105" data-tab="inventory">
+                            <i class="fas fa-boxes group-hover:rotate-12 transition-transform duration-300"></i>
+                            <span class="hidden sm:inline">Estoque</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard-content" class="tab-content active">
+                <div class="space-y-6">
+                    <!-- KPIs Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- KPI 1: OS Ativas -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl">
+                                    <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">OS Ativas</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-orders">0</p>
+                        </div>
+
+                        <!-- KPI 2: Estoque Baixo -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-red-500 to-red-700 rounded-2xl">
+                                    <i class="fas fa-exclamation-triangle text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Estoque Baixo</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-low-stock">0</p>
+                        </div>
+
+                        <!-- KPI 3: Clientes Ativos -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl">
+                                    <i class="fas fa-users text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Clientes Ativos</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-clients">0</p>
+                        </div>
+
+                        <!-- KPI 4: Intercorrências -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-yellow-500 to-orange-700 rounded-2xl">
+                                    <i class="fas fa-bell text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Intercorrências Abertas</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-open-incidents">0</p>
+                        </div>
+                    </div>
+
+                    <!-- Atividades Recentes -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                            <i class="fas fa-history text-emerald-600"></i>
+                            Atividades Recentes
+                        </h2>
+                        <div id="recent-activities" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                            <p>Carregando atividades...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Tab -->
+            <div id="clients-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                            <i class="fas fa-users text-emerald-600"></i>
+                            Gestão de Clientes
+                        </h2>
+                        <button onclick="openClientModal()" class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                            <i class="fas fa-plus"></i>
+                            Novo Cliente
+                        </button>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="client-search" placeholder="Buscar cliente..." 
+                                class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                        </div>
+                        <select id="client-filter-type" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os tipos</option>
                             <option value="clinic">Clínica</option>
                             <option value="dentist">Dentista</option>
                             <option value="individual">Individual</option>
                         </select>
+                        <select id="client-filter-status" class="border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900 transition-all">
+                            <option value="">Todos os status</option>
+                            <option value="active">Ativos</option>
+                            <option value="inactive">Inativos</option>
+                        </select>
                     </div>
-                    
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Nome Completo *
-                        </label>
-                        <input type="text" name="full_name" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Email
-                        </label>
-                        <input type="email" name="email" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Telefone
-                        </label>
-                        <input type="text" name="phone" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            NIF/VAT
-                        </label>
-                        <input type="text" name="nif_vat" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Cidade
-                        </label>
-                        <input type="text" name="address_city" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+
+                    <!-- Tabela de Clientes -->
+                    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-900">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cliente</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contato</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NIF</th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clients-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                                        <p>Carregando clientes...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
-                <div class="flex justify-end gap-4 pt-4">
-                    <button type="button" onclick="closeClientModal()" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
-                        <i class="fas fa-save mr-2"></i>
-                        Salvar
-                    </button>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="orders-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                        <i class="fas fa-clipboard-list text-emerald-600"></i>
+                        Ordens de Serviço
+                    </h2>
+                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-clipboard-list text-6xl mb-4 opacity-50"></i>
+                        <p class="text-lg">Funcionalidade em desenvolvimento...</p>
+                    </div>
                 </div>
-            </form>
+            </div>
+
+            <!-- Kits Tab -->
+            <div id="kits-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                        <i class="fas fa-box-open text-emerald-600"></i>
+                        Kits de Procedimentos
+                    </h2>
+                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-box-open text-6xl mb-4 opacity-50"></i>
+                        <p class="text-lg">Funcionalidade em desenvolvimento...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventory-content" class="tab-content">
+                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                        <i class="fas fa-boxes text-emerald-600"></i>
+                        Gestão de Estoque
+                    </h2>
+                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-boxes text-6xl mb-4 opacity-50"></i>
+                        <p class="text-lg">Funcionalidade em desenvolvimento...</p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <!-- Order Modal -->
-    <div id="order-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-clipboard-list mr-2"></i>
-                    Nova Ordem de Serviço
-                </h3>
-            </div>
-            
-            <form id="order-form" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Cliente *
-                        </label>
-                        <select name="client_id" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="">Selecione um cliente</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Nome do Paciente *
-                        </label>
-                        <input type="text" name="patient_name" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Tipo de Trabalho *
-                        </label>
-                        <select name="work_type_id" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="">Selecione o tipo</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Cor
-                        </label>
-                        <input type="text" name="shade" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Ex: A2, B3, etc.">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Prazo de Entrega *
-                        </label>
-                        <input type="date" name="deadline" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Prioridade
-                        </label>
-                        <select name="priority" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="normal">Normal</option>
-                            <option value="urgent">Urgente</option>
-                            <option value="express">Express</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Observações
-                        </label>
-                        <textarea name="notes" rows="3" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Detalhes adicionais sobre o trabalho..."></textarea>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end gap-4 pt-4">
-                    <button type="button" onclick="closeOrderModal()" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
-                        <i class="fas fa-save mr-2"></i>
-                        Criar OS
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Kit Modal -->
-    <div id="kit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-box-open mr-2"></i>
-                    Novo Kit de Procedimento
-                </h3>
-            </div>
-            
-            <form id="kit-form" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Nome do Kit *
-                        </label>
-                        <input type="text" name="name" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Ex: Kit Coroa Cerâmica">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Tipo de Trabalho *
-                        </label>
-                        <select name="work_type_id" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="">Selecione o tipo</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Tempo Estimado (horas)
-                        </label>
-                        <input type="number" name="estimated_time_hours" step="0.5" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Descrição
-                        </label>
-                        <textarea name="description" rows="2" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Descreva os materiais e procedimentos..."></textarea>
-                    </div>
-                </div>
-
-                <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-lg font-semibold text-gray-800 dark:text-white">Materiais do Kit</h4>
-                        <button type="button" onclick="addKitMaterial()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-                            <i class="fas fa-plus mr-1"></i>
-                            Adicionar Material
-                        </button>
-                    </div>
-
-                    <div id="kit-materials-list" class="space-y-3">
-                        <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
-                            Nenhum material adicionado. Clique em "Adicionar Material" para começar.
-                        </p>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="closeKitModal()" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
-                        <i class="fas fa-save mr-2"></i>
-                        Salvar Kit
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Inventory Modal -->
-    <div id="inventory-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-box mr-2"></i>
-                    Novo Material
-                </h3>
-            </div>
-            
-            <form id="inventory-form" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Nome do Material *
-                        </label>
-                        <input type="text" name="name" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Código
-                        </label>
-                        <input type="text" name="code" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Categoria *
-                        </label>
-                        <select name="category" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                            <option value="">Selecione</option>
-                            <option value="ceramic">Cerâmica</option>
-                            <option value="resin">Resina</option>
-                            <option value="metal">Metal</option>
-                            <option value="plaster">Gesso</option>
-                            <option value="tools">Ferramentas</option>
-                            <option value="consumables">Consumíveis</option>
-                            <option value="other">Outros</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Quantidade Atual *
-                        </label>
-                        <input type="number" name="quantity" step="0.01" min="0" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Unidade *
-                        </label>
-                        <input type="text" name="unit" value="un" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Estoque Mínimo
-                        </label>
-                        <input type="number" name="min_stock" step="0.01" min="0" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custo Unitário (€)
-                        </label>
-                        <input type="number" name="unit_cost" step="0.01" min="0" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    </div>
-                    
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Descrição
-                        </label>
-                        <textarea name="description" rows="2" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"></textarea>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end gap-4 pt-4">
-                    <button type="button" onclick="closeInventoryModal()" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
-                        <i class="fas fa-save mr-2"></i>
-                        Salvar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- QR Scanner Modal -->
-    <div id="qr-scanner-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full mx-4">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
-                    <i class="fas fa-qrcode mr-2"></i>
-                    Scanner QR Code
-                </h3>
-            </div>
-            
-            <div class="p-6 text-center">
-                <div class="bg-gray-100 dark:bg-gray-700 rounded-lg p-8 mb-4">
-                    <i class="fas fa-camera text-6xl text-gray-400 mb-4"></i>
-                    <p class="text-gray-600 dark:text-gray-400">
-                        Funcionalidade de scanner QR Code será implementada em breve.
-                    </p>
-                    <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                        Aguardando integração com biblioteca de QR Code.
-                    </p>
-                </div>
-                
-                <button onclick="closeQRScannerModal()" class="w-full bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors">
-                    Fechar
-                </button>
-            </div>
-        </div>
-    </div>
-
+    <!-- Scripts -->
     <script src="prostoral.js"></script>
-
+    
+    <script>
+        // Mobile Menu Logic
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        
+        function openMobileMenu() {
+            mobileMenu.classList.remove('translate-x-full');
+            mobileMenuOverlay.classList.remove('opacity-0', 'invisible');
+        }
+        
+        function closeMobileMenuFn() {
+            mobileMenu.classList.add('translate-x-full');
+            mobileMenuOverlay.classList.add('opacity-0', 'invisible');
+        }
+        
+        mobileMenuToggle?.addEventListener('click', openMobileMenu);
+        closeMobileMenu?.addEventListener('click', closeMobileMenuFn);
+        mobileMenuOverlay?.addEventListener('click', closeMobileMenuFn);
+        
+        // Mobile Logout
+        document.getElementById('mobileLogoutBtn')?.addEventListener('click', () => {
+            if (window.authManager) {
+                window.authManager.signOut();
+            }
+        });
+        
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const mobileDarkModeToggle = document.getElementById('mobileDarkModeToggle');
+        
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+        
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+        }
+        
+        darkModeToggle?.addEventListener('click', toggleDarkMode);
+        mobileDarkModeToggle?.addEventListener('click', toggleDarkMode);
+        
+        // Tab Navigation
+        const tabs = document.querySelectorAll('.prostoral-tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                // Remove active class from all tabs
+                tabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.classList.remove('bg-gradient-to-r', 'from-emerald-500', 'to-emerald-600', 'text-white', 'shadow-lg');
+                    t.classList.add('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+                });
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                tab.classList.add('bg-gradient-to-r', 'from-emerald-500', 'to-emerald-600', 'text-white', 'shadow-lg');
+                tab.classList.remove('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+                
+                // Hide all tab contents
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Show target tab content
+                const targetContent = document.getElementById(`${targetTab}-content`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
-

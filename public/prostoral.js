@@ -4,18 +4,17 @@
 
 class ProstoralApp {
     constructor() {
-        this.currentView = 'dashboard';
         this.clients = [];
-        this.inventory = [];
         this.orders = [];
-        this.workTypes = [];
         this.kits = [];
-        this.kitMaterialCounter = 0;
+        this.inventory = [];
         this.apiBaseUrl = '/api/prostoral';
         this.init();
     }
 
     async init() {
+        console.log('Iniciando ProStoral App...');
+        
         // Aguardar authManager estar pronto
         if (!window.authManager) {
             console.error('AuthManager não encontrado');
@@ -23,146 +22,181 @@ class ProstoralApp {
             return;
         }
 
+        // Aguardar inicialização do authManager
         await window.authManager.init();
 
-        // Verificar autenticação após inicialização
+        // Verificar autenticação
         if (!window.authManager.isUserAuthenticated()) {
             console.log('Usuário não autenticado, redirecionando para login');
             window.location.href = 'login.html';
             return;
         }
 
+        console.log('Usuário autenticado!');
+
         // Carregar dados do usuário
         await this.loadUserInfo();
 
-        // Configurar tabs
-        this.setupTabs();
+        // Carregar dashboard (view inicial)
+        await this.loadDashboard();
 
-        // Carregar view inicial
-        this.switchView('dashboard');
-
-        // Event listeners
+        // Setup event listeners
         this.setupEventListeners();
     }
 
     async loadUserInfo() {
         const user = window.authManager.user;
         if (user && user.email) {
-            document.getElementById('user-name').textContent = user.email;
-            document.getElementById('user-role').textContent = 'Usuário';
+            // Desktop
+            document.getElementById('totalOrders').textContent = '0';
+            document.getElementById('totalClients').textContent = '0';
+            
+            // Mobile
+            document.getElementById('mobileUserEmail').textContent = user.email;
+            document.getElementById('mobileTotalOrders').textContent = '0';
+            document.getElementById('mobileTotalClients').textContent = '0';
         }
     }
 
-    setupTabs() {
-        const tabs = [
-            { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-chart-pie', permission: 'prostoral:dashboard:read' },
-            { id: 'clients', name: 'Clientes', icon: 'fas fa-users', permission: 'prostoral:clients:read' },
-            { id: 'orders', name: 'Ordens de Serviço', icon: 'fas fa-clipboard-list', permission: 'prostoral:orders:read' },
-            { id: 'kits', name: 'Kits', icon: 'fas fa-box-open', permission: 'prostoral:kits:read' },
-            { id: 'inventory', name: 'Estoque', icon: 'fas fa-boxes', permission: 'prostoral:inventory:read' },
-        ];
+    setupEventListeners() {
+        // Filtros de clientes
+        const clientSearch = document.getElementById('client-search');
+        const clientFilterType = document.getElementById('client-filter-type');
+        const clientFilterStatus = document.getElementById('client-filter-status');
 
-        const tabsContainer = document.getElementById('prostoral-tabs');
-        tabsContainer.innerHTML = '';
-
-        tabs.forEach(tab => {
-            // Verificar permissão
-            if (!window.authManager.hasPermission(tab.permission)) {
-                return;
-            }
-
-            const tabElement = document.createElement('button');
-            tabElement.className = 'nav-tab px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2';
-            tabElement.innerHTML = `
-                <i class="${tab.icon}"></i>
-                <span>${tab.name}</span>
-            `;
-            tabElement.onclick = () => this.switchView(tab.id);
-            tabsContainer.appendChild(tabElement);
-        });
-    }
-
-    switchView(viewName) {
-        // Esconder todas as views
-        document.querySelectorAll('.view-content').forEach(view => {
-            view.classList.add('hidden');
-        });
-
-        // Mostrar view selecionada
-        const targetView = document.getElementById(`view-${viewName}`);
-        if (targetView) {
-            targetView.classList.remove('hidden');
+        if (clientSearch) {
+            clientSearch.addEventListener('input', this.debounce(() => this.loadClients(), 300));
         }
-
-        // Atualizar tabs ativas
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.remove('active', 'bg-emerald-600', 'text-white');
-            tab.classList.add('bg-white', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
-        });
-
-        const activeTab = Array.from(document.querySelectorAll('.nav-tab'))[
-            ['dashboard', 'clients', 'orders', 'inventory'].indexOf(viewName)
-        ];
-        if (activeTab) {
-            activeTab.classList.add('active', 'bg-emerald-600', 'text-white');
-            activeTab.classList.remove('bg-white', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+        if (clientFilterType) {
+            clientFilterType.addEventListener('change', () => this.loadClients());
         }
-
-        this.currentView = viewName;
-
-        // Carregar dados da view
-        this.loadViewData(viewName);
-    }
-
-    async loadViewData(viewName) {
-        switch (viewName) {
-            case 'dashboard':
-                await this.loadDashboard();
-                break;
-            case 'clients':
-                await this.loadClients();
-                break;
-            case 'inventory':
-                await this.loadInventory();
-                break;
-            case 'orders':
-                await this.loadOrders();
-                break;
-            case 'kits':
-                await this.loadKits();
-                break;
+        if (clientFilterStatus) {
+            clientFilterStatus.addEventListener('change', () => this.loadClients());
         }
     }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // =====================================================
+    // DASHBOARD
+    // =====================================================
 
     async loadDashboard() {
+        console.log('Carregando dashboard...');
         try {
-            // Carregar estatísticas básicas
             const token = await window.authManager.getAccessToken();
-
-            // Clientes ativos
-            const clientsRes = await fetch(`${this.apiBaseUrl}/clients?is_active=true`, {
+            
+            // Carregar KPIs
+            const response = await fetch(`${this.apiBaseUrl}/dashboard/kpis`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (clientsRes.ok) {
-                const clientsData = await clientsRes.json();
-                document.getElementById('stat-active-clients').textContent = clientsData.clients.length;
+
+            if (!response.ok) {
+                throw new Error('Erro ao carregar KPIs');
             }
 
-            // Estoque baixo
-            const lowStockRes = await fetch(`${this.apiBaseUrl}/inventory/low-stock`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (lowStockRes.ok) {
-                const lowStockData = await lowStockRes.json();
-                document.getElementById('stat-low-stock').textContent = lowStockData.items.length;
+            const data = await response.json();
+            
+            if (data.success && data.kpis) {
+                // Atualizar KPIs
+                document.getElementById('kpi-active-orders').textContent = data.kpis.totalOrders || 0;
+                document.getElementById('kpi-low-stock').textContent = data.kpis.lowStockItems || 0;
+                document.getElementById('kpi-active-clients').textContent = data.kpis.ordersByStatus?.active || 0;
+                document.getElementById('kpi-open-incidents').textContent = data.kpis.openIncidents || 0;
+                
+                // Atualizar header stats
+                document.getElementById('totalOrders').textContent = data.kpis.totalOrders || 0;
+                document.getElementById('mobileTotalOrders').textContent = data.kpis.totalOrders || 0;
             }
+
+            // Carregar atividades recentes
+            await this.loadRecentActivities();
 
         } catch (error) {
             console.error('Erro ao carregar dashboard:', error);
+            this.showError('Erro ao carregar dashboard');
         }
     }
 
+    async loadRecentActivities() {
+        const container = document.getElementById('recent-activities');
+        if (!container) return;
+
+        try {
+            const token = await window.authManager.getAccessToken();
+            
+            // Buscar últimas OS
+            const response = await fetch(`${this.apiBaseUrl}/orders?limit=5`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao carregar atividades');
+            }
+
+            const data = await response.json();
+            
+            if (data.success && data.orders && data.orders.length > 0) {
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        ${data.orders.map(order => `
+                            <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                <div class="flex items-center gap-4">
+                                    <div class="p-3 bg-emerald-100 dark:bg-emerald-900 rounded-xl">
+                                        <i class="fas fa-clipboard-list text-emerald-600 dark:text-emerald-400"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold text-gray-900 dark:text-white">OS #${order.work_order_number || order.id.substring(0, 8)}</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">${order.patient_name || 'Paciente'}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold ${this.getStatusColor(order.status)}">
+                                        ${this.getStatusText(order.status)}
+                                    </span>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        ${new Date(order.created_at).toLocaleDateString('pt-BR')}
+                                    </p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-inbox text-4xl text-gray-300 dark:text-gray-600 mb-3"></i>
+                        <p class="text-gray-500 dark:text-gray-400">Nenhuma atividade recente</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar atividades:', error);
+            container.innerHTML = `
+                <div class="text-center py-8 text-red-500">
+                    <i class="fas fa-exclamation-circle text-4xl mb-3"></i>
+                    <p>Erro ao carregar atividades</p>
+                </div>
+            `;
+        }
+    }
+
+    // =====================================================
+    // CLIENTES
+    // =====================================================
+
     async loadClients() {
+        console.log('Carregando clientes...');
         try {
             const token = await window.authManager.getAccessToken();
             const search = document.getElementById('client-search')?.value || '';
@@ -171,7 +205,8 @@ class ProstoralApp {
 
             let url = `${this.apiBaseUrl}/clients?`;
             if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (status) url += `is_active=${status}&`;
+            if (type) url += `type=${type}&`;
+            if (status) url += `status=${status}&`;
 
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -184,952 +219,186 @@ class ProstoralApp {
             const data = await response.json();
             this.clients = data.clients || [];
 
-            // Filtrar por tipo se necessário
-            let filteredClients = this.clients;
-            if (type) {
-                filteredClients = this.clients.filter(c => c.client_type === type);
-            }
+            // Atualizar contadores
+            const activeClients = this.clients.filter(c => c.is_active).length;
+            document.getElementById('totalClients').textContent = this.clients.length;
+            document.getElementById('mobileTotalClients').textContent = this.clients.length;
+            document.getElementById('kpi-active-clients').textContent = activeClients;
 
-            this.renderClients(filteredClients);
+            this.renderClients();
         } catch (error) {
             console.error('Erro ao carregar clientes:', error);
             this.showError('Erro ao carregar clientes');
         }
     }
 
-    renderClients(clients) {
+    renderClients() {
         const tbody = document.getElementById('clients-table-body');
-        
-        if (!clients || clients.length === 0) {
+        if (!tbody) return;
+
+        if (this.clients.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        Nenhum cliente encontrado
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-users text-6xl mb-4 opacity-50"></i>
+                        <p>Nenhum cliente encontrado</p>
                     </td>
                 </tr>
             `;
             return;
         }
 
-        tbody.innerHTML = clients.map(client => {
-            const typeLabels = {
-                'clinic': 'Clínica',
-                'dentist': 'Dentista',
-                'individual': 'Individual'
-            };
-
-            const statusBadge = client.is_active
-                ? '<span class="px-3 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full">Ativo</span>'
-                : '<span class="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded-full">Inativo</span>';
-
-            return `
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td class="px-6 py-4">
-                        <div class="font-medium text-gray-900 dark:text-white">${client.full_name}</div>
-                        ${client.contact_person ? `<div class="text-sm text-gray-500 dark:text-gray-400">${client.contact_person}</div>` : ''}
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
-                            ${typeLabels[client.client_type] || client.client_type}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900 dark:text-white">${client.email || '-'}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${client.phone || '-'}</div>
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        ${client.nif_vat || '-'}
-                    </td>
-                    <td class="px-6 py-4">
-                        ${statusBadge}
-                    </td>
-                    <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
-                        <button onclick="prostoralApp.viewClient('${client.id}')" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="prostoralApp.editClient('${client.id}')" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    async loadInventory() {
-        try {
-            const token = await window.authManager.getAccessToken();
-            const search = document.getElementById('inventory-search')?.value || '';
-            const category = document.getElementById('inventory-filter-category')?.value || '';
-            const stock = document.getElementById('inventory-filter-stock')?.value || '';
-
-            let url = `${this.apiBaseUrl}/inventory?`;
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (category) url += `category=${category}&`;
-            
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao carregar estoque');
-            }
-
-            const data = await response.json();
-            this.inventory = data.items || [];
-
-            // Filtrar por nível de estoque se necessário
-            let filteredInventory = this.inventory;
-            if (stock === 'low') {
-                filteredInventory = this.inventory.filter(item => item.quantity <= (item.min_stock || 0));
-            } else if (stock === 'out') {
-                filteredInventory = this.inventory.filter(item => item.quantity === 0);
-            } else if (stock === 'available') {
-                filteredInventory = this.inventory.filter(item => item.quantity > (item.min_stock || 0));
-            }
-
-            this.renderInventory(filteredInventory);
-        } catch (error) {
-            console.error('Erro ao carregar estoque:', error);
-            this.showError('Erro ao carregar estoque');
-        }
-    }
-
-    renderInventory(items) {
-        const tbody = document.getElementById('inventory-table-body');
-        
-        if (!items || items.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        Nenhum material encontrado
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = items.map(item => {
-            const categoryLabels = {
-                'ceramic': 'Cerâmica',
-                'resin': 'Resina',
-                'metal': 'Metal',
-                'plaster': 'Gesso',
-                'tools': 'Ferramentas',
-                'consumables': 'Consumíveis',
-                'other': 'Outros'
-            };
-
-            const isLowStock = item.quantity <= (item.min_stock || 0);
-            const isOutOfStock = item.quantity === 0;
-
-            const stockClass = isOutOfStock 
-                ? 'text-red-600 font-bold' 
-                : isLowStock 
-                    ? 'text-yellow-600 font-bold' 
-                    : 'text-gray-900 dark:text-white';
-
-            return `
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td class="px-6 py-4">
-                        <div class="font-medium text-gray-900 dark:text-white">${item.name}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${item.code || '-'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
-                            ${categoryLabels[item.category] || item.category}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="${stockClass}">
-                            ${item.quantity}
-                            ${isLowStock ? '<i class="fas fa-exclamation-triangle ml-1"></i>' : ''}
+        tbody.innerHTML = this.clients.map(client => `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center">
+                            <i class="fas ${this.getClientIcon(client.type)} text-white"></i>
                         </div>
-                        ${item.min_stock ? `<div class="text-xs text-gray-500">Mín: ${item.min_stock}</div>` : ''}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        ${item.unit}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        €${(item.unit_cost || 0).toFixed(2)}
-                    </td>
-                    <td class="px-6 py-4">
-                        <button onclick="prostoralApp.viewQRCode('${item.id}')" class="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300">
-                            <i class="fas fa-qrcode text-xl"></i>
-                        </button>
-                    </td>
-                    <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
-                        <button onclick="prostoralApp.adjustStock('${item.id}')" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                            <i class="fas fa-exchange-alt"></i>
-                        </button>
-                        <button onclick="prostoralApp.editInventory('${item.id}')" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    async handleInventorySubmit(e) {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const itemData = Object.fromEntries(formData.entries());
-
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/inventory`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(itemData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao criar material');
-            }
-
-            this.showSuccess('Material criado com sucesso!');
-            closeInventoryModal();
-            this.loadInventory();
-        } catch (error) {
-            console.error('Erro ao criar material:', error);
-            this.showError('Erro ao criar material');
-        }
-    }
-
-    adjustStock(id) {
-        console.log('Ajustar estoque:', id);
-        alert('Funcionalidade de ajuste de estoque em desenvolvimento');
-    }
-
-    editInventory(id) {
-        console.log('Editar material:', id);
-        alert('Edição de material em desenvolvimento');
-    }
-
-    viewQRCode(id) {
-        console.log('Ver QR Code:', id);
-        alert('Visualização de QR Code em desenvolvimento');
-    }
-
-    exportInventoryQRCodes() {
-        console.log('Exportar QR Codes');
-        alert('Exportação de QR Codes em desenvolvimento');
-    }
-
-    async loadOrders() {
-        try {
-            const token = await window.authManager.getAccessToken();
-            const search = document.getElementById('order-search')?.value || '';
-            const status = document.getElementById('order-filter-status')?.value || '';
-            const client_id = document.getElementById('order-filter-client')?.value || '';
-            const work_type_id = document.getElementById('order-filter-type')?.value || '';
-
-            let url = `${this.apiBaseUrl}/orders?`;
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (status) url += `status=${status}&`;
-            if (client_id) url += `client_id=${client_id}&`;
-            if (work_type_id) url += `work_type_id=${work_type_id}&`;
-
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao carregar ordens de serviço');
-            }
-
-            const data = await response.json();
-            this.orders = data.orders || [];
-
-            this.renderOrders(this.orders);
-            
-            // Carregar clientes e tipos de trabalho para os filtros e modal
-            await this.loadWorkTypes();
-            await this.loadClientsForSelect();
-        } catch (error) {
-            console.error('Erro ao carregar ordens de serviço:', error);
-            this.showError('Erro ao carregar ordens de serviço');
-        }
-    }
-
-    async loadWorkTypes() {
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/work-types`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao carregar tipos de trabalho');
-            }
-
-            const data = await response.json();
-            this.workTypes = data.workTypes || [];
-
-            // Popula select de tipos de trabalho nos filtros
-            const filterSelect = document.getElementById('order-filter-type');
-            if (filterSelect && filterSelect.options.length === 1) {
-                this.workTypes.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type.id;
-                    option.textContent = type.name;
-                    filterSelect.appendChild(option);
-                });
-            }
-
-            // Popula select de tipos de trabalho no modal
-            const modalSelect = document.querySelector('#order-form select[name="work_type_id"]');
-            if (modalSelect) {
-                modalSelect.innerHTML = '<option value="">Selecione o tipo</option>';
-                this.workTypes.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type.id;
-                    option.textContent = type.name;
-                    modalSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Erro ao carregar tipos de trabalho:', error);
-        }
-    }
-
-    async loadClientsForSelect() {
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/clients?is_active=true`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao carregar clientes');
-            }
-
-            const data = await response.json();
-            const clients = data.clients || [];
-
-            // Popula select de clientes nos filtros
-            const filterSelect = document.getElementById('order-filter-client');
-            if (filterSelect && filterSelect.options.length === 1) {
-                clients.forEach(client => {
-                    const option = document.createElement('option');
-                    option.value = client.id;
-                    option.textContent = client.full_name;
-                    filterSelect.appendChild(option);
-                });
-            }
-
-            // Popula select de clientes no modal
-            const modalSelect = document.querySelector('#order-form select[name="client_id"]');
-            if (modalSelect) {
-                modalSelect.innerHTML = '<option value="">Selecione um cliente</option>';
-                clients.forEach(client => {
-                    const option = document.createElement('option');
-                    option.value = client.id;
-                    option.textContent = client.full_name;
-                    modalSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Erro ao carregar clientes:', error);
-        }
-    }
-
-    renderOrders(orders) {
-        const tbody = document.getElementById('orders-table-body');
-        
-        if (!orders || orders.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        Nenhuma ordem de serviço encontrada
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = orders.map(order => {
-            const statusLabels = {
-                'pending': { text: 'Pendente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-                'in_production': { text: 'Em Produção', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-                'quality_check': { text: 'Controle de Qualidade', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-                'ready': { text: 'Pronto', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-                'delivered': { text: 'Entregue', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-                'cancelled': { text: 'Cancelado', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
-            };
-
-            const statusInfo = statusLabels[order.status] || { text: order.status, color: 'bg-gray-100 text-gray-800' };
-            
-            const deadline = order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-';
-            const isOverdue = order.deadline && new Date(order.deadline) < new Date() && order.status !== 'delivered';
-
-            return `
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td class="px-6 py-4">
-                        <div class="font-medium text-gray-900 dark:text-white">${order.work_order_number}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900 dark:text-white">${order.client?.full_name || '-'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900 dark:text-white">${order.patient_name || '-'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-900 dark:text-white">${order.work_type?.name || '-'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}">
-                            ${deadline}
-                            ${isOverdue ? '<i class="fas fa-exclamation-triangle ml-1"></i>' : ''}
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                ${client.full_name || client.company_name || 'N/A'}
+                            </div>
+                            ${client.company_name && client.full_name ? `<div class="text-sm text-gray-500 dark:text-gray-400">${client.company_name}</div>` : ''}
                         </div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-3 py-1 text-xs font-medium ${statusInfo.color} rounded-full">
-                            ${statusInfo.text}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
-                        <button onclick="prostoralApp.viewOrder('${order.id}')" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="prostoralApp.editOrder('${order.id}')" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${this.getTypeColor(client.type)}">
+                        ${this.getTypeText(client.type)}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    ${client.email || 'N/A'}<br>
+                    <span class="text-gray-500 dark:text-gray-400">${client.phone || 'N/A'}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    ${client.nif || 'N/A'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${client.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}">
+                        ${client.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onclick="prostoralApp.viewClient('${client.id}')" class="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300 mr-3">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button onclick="prostoralApp.editClient('${client.id}')" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="prostoralApp.deleteClient('${client.id}')" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
     }
 
-    setupEventListeners() {
-        // Busca de clientes
-        const clientSearch = document.getElementById('client-search');
-        if (clientSearch) {
-            let debounceTimer;
-            clientSearch.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => this.loadClients(), 300);
-            });
-        }
+    // =====================================================
+    // HELPERS
+    // =====================================================
 
-        // Filtros de clientes
-        const clientFilterType = document.getElementById('client-filter-type');
-        const clientFilterStatus = document.getElementById('client-filter-status');
-        
-        if (clientFilterType) {
-            clientFilterType.addEventListener('change', () => this.loadClients());
-        }
-        if (clientFilterStatus) {
-            clientFilterStatus.addEventListener('change', () => this.loadClients());
-        }
-
-        // Form de cliente
-        const clientForm = document.getElementById('client-form');
-        if (clientForm) {
-            clientForm.addEventListener('submit', (e) => this.handleClientSubmit(e));
-        }
-
-        // Busca e filtros de ordens
-        const orderSearch = document.getElementById('order-search');
-        if (orderSearch) {
-            let debounceTimer;
-            orderSearch.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => this.loadOrders(), 300);
-            });
-        }
-
-        const orderFilterStatus = document.getElementById('order-filter-status');
-        const orderFilterClient = document.getElementById('order-filter-client');
-        const orderFilterType = document.getElementById('order-filter-type');
-        
-        if (orderFilterStatus) {
-            orderFilterStatus.addEventListener('change', () => this.loadOrders());
-        }
-        if (orderFilterClient) {
-            orderFilterClient.addEventListener('change', () => this.loadOrders());
-        }
-        if (orderFilterType) {
-            orderFilterType.addEventListener('change', () => this.loadOrders());
-        }
-
-        // Form de ordem de serviço
-        const orderForm = document.getElementById('order-form');
-        if (orderForm) {
-            orderForm.addEventListener('submit', (e) => this.handleOrderSubmit(e));
-        }
-
-        // Busca e filtros de kits
-        const kitSearch = document.getElementById('kit-search');
-        if (kitSearch) {
-            let debounceTimer;
-            kitSearch.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => this.loadKits(), 300);
-            });
-        }
-
-        const kitFilterType = document.getElementById('kit-filter-type');
-        if (kitFilterType) {
-            kitFilterType.addEventListener('change', () => this.loadKits());
-        }
-
-        // Form de kit
-        const kitForm = document.getElementById('kit-form');
-        if (kitForm) {
-            kitForm.addEventListener('submit', (e) => this.handleKitSubmit(e));
-        }
-
-        // Busca e filtros de inventário
-        const inventorySearch = document.getElementById('inventory-search');
-        if (inventorySearch) {
-            let debounceTimer;
-            inventorySearch.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => this.loadInventory(), 300);
-            });
-        }
-
-        const inventoryFilterCategory = document.getElementById('inventory-filter-category');
-        const inventoryFilterStock = document.getElementById('inventory-filter-stock');
-        
-        if (inventoryFilterCategory) {
-            inventoryFilterCategory.addEventListener('change', () => this.loadInventory());
-        }
-        if (inventoryFilterStock) {
-            inventoryFilterStock.addEventListener('change', () => this.loadInventory());
-        }
-
-        // Form de inventário
-        const inventoryForm = document.getElementById('inventory-form');
-        if (inventoryForm) {
-            inventoryForm.addEventListener('submit', (e) => this.handleInventorySubmit(e));
-        }
+    getClientIcon(type) {
+        const icons = {
+            clinic: 'fa-building',
+            dentist: 'fa-user-md',
+            individual: 'fa-user'
+        };
+        return icons[type] || 'fa-user';
     }
 
-    async handleOrderSubmit(e) {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const orderData = Object.fromEntries(formData.entries());
-
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/orders`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(orderData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao criar ordem de serviço');
-            }
-
-            this.showSuccess('Ordem de serviço criada com sucesso!');
-            closeOrderModal();
-            this.loadOrders();
-        } catch (error) {
-            console.error('Erro ao criar OS:', error);
-            this.showError('Erro ao criar ordem de serviço');
-        }
+    getTypeColor(type) {
+        const colors = {
+            clinic: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+            dentist: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+            individual: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+        };
+        return colors[type] || colors.individual;
     }
 
-    async handleClientSubmit(e) {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const clientData = Object.fromEntries(formData.entries());
-
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/clients`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(clientData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao criar cliente');
-            }
-
-            this.showSuccess('Cliente criado com sucesso!');
-            closeClientModal();
-            this.loadClients();
-        } catch (error) {
-            console.error('Erro ao criar cliente:', error);
-            this.showError('Erro ao criar cliente');
-        }
+    getTypeText(type) {
+        const texts = {
+            clinic: 'Clínica',
+            dentist: 'Dentista',
+            individual: 'Individual'
+        };
+        return texts[type] || 'Individual';
     }
 
+    getStatusColor(status) {
+        const colors = {
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+            in_production: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+            quality_check: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+            ready: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+            delivered: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+            cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+        };
+        return colors[status] || colors.pending;
+    }
+
+    getStatusText(status) {
+        const texts = {
+            pending: 'Pendente',
+            in_production: 'Em Produção',
+            quality_check: 'Controle Qualidade',
+            ready: 'Pronto',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado'
+        };
+        return texts[status] || 'Pendente';
+    }
+
+    showError(message) {
+        alert(message);
+    }
+
+    showSuccess(message) {
+        alert(message);
+    }
+
+    // Métodos placeholder
     viewClient(id) {
         console.log('Ver cliente:', id);
-        // TODO: Implementar visualização de cliente
+        this.showError('Funcionalidade em desenvolvimento');
     }
 
     editClient(id) {
         console.log('Editar cliente:', id);
-        // TODO: Implementar edição de cliente
+        this.showError('Funcionalidade em desenvolvimento');
     }
 
-    viewOrder(id) {
-        console.log('Ver OS:', id);
-        // TODO: Implementar visualização detalhada de OS
-        alert('Visualização detalhada em desenvolvimento');
-    }
-
-    editOrder(id) {
-        console.log('Editar OS:', id);
-        // TODO: Implementar edição de OS
-        alert('Edição de OS em desenvolvimento');
-    }
-
-    async loadKits() {
-        try {
-            const token = await window.authManager.getAccessToken();
-            const search = document.getElementById('kit-search')?.value || '';
-            const work_type_id = document.getElementById('kit-filter-type')?.value || '';
-
-            let url = `${this.apiBaseUrl}/kits?`;
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (work_type_id) url += `work_type_id=${work_type_id}&`;
-
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao carregar kits');
-            }
-
-            const data = await response.json();
-            this.kits = data.kits || [];
-
-            this.renderKits(this.kits);
-            
-            // Popula filtro de tipos de trabalho se necessário
-            await this.loadWorkTypesForKits();
-        } catch (error) {
-            console.error('Erro ao carregar kits:', error);
-            this.showError('Erro ao carregar kits');
-        }
-    }
-
-    async loadWorkTypesForKits() {
-        if (this.workTypes.length === 0) {
-            await this.loadWorkTypes();
-        }
-
-        const filterSelect = document.getElementById('kit-filter-type');
-        if (filterSelect && filterSelect.options.length === 1) {
-            this.workTypes.forEach(type => {
-                const option = document.createElement('option');
-                option.value = type.id;
-                option.textContent = type.name;
-                filterSelect.appendChild(option);
-            });
-        }
-
-        // Popula select de tipos de trabalho no modal de kits
-        const modalSelect = document.querySelector('#kit-form select[name="work_type_id"]');
-        if (modalSelect && modalSelect.options.length === 1) {
-            modalSelect.innerHTML = '<option value="">Selecione o tipo</option>';
-            this.workTypes.forEach(type => {
-                const option = document.createElement('option');
-                option.value = type.id;
-                option.textContent = type.name;
-                modalSelect.appendChild(option);
-            });
-        }
-    }
-
-    renderKits(kits) {
-        const grid = document.getElementById('kits-grid');
-        
-        if (!kits || kits.length === 0) {
-            grid.innerHTML = `
-                <div class="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
-                    Nenhum kit encontrado
-                </div>
-            `;
-            return;
-        }
-
-        grid.innerHTML = kits.map(kit => {
-            const itemsCount = kit.items?.length || 0;
-            const estimatedCost = kit.items?.reduce((sum, item) => {
-                return sum + (item.standard_quantity * (item.inventory_item?.unit_cost || 0));
-            }, 0) || 0;
-
-            return `
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 text-white">
-                        <h3 class="text-lg font-bold">${kit.name}</h3>
-                        <p class="text-sm text-emerald-100">${kit.work_type?.name || '-'}</p>
-                    </div>
-                    <div class="p-4">
-                        <div class="mb-4">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">${kit.description || 'Sem descrição'}</p>
-                        </div>
-                        <div class="flex items-center justify-between text-sm mb-2">
-                            <span class="text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-box mr-1"></i>
-                                ${itemsCount} ${itemsCount === 1 ? 'material' : 'materiais'}
-                            </span>
-                            ${kit.estimated_time_hours ? `
-                                <span class="text-gray-600 dark:text-gray-400">
-                                    <i class="fas fa-clock mr-1"></i>
-                                    ${kit.estimated_time_hours}h
-                                </span>
-                            ` : ''}
-                        </div>
-                        <div class="text-sm mb-4">
-                            <span class="text-gray-600 dark:text-gray-400">Custo estimado:</span>
-                            <span class="text-lg font-bold text-emerald-600">€${estimatedCost.toFixed(2)}</span>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="prostoralApp.viewKit('${kit.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm transition-colors">
-                                <i class="fas fa-eye mr-1"></i>
-                                Ver
-                            </button>
-                            <button onclick="prostoralApp.editKit('${kit.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm transition-colors">
-                                <i class="fas fa-edit mr-1"></i>
-                                Editar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    async handleKitSubmit(e) {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const kitData = {
-            name: formData.get('name'),
-            work_type_id: formData.get('work_type_id'),
-            description: formData.get('description'),
-            estimated_time_hours: formData.get('estimated_time_hours') ? parseFloat(formData.get('estimated_time_hours')) : null
-        };
-
-        // Coletar materiais
-        const materials = [];
-        document.querySelectorAll('.kit-material-row').forEach(row => {
-            const inventoryItemId = row.querySelector('select[name^="inventory_item_id"]').value;
-            const quantity = row.querySelector('input[name^="quantity"]').value;
-            const unit = row.querySelector('input[name^="unit"]').value;
-
-            if (inventoryItemId && quantity) {
-                materials.push({
-                    inventory_item_id: inventoryItemId,
-                    standard_quantity: parseFloat(quantity),
-                    unit: unit || 'un'
-                });
-            }
-        });
-
-        kitData.items = materials;
-
-        try {
-            const token = await window.authManager.getAccessToken();
-            
-            const response = await fetch(`${this.apiBaseUrl}/kits`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(kitData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Erro ao criar kit');
-            }
-
-            this.showSuccess('Kit criado com sucesso!');
-            closeKitModal();
-            this.loadKits();
-        } catch (error) {
-            console.error('Erro ao criar kit:', error);
-            this.showError('Erro ao criar kit');
-        }
-    }
-
-    viewKit(id) {
-        console.log('Ver kit:', id);
-        // TODO: Implementar visualização detalhada
-        alert('Visualização detalhada em desenvolvimento');
-    }
-
-    editKit(id) {
-        console.log('Editar kit:', id);
-        // TODO: Implementar edição
-        alert('Edição de kit em desenvolvimento');
-    }
-
-    showSuccess(message) {
-        // TODO: Implementar toast de sucesso
-        alert(message);
-    }
-
-    showError(message) {
-        // TODO: Implementar toast de erro
-        alert(message);
+    deleteClient(id) {
+        console.log('Deletar cliente:', id);
+        this.showError('Funcionalidade em desenvolvimento');
     }
 }
 
 // Funções globais para modals
 function openClientModal() {
-    document.getElementById('client-modal').classList.remove('hidden');
-    document.getElementById('client-modal').classList.add('flex');
+    alert('Modal de novo cliente - Em desenvolvimento');
 }
 
-function closeClientModal() {
-    document.getElementById('client-modal').classList.add('hidden');
-    document.getElementById('client-modal').classList.remove('flex');
-    document.getElementById('client-form').reset();
-}
-
-function openInventoryModal() {
-    alert('Modal de estoque em desenvolvimento');
-}
-
-function openOrderModal() {
-    document.getElementById('order-modal').classList.remove('hidden');
-    document.getElementById('order-modal').classList.add('flex');
-}
-
-function closeOrderModal() {
-    document.getElementById('order-modal').classList.add('hidden');
-    document.getElementById('order-modal').classList.remove('flex');
-    document.getElementById('order-form').reset();
-}
-
-async function openKitModal() {
-    document.getElementById('kit-modal').classList.remove('hidden');
-    document.getElementById('kit-modal').classList.add('flex');
+// Inicializar app quando DOM estiver pronto
+window.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM carregado, aguardando authManager...');
     
-    // Carregar estoque para os selects de materiais
-    if (prostoralApp.inventory.length === 0) {
-        await prostoralApp.loadInventory();
-    }
-}
-
-function closeKitModal() {
-    document.getElementById('kit-modal').classList.add('hidden');
-    document.getElementById('kit-modal').classList.remove('flex');
-    document.getElementById('kit-form').reset();
+    // Aguardar authManager estar disponível
+    const checkAuthManager = setInterval(() => {
+        if (window.authManager) {
+            clearInterval(checkAuthManager);
+            console.log('AuthManager disponível, iniciando app...');
+            window.prostoralApp = new ProstoralApp();
+        }
+    }, 100);
     
-    // Limpar lista de materiais
-    const materialsList = document.getElementById('kit-materials-list');
-    materialsList.innerHTML = `
-        <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
-            Nenhum material adicionado. Clique em "Adicionar Material" para começar.
-        </p>
-    `;
-    prostoralApp.kitMaterialCounter = 0;
-}
-
-function addKitMaterial() {
-    const materialsList = document.getElementById('kit-materials-list');
-    const counter = prostoralApp.kitMaterialCounter++;
-    
-    // Remover mensagem "Nenhum material adicionado" se existir
-    const emptyMessage = materialsList.querySelector('p');
-    if (emptyMessage) {
-        materialsList.innerHTML = '';
-    }
-    
-    const materialRow = document.createElement('div');
-    materialRow.className = 'kit-material-row flex gap-3 items-start bg-gray-50 dark:bg-gray-700 p-3 rounded-lg';
-    materialRow.innerHTML = `
-        <div class="flex-1">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Material *
-            </label>
-            <select name="inventory_item_id_${counter}" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
-                <option value="">Selecione o material</option>
-                ${prostoralApp.inventory.map(item => `
-                    <option value="${item.id}">${item.name} (${item.code})</option>
-                `).join('')}
-            </select>
-        </div>
-        <div class="w-24">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Quantidade *
-            </label>
-            <input type="number" name="quantity_${counter}" step="0.01" min="0.01" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
-        </div>
-        <div class="w-20">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Unidade
-            </label>
-            <input type="text" name="unit_${counter}" value="un" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
-        </div>
-        <button type="button" onclick="removeKitMaterial(this)" class="mt-6 bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors">
-            <i class="fas fa-trash"></i>
-        </button>
-    `;
-    
-    materialsList.appendChild(materialRow);
-}
-
-function removeKitMaterial(button) {
-    const row = button.closest('.kit-material-row');
-    row.remove();
-    
-    // Se não há mais materiais, mostrar mensagem
-    const materialsList = document.getElementById('kit-materials-list');
-    if (materialsList.querySelectorAll('.kit-material-row').length === 0) {
-        materialsList.innerHTML = `
-            <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
-                Nenhum material adicionado. Clique em "Adicionar Material" para começar.
-            </p>
-        `;
-    }
-}
-
-function openInventoryModal() {
-    document.getElementById('inventory-modal').classList.remove('hidden');
-    document.getElementById('inventory-modal').classList.add('flex');
-}
-
-function closeInventoryModal() {
-    document.getElementById('inventory-modal').classList.add('hidden');
-    document.getElementById('inventory-modal').classList.remove('flex');
-    document.getElementById('inventory-form').reset();
-}
-
-function openQRScannerModal() {
-    document.getElementById('qr-scanner-modal').classList.remove('hidden');
-    document.getElementById('qr-scanner-modal').classList.add('flex');
-}
-
-function closeQRScannerModal() {
-    document.getElementById('qr-scanner-modal').classList.add('hidden');
-    document.getElementById('qr-scanner-modal').classList.remove('flex');
-}
-
-// Inicializar aplicação
-let prostoralApp;
-document.addEventListener('DOMContentLoaded', () => {
-    prostoralApp = new ProstoralApp();
+    // Timeout de segurança
+    setTimeout(() => {
+        clearInterval(checkAuthManager);
+        if (!window.prostoralApp) {
+            console.error('Timeout ao aguardar authManager');
+            window.location.href = 'login.html';
+        }
+    }, 5000);
 });
-
