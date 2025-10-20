@@ -2278,6 +2278,279 @@ app.use((req, res) => {
     });
 });
 
+// =====================================================
+// PROSTORAL - API ENDPOINTS
+// =====================================================
+
+// ==================== CLIENTES ====================
+
+// GET - Listar todos os clientes
+app.get('/api/prostoral/clients', authenticateToken, async (req, res) => {
+    try {
+        const { search, is_active } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_clients')
+            .select('*')
+            .order('name', { ascending: true });
+        
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,clinic_name.ilike.%${search}%,dentist_name.ilike.%${search}%`);
+        }
+        
+        if (is_active !== undefined) {
+            query = query.eq('is_active', is_active === 'true');
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, clients: data });
+    } catch (error) {
+        console.error('Erro ao buscar clientes:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar cliente por ID
+app.get('/api/prostoral/clients/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_clients')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, client: data });
+    } catch (error) {
+        console.error('Erro ao buscar cliente:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar novo cliente
+app.post('/api/prostoral/clients', authenticateToken, async (req, res) => {
+    try {
+        const clientData = {
+            ...req.body,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            created_by: req.user.id
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_clients')
+            .insert([clientData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, client: data });
+    } catch (error) {
+        console.error('Erro ao criar cliente:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT - Atualizar cliente
+app.put('/api/prostoral/clients/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const clientData = {
+            ...req.body,
+            updated_by: req.user.id
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_clients')
+            .update(clientData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, client: data });
+    } catch (error) {
+        console.error('Erro ao atualizar cliente:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE - Desativar cliente
+app.delete('/api/prostoral/clients/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_clients')
+            .update({ is_active: false })
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, client: data });
+    } catch (error) {
+        console.error('Erro ao desativar cliente:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Estatísticas do cliente
+app.get('/api/prostoral/clients/:id/stats', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .rpc('get_client_statistics', { p_client_id: id });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, stats: data[0] });
+    } catch (error) {
+        console.error('Erro ao buscar estatísticas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== ESTOQUE ====================
+
+// GET - Listar estoque
+app.get('/api/prostoral/inventory', authenticateToken, async (req, res) => {
+    try {
+        const { category, search, low_stock } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_inventory')
+            .select('*')
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        
+        if (category) {
+            query = query.eq('category', category);
+        }
+        
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+        
+        if (low_stock === 'true') {
+            query = query.filter('quantity', 'lte', 'min_stock');
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, items: data });
+    } catch (error) {
+        console.error('Erro ao buscar estoque:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Adicionar item ao estoque
+app.post('/api/prostoral/inventory', authenticateToken, async (req, res) => {
+    try {
+        const itemData = {
+            ...req.body,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            created_by: req.user.id
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_inventory')
+            .insert([itemData])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, item: data });
+    } catch (error) {
+        console.error('Erro ao criar item:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT - Atualizar item do estoque
+app.put('/api/prostoral/inventory/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const itemData = {
+            ...req.body,
+            updated_by: req.user.id
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_inventory')
+            .update(itemData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, item: data });
+    } catch (error) {
+        console.error('Erro ao atualizar item:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Registrar movimentação de estoque
+app.post('/api/prostoral/inventory/:id/movement', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { movement_type, quantity, unit_cost, work_order_id, reason, notes } = req.body;
+        
+        const { data, error } = await supabaseAdmin
+            .rpc('register_inventory_movement', {
+                p_inventory_item_id: id,
+                p_movement_type: movement_type,
+                p_quantity: quantity,
+                p_unit_cost: unit_cost,
+                p_work_order_id: work_order_id,
+                p_reference_document: null,
+                p_reason: reason,
+                p_notes: notes,
+                p_performed_by: req.user.id,
+                p_tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+            });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, movement_id: data });
+    } catch (error) {
+        console.error('Erro ao registrar movimentação:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Itens com estoque baixo
+app.get('/api/prostoral/inventory/low-stock', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .rpc('get_low_stock_items', { 
+                p_tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+            });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, items: data });
+    } catch (error) {
+        console.error('Erro ao buscar itens com estoque baixo:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
