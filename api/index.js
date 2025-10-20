@@ -3408,6 +3408,185 @@ app.patch('/api/prostoral/incidents/:id/status', authenticateToken, async (req, 
     }
 });
 
+// ==================== FATURAÇÃO ====================
+
+// GET - Listar faturas
+app.get('/api/prostoral/invoices', authenticateToken, async (req, res) => {
+    try {
+        const { status, client_id, date_from, date_to } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_invoices')
+            .select(`
+                *,
+                client:prostoral_clients(id, full_name, client_type, company_name),
+                items:prostoral_invoice_items(
+                    *,
+                    work_order:prostoral_work_orders(id, work_order_number, patient_name)
+                )
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (status) {
+            query = query.eq('status', status);
+        }
+        
+        if (client_id) {
+            query = query.eq('client_id', client_id);
+        }
+        
+        if (date_from) {
+            query = query.gte('issue_date', date_from);
+        }
+        
+        if (date_to) {
+            query = query.lte('issue_date', date_to);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, invoices: data });
+    } catch (error) {
+        console.error('Erro ao buscar faturas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar fatura por ID
+app.get('/api/prostoral/invoices/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_invoices')
+            .select(`
+                *,
+                client:prostoral_clients(*),
+                items:prostoral_invoice_items(
+                    *,
+                    work_order:prostoral_work_orders(*)
+                )
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, invoice: data });
+    } catch (error) {
+        console.error('Erro ao buscar fatura:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar fatura
+app.post('/api/prostoral/invoices', authenticateToken, async (req, res) => {
+    try {
+        const { items, ...invoiceData } = req.body;
+        
+        // Gerar número da fatura
+        const { data: invoiceNumber, error: numberError } = await supabaseAdmin
+            .rpc('get_next_invoice_number', {
+                p_tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+            });
+        
+        if (numberError) throw numberError;
+        
+        const dataToInsert = {
+            ...invoiceData,
+            invoice_number: invoiceNumber,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            created_by: req.user.id,
+            status: invoiceData.status || 'draft'
+        };
+        
+        const { data: invoice, error: invoiceError } = await supabaseAdmin
+            .from('prostoral_invoices')
+            .insert([dataToInsert])
+            .select()
+            .single();
+        
+        if (invoiceError) throw invoiceError;
+        
+        // Adicionar itens da fatura
+        if (items && items.length > 0) {
+            const invoiceItems = items.map(item => ({
+                invoice_id: invoice.id,
+                work_order_id: item.work_order_id,
+                description: item.description,
+                quantity: item.quantity || 1,
+                unit_price: item.unit_price,
+                discount: item.discount || 0,
+                tax_rate: item.tax_rate || 0
+            }));
+            
+            const { error: itemsError } = await supabaseAdmin
+                .from('prostoral_invoice_items')
+                .insert(invoiceItems);
+            
+            if (itemsError) throw itemsError;
+        }
+        
+        res.json({ success: true, invoice });
+    } catch (error) {
+        console.error('Erro ao criar fatura:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH - Atualizar status da fatura
+app.patch('/api/prostoral/invoices/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        
+        const updateData = { 
+            status,
+            updated_by: req.user.id
+        };
+        
+        if (status === 'sent') {
+            updateData.sent_at = new Date().toISOString();
+        } else if (status === 'paid') {
+            updateData.paid_at = new Date().toISOString();
+        }
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_invoices')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, invoice: data });
+    } catch (error) {
+        console.error('Erro ao atualizar status da fatura:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Gerar PDF da fatura
+app.get('/api/prostoral/invoices/:id/pdf', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // TODO: Implementar geração de PDF
+        // Por enquanto, retornar informação de que está em desenvolvimento
+        res.json({ 
+            success: false, 
+            message: 'Geração de PDF em desenvolvimento',
+            invoice_id: id 
+        });
+    } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);
