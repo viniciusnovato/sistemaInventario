@@ -5,10 +5,18 @@ const compression = require('compression');
 const path = require('path');
 const multer = require('multer');
 const QRCode = require('qrcode');
-const { sanitizeFileName } = require('../sanitize-filename');
 require('dotenv').config();
 
+// Função para sanitizar nomes de arquivos
+function sanitizeFileName(filename) {
+    return filename
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
 const { createClient } = require('@supabase/supabase-js');
+const { authenticateToken, requirePermission, requireRole, requireAdmin, getCurrentUser } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -24,9 +32,13 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB
+        fileSize: 10 * 1024 * 1024, // 10MB - mesmo limite do Express
+        fieldSize: 10 * 1024 * 1024, // 10MB para campos de texto
+        fields: 50, // Máximo de 50 campos
+        files: 15 // Máximo de 15 arquivos
     },
     fileFilter: (req, file, cb) => {
+        console.log(`📁 Processando arquivo: ${file.originalname}, tipo: ${file.mimetype}, tamanho estimado: ${file.size || 'desconhecido'}`);
         if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
         } else {
@@ -139,11 +151,22 @@ app.use(helmet({
 }));
 app.use(cors());
 app.use(compression());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Servir arquivos estáticos da pasta public
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Middleware condicional para parsing JSON/URL - apenas para rotas que não usam multipart
+app.use((req, res, next) => {
+    const contentType = req.headers['content-type'] || '';
+    
+    // Se não for multipart/form-data, aplicar parsing JSON/URL
+    if (!contentType.includes('multipart/form-data')) {
+        express.json({ limit: '10mb' })(req, res, (err) => {
+            if (err) return next(err);
+            express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+        });
+    } else {
+        // Para multipart, pular o parsing JSON/URL
+        next();
+    }
+});
 
 // Middleware de logging
 app.use((req, res, next) => {
@@ -151,16 +174,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rota principal - servir index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
+// Endpoint para autenticação e informações do usuário
+app.get('/api/auth/me', authenticateToken, getCurrentUser);
 
 // Rotas da API
 
-// GET - Listar todos os itens
-app.get('/api/items', async (req, res) => {
-    try {
+// GET -// Rota para listar todos os itens
+app.get('/api/items', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {    try {
         const {
             search = '',
             category = '',
@@ -320,7 +340,7 @@ app.get('/api/items', async (req, res) => {
 });
 
 // GET - Buscar item por ID
-app.get('/api/items/:id', async (req, res) => {
+app.get('/api/items/:id', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { id } = req.params;
         
@@ -369,7 +389,7 @@ app.get('/api/items/:id', async (req, res) => {
 });
 
 // POST - Criar novo item
-app.post('/api/items', upload.fields([
+app.post('/api/items', authenticateToken, requirePermission('inventory', 'create'), upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'pdf', maxCount: 10 } // Permitir até 10 PDFs
 ]), async (req, res) => {
@@ -543,7 +563,7 @@ app.post('/api/items', upload.fields([
 });
 
 // PUT - Atualizar item
-app.put('/api/items/:id', upload.fields([
+app.put('/api/items/:id', authenticateToken, requirePermission('inventory', 'manage'), upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'pdf', maxCount: 10 } // Permitir até 10 PDFs
 ]), async (req, res) => {
@@ -775,7 +795,7 @@ async function deleteFileFromStorage(bucket, filePath) {
 }
 
 // DELETE - Excluir item
-app.delete('/api/items/:id', async (req, res) => {
+app.delete('/api/items/:id', authenticateToken, requirePermission('inventory', 'delete'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -845,7 +865,7 @@ app.delete('/api/items/:id', async (req, res) => {
 });
 
 // GET - Estatísticas do inventário
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('sistemainventario')
@@ -896,7 +916,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // GET - Buscar itens com filtros
-app.get('/api/search', async (req, res) => {
+app.get('/api/search', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { q, category, company, status } = req.query;
         
@@ -951,7 +971,7 @@ app.get('/api/search', async (req, res) => {
 // ===== ROTAS PARA CATEGORIAS =====
 
 // GET - Listar todas as categorias
-app.get('/api/categories', async (req, res) => {
+app.get('/api/categories', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('categoriassistemainventario')
@@ -981,7 +1001,7 @@ app.get('/api/categories', async (req, res) => {
 });
 
 // POST - Criar nova categoria
-app.post('/api/categories', async (req, res) => {
+app.post('/api/categories', authenticateToken, requirePermission('inventory', 'manage'), async (req, res) => {
     try {
         const { nome } = req.body;
 
@@ -1026,7 +1046,7 @@ app.post('/api/categories', async (req, res) => {
 // ===== ROTAS PARA COLABORADORES =====
 
 // GET - Listar todos os colaboradores
-app.get('/api/collaborators', async (req, res) => {
+app.get('/api/collaborators', authenticateToken, requirePermission('inventory', 'read'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('colaboradoressistemainventario')
@@ -1056,7 +1076,7 @@ app.get('/api/collaborators', async (req, res) => {
 });
 
 // POST - Criar novo colaborador
-app.post('/api/collaborators', async (req, res) => {
+app.post('/api/collaborators', authenticateToken, requirePermission('inventory', 'manage'), async (req, res) => {
     try {
         const { nome, email, cargo } = req.body;
 
@@ -1836,6 +1856,417 @@ app.post('/api/setup-print-table', async (req, res) => {
             `
         });
     }
+});
+
+// =====================================================
+// ENDPOINTS DE MÓDULOS DO ERP
+// =====================================================
+
+// GET - Listar todos os módulos disponíveis no sistema
+app.get('/api/modules', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('modules')
+            .select('*')
+            .eq('is_active', true)
+            .order('display_order', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar módulos:', error);
+            return res.status(500).json({ error: 'Erro ao buscar módulos' });
+        }
+
+        res.json({ success: true, modules: data });
+    } catch (error) {
+        console.error('Erro ao buscar módulos:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// GET - Listar módulos acessíveis pelo usuário atual
+app.get('/api/modules/available', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Usar a função SQL para obter módulos acessíveis
+        const { data, error } = await supabaseAdmin.rpc('get_user_accessible_modules', {
+            p_user_id: userId
+        });
+
+        if (error) {
+            console.error('Erro ao buscar módulos acessíveis:', error);
+            return res.status(500).json({ error: 'Erro ao buscar módulos acessíveis' });
+        }
+
+        res.json({ success: true, modules: data || [] });
+    } catch (error) {
+        console.error('Erro ao buscar módulos acessíveis:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// GET - Verificar se usuário tem acesso a um módulo específico
+app.get('/api/modules/:moduleCode/check-access', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { moduleCode } = req.params;
+
+        const { data, error } = await supabaseAdmin.rpc('user_has_module_access', {
+            p_user_id: userId,
+            p_module_code: moduleCode
+        });
+
+        if (error) {
+            console.error('Erro ao verificar acesso ao módulo:', error);
+            return res.status(500).json({ error: 'Erro ao verificar acesso' });
+        }
+
+        res.json({ success: true, hasAccess: data });
+    } catch (error) {
+        console.error('Erro ao verificar acesso ao módulo:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// POST - Criar novo módulo (apenas admin)
+app.post('/api/modules', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { code, name, description, icon, emoji, color, route, display_order } = req.body;
+
+        if (!code || !name) {
+            return res.status(400).json({ error: 'Código e nome são obrigatórios' });
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('modules')
+            .insert([{
+                code,
+                name,
+                description,
+                icon,
+                emoji,
+                color,
+                route,
+                display_order: display_order || 0
+            }])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao criar módulo:', error);
+            return res.status(500).json({ error: 'Erro ao criar módulo' });
+        }
+
+        res.json({ success: true, module: data });
+    } catch (error) {
+        console.error('Erro ao criar módulo:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// PUT - Atualizar módulo (apenas admin)
+app.put('/api/modules/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, icon, emoji, color, route, display_order, is_active } = req.body;
+
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (icon !== undefined) updateData.icon = icon;
+        if (emoji !== undefined) updateData.emoji = emoji;
+        if (color !== undefined) updateData.color = color;
+        if (route !== undefined) updateData.route = route;
+        if (display_order !== undefined) updateData.display_order = display_order;
+        if (is_active !== undefined) updateData.is_active = is_active;
+
+        const { data, error } = await supabaseAdmin
+            .from('modules')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao atualizar módulo:', error);
+            return res.status(500).json({ error: 'Erro ao atualizar módulo' });
+        }
+
+        res.json({ success: true, module: data });
+    } catch (error) {
+        console.error('Erro ao atualizar módulo:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// DELETE - Deletar módulo (apenas admin)
+app.delete('/api/modules/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { error } = await supabaseAdmin
+            .from('modules')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao deletar módulo:', error);
+            return res.status(500).json({ error: 'Erro ao deletar módulo' });
+        }
+
+        res.json({ success: true, message: 'Módulo deletado com sucesso' });
+    } catch (error) {
+        console.error('Erro ao deletar módulo:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// =====================================================
+// ENDPOINTS DE GERENCIAMENTO DE ACESSO A MÓDULOS
+// =====================================================
+
+// GET - Listar acessos de um usuário específico (apenas admin)
+app.get('/api/modules/access/user/:userId', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const { data, error } = await supabaseAdmin
+            .from('user_module_access')
+            .select(`
+                *,
+                modules (
+                    id,
+                    code,
+                    name,
+                    icon,
+                    emoji,
+                    color
+                )
+            `)
+            .eq('user_id', userId)
+            .eq('is_active', true);
+
+        if (error) {
+            console.error('Erro ao buscar acessos do usuário:', error);
+            return res.status(500).json({ error: 'Erro ao buscar acessos' });
+        }
+
+        res.json({ success: true, accesses: data });
+    } catch (error) {
+        console.error('Erro ao buscar acessos do usuário:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// POST - Conceder acesso a módulo para usuário (apenas admin)
+app.post('/api/modules/access/grant', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { user_id, module_id, expires_at } = req.body;
+        const grantedBy = req.user.id;
+
+        if (!user_id || !module_id) {
+            return res.status(400).json({ error: 'user_id e module_id são obrigatórios' });
+        }
+
+        // Verificar se o acesso já existe
+        const { data: existing } = await supabaseAdmin
+            .from('user_module_access')
+            .select('id')
+            .eq('user_id', user_id)
+            .eq('module_id', module_id)
+            .single();
+
+        if (existing) {
+            // Atualizar acesso existente
+            const { data, error } = await supabaseAdmin
+                .from('user_module_access')
+                .update({
+                    is_active: true,
+                    granted_by: grantedBy,
+                    granted_at: new Date().toISOString(),
+                    expires_at: expires_at || null
+                })
+                .eq('id', existing.id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Erro ao atualizar acesso:', error);
+                return res.status(500).json({ error: 'Erro ao atualizar acesso' });
+            }
+
+            return res.json({ success: true, access: data, message: 'Acesso atualizado com sucesso' });
+        }
+
+        // Criar novo acesso
+        const { data, error } = await supabaseAdmin
+            .from('user_module_access')
+            .insert([{
+                user_id,
+                module_id,
+                granted_by: grantedBy,
+                expires_at: expires_at || null
+            }])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao conceder acesso:', error);
+            return res.status(500).json({ error: 'Erro ao conceder acesso' });
+        }
+
+        res.json({ success: true, access: data, message: 'Acesso concedido com sucesso' });
+    } catch (error) {
+        console.error('Erro ao conceder acesso:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// DELETE - Revogar acesso a módulo (apenas admin)
+app.delete('/api/modules/access/revoke', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { user_id, module_id } = req.body;
+
+        if (!user_id || !module_id) {
+            return res.status(400).json({ error: 'user_id e module_id são obrigatórios' });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('user_module_access')
+            .update({ is_active: false })
+            .eq('user_id', user_id)
+            .eq('module_id', module_id);
+
+        if (error) {
+            console.error('Erro ao revogar acesso:', error);
+            return res.status(500).json({ error: 'Erro ao revogar acesso' });
+        }
+
+        res.json({ success: true, message: 'Acesso revogado com sucesso' });
+    } catch (error) {
+        console.error('Erro ao revogar acesso:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// GET - Listar todos os usuários com seus acessos (apenas admin)
+app.get('/api/modules/access/all-users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        // Buscar todos os perfis de usuários
+        const { data: profiles, error: profilesError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email, full_name')
+            .order('full_name');
+
+        if (profilesError) {
+            console.error('Erro ao buscar perfis:', profilesError);
+            return res.status(500).json({ error: 'Erro ao buscar usuários' });
+        }
+
+        // Buscar acessos de cada usuário
+        const usersWithAccess = await Promise.all(
+            profiles.map(async (profile) => {
+                const { data: accesses } = await supabaseAdmin
+                    .from('user_module_access')
+                    .select(`
+                        *,
+                        modules (
+                            id,
+                            code,
+                            name,
+                            icon,
+                            emoji,
+                            color
+                        )
+                    `)
+                    .eq('user_id', profile.id)
+                    .eq('is_active', true);
+
+                return {
+                    ...profile,
+                    module_accesses: accesses || []
+                };
+            })
+        );
+
+        res.json({ success: true, users: usersWithAccess });
+    } catch (error) {
+        console.error('Erro ao buscar usuários com acessos:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+
+// Servir arquivos estáticos da pasta public
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Middleware para capturar erros do multer
+app.use((error, req, res, next) => {
+    console.log('🚨 Erro capturado no middleware:', {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        type: error.type,
+        field: error.field,
+        stack: error.stack?.substring(0, 500)
+    });
+    
+    if (error instanceof multer.MulterError) {
+        console.log('📁 Erro específico do Multer:', {
+            code: error.code,
+            field: error.field,
+            message: error.message
+        });
+        
+        switch (error.code) {
+            case 'LIMIT_FILE_SIZE':
+                return res.status(413).json({ 
+                    error: 'Arquivo muito grande', 
+                    details: `Tamanho máximo permitido: 10MB` 
+                });
+            case 'LIMIT_FILE_COUNT':
+                return res.status(413).json({ 
+                    error: 'Muitos arquivos', 
+                    details: 'Máximo de 15 arquivos permitidos' 
+                });
+            case 'LIMIT_FIELD_COUNT':
+                return res.status(413).json({ 
+                    error: 'Muitos campos', 
+                    details: 'Máximo de 50 campos permitidos' 
+                });
+            case 'LIMIT_FIELD_SIZE':
+                return res.status(413).json({ 
+                    error: 'Campo muito grande', 
+                    details: 'Tamanho máximo do campo: 10MB' 
+                });
+            default:
+                return res.status(400).json({ 
+                    error: 'Erro no upload', 
+                    details: error.message 
+                });
+        }
+    }
+    
+    if (error.type === 'entity.parse.failed') {
+        console.log('🔍 Erro de parsing detectado:', {
+            message: error.message,
+            body: req.body ? 'Body presente' : 'Body ausente',
+            contentType: req.headers['content-type'],
+            contentLength: req.headers['content-length']
+        });
+        
+        return res.status(400).json({ 
+            error: 'Erro ao processar dados', 
+            details: 'Falha no parsing dos dados enviados. Verifique o formato dos arquivos.' 
+        });
+    }
+    
+    next(error);
+});
+
+// Rota principal - servir dashboard.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
 });
 
 // GET - Endpoint para servir QR Code como imagem

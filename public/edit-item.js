@@ -18,8 +18,8 @@ let selectedPdfs = []; // Array para armazenar múltiplos PDFs
 let existingPdfs = [];
 let existingPdfsToRemove = [];
 
-// Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Initialize Supabase client (usando configurações globais)
+const supabase = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
 // Image and PDF upload functions
 function updateImageProgressBar(percent, text) {
@@ -193,8 +193,8 @@ function removeExistingPdf(pdfUrl) {
 async function loadDropdownData() {
     try {
         const [categoriesResponse, collaboratorsResponse] = await Promise.all([
-            fetch('/api/categories'),
-            fetch('/api/collaborators')
+            authenticatedFetch('/api/categories'),
+            authenticatedFetch('/api/collaborators')
         ]);
 
         const categoriesData = await categoriesResponse.json();
@@ -296,7 +296,7 @@ document.getElementById('categoryForm').addEventListener('submit', async (e) => 
     };
 
     try {
-        const response = await fetch('/api/categories', {
+        const response = await authenticatedFetch('/api/categories', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -338,7 +338,7 @@ document.getElementById('collaboratorForm').addEventListener('submit', async (e)
     };
 
     try {
-        const response = await fetch('/api/collaborators', {
+        const response = await authenticatedFetch('/api/collaborators', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -376,7 +376,7 @@ async function loadItem() {
     }
 
     try {
-        const response = await fetch(`/api/items/${itemId}`);
+        const response = await authenticatedFetch(`/api/items/${itemId}`);
         const data = await response.json();
 
         if (!response.ok || !data.success) {
@@ -530,7 +530,7 @@ async function saveItem() {
 
     try {
         console.log('Enviando FormData para API...');
-        const response = await fetch(`/api/items/${itemId}`, {
+        const response = await authenticatedFetch(`/api/items/${itemId}`, {
             method: 'PUT',
             body: formData
         });
@@ -600,4 +600,24 @@ async function init() {
     await loadItem();
 }
 
-init();
+// Aguardar o DOM e o authManager estarem prontos antes de inicializar
+document.addEventListener('DOMContentLoaded', async () => {
+    // Aguardar o authManager estar pronto
+    if (window.authManager) {
+        // Aguardar a inicialização completa do authManager
+        await window.authManager.init();
+        
+        // Verificar se está autenticado
+        if (!window.authManager.isUserAuthenticated()) {
+            console.log('Usuário não autenticado, redirecionando para login');
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        // Usuário autenticado, inicializar a página
+        await init();
+    } else {
+        console.error('AuthManager não encontrado');
+        window.location.href = 'login.html';
+    }
+});

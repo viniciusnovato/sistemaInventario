@@ -30,7 +30,7 @@
         <div class="container mx-auto px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <a href="index.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                    <a href="inventory.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
                         <i class="fas fa-arrow-left text-xl"></i>
                         <span class="text-lg font-semibold">Voltar ao Inventário</span>
                     </a>
@@ -62,7 +62,7 @@
                 <i class="fas fa-exclamation-triangle mr-2"></i>
                 <span id="errorMessage">Item não encontrado</span>
             </div>
-            <a href="index.html" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+            <a href="inventory.html" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
                 <i class="fas fa-arrow-left mr-2"></i>
                 Voltar ao Inventário
             </a>
@@ -385,7 +385,7 @@
                 <!-- Action Buttons -->
                 <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-between items-center">
                     <div class="flex space-x-3">
-                        <a href="index.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
+                        <a href="inventory.html" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors">
                             <i class="fas fa-times mr-2"></i>
                             Cancelar
                         </a>
@@ -411,7 +411,7 @@
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Item Atualizado!</h3>
                 <p class="text-gray-600 dark:text-gray-400 mb-4">As alterações foram salvas com sucesso.</p>
                 <div class="flex space-x-3 justify-center">
-                    <a href="index.html" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <a href="inventory.html" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
                         Voltar ao Inventário
                     </a>
                     <button id="continueEditingBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
@@ -507,6 +507,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="auth.js"></script>
     <script>
         // Proteger página - verificar autenticação

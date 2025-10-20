@@ -1,5 +1,5 @@
-// Inicializar cliente Supabase (usando configurações do auth.js)
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Inicializar cliente Supabase (usando configurações globais)
+const supabase = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
 // View Modal
 let currentViewItemId = null;
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // Enviar dados do item
-                const response = await fetch('/api/items', {
+                const response = await authenticatedFetch('/api/items', {
                     method: 'POST',
                     body: formData
                 });
@@ -919,7 +919,7 @@ async function deleteItem(itemId) {
     try {
         showLoading(true);
         
-        const response = await fetch(`/api/items/${itemId}`, {
+        const response = await authenticatedFetch(`/api/items/${itemId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
@@ -974,11 +974,39 @@ const AdvancedSearch = {
     /**
      * Inicializa o sistema de busca avançada
      */
-    init() {
+    async init() {
         this.setupEventListeners();
         this.setupViewToggle();
-        this.loadItems();
+        
+        // Aguardar autenticação estar pronta antes de carregar itens
+        await this.waitForAuth();
+        await this.loadItems();
+        
         console.log('🔍 Sistema de busca avançada inicializado');
+    },
+
+    /**
+     * Aguarda a autenticação estar pronta
+     */
+    async waitForAuth() {
+        return new Promise((resolve) => {
+            const checkAuth = () => {
+                if (window.authManager && 
+                    window.authManager.isAuthenticated && 
+                    window.authManager.getAccessToken()) {
+                    console.log('✅ Autenticação confirmada com token válido, carregando itens...');
+                    resolve();
+                } else {
+                    console.log('⏳ Aguardando autenticação completa...', {
+                        hasAuthManager: !!window.authManager,
+                        isAuthenticated: window.authManager?.isAuthenticated,
+                        hasToken: !!window.authManager?.getAccessToken()
+                    });
+                    setTimeout(checkAuth, 100);
+                }
+            };
+            checkAuth();
+        });
     },
 
     /**
@@ -988,10 +1016,13 @@ const AdvancedSearch = {
         // Busca principal
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
-            searchInput.addEventListener('input', debounce((e) => {
-                this.filters.search = e.target.value;
-                this.applyFilters();
-            }, 300));
+            const self = this;
+            const debouncedSearch = debounce(function(e) {
+                self.filters.search = e.target.value;
+                self.applyFilters();
+            }, 150);
+            
+            searchInput.addEventListener('input', debouncedSearch);
         }
 
         // Filtros de categoria
@@ -1176,7 +1207,7 @@ const AdvancedSearch = {
         try {
             showLoading(true);
             
-            const response = await fetch('/api/items?limit=1000');
+            const response = await authenticatedFetch('/api/items?limit=1000');
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -2231,10 +2262,13 @@ window.populateCollaboratorsDropdown = populateCollaboratorsDropdown;
 window.setupDropdownEventListeners = setupDropdownEventListeners;
 
 // Inicializar o sistema quando o DOM estiver carregado
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (window.location.pathname === '/' || 
+        window.location.pathname === '/index.html' || 
+        window.location.pathname === '/inventory.html' ||
+        window.location.pathname.endsWith('inventory.html')) {
         ToastSystem.init();
-        AdvancedSearch.init();
+        await AdvancedSearch.init(); // Aguardar inicialização completa
         DragDropSystem.init();
         TabSystem.init(); // Inicializar sistema de abas
         setupGlobalEventListeners(); // Configurar event listeners globais
@@ -2299,8 +2333,8 @@ async function loadDropdownData() {
         console.log('📋 Carregando dados dos dropdowns...');
         
         const [categoriesResponse, collaboratorsResponse] = await Promise.all([
-            fetch('/api/categories'),
-            fetch('/api/collaborators')
+            authenticatedFetch('/api/categories'),
+            authenticatedFetch('/api/collaborators')
         ]);
 
         const categoriesData = await categoriesResponse.json();
@@ -2333,7 +2367,7 @@ async function updateAllQRCodes() {
         ToastSystem.info('🔄 Atualizando QR codes...');
         
         // Fazer requisição para atualizar QR codes
-        const response = await fetch('/api/qr-codes/update-all', {
+        const response = await authenticatedFetch('/api/qr-codes/update-all', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -2497,7 +2531,7 @@ function setupModalEventListeners() {
             };
 
             try {
-                const response = await fetch('/api/categories', {
+                const response = await authenticatedFetch('/api/categories', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -2547,7 +2581,7 @@ function setupModalEventListeners() {
             };
 
             try {
-                const response = await fetch('/api/collaborators', {
+                const response = await authenticatedFetch('/api/collaborators', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -2609,8 +2643,8 @@ async function loadDropdownData() {
         console.log('📋 Carregando dados dos dropdowns...');
         
         const [categoriesResponse, collaboratorsResponse] = await Promise.all([
-            fetch('/api/categories'),
-            fetch('/api/collaborators')
+            authenticatedFetch('/api/categories'),
+            authenticatedFetch('/api/collaborators')
         ]);
 
         const categoriesData = await categoriesResponse.json();
@@ -2643,7 +2677,7 @@ async function updateAllQRCodes() {
         ToastSystem.info('🔄 Atualizando QR codes...');
         
         // Fazer requisição para atualizar QR codes
-        const response = await fetch('/api/qr-codes/update-all', {
+        const response = await authenticatedFetch('/api/qr-codes/update-all', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

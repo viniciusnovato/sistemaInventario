@@ -13,6 +13,7 @@
     
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     
     <!-- Tailwind Configuration -->
     <script>
@@ -298,13 +299,13 @@
                 } else {
                     localStorage.removeItem('rememberMe');
                 }
-                
-                // Redirect to main app
-                window.location.href = 'index.html';
-                
+
+                // Redirect to dashboard
+                window.location.href = 'dashboard.html';
+
             } catch (error) {
                 console.error('Erro no login:', error);
-                
+
                 let errorMessage = 'Erro ao fazer login. Tente novamente.';
                 
                 if (error.message.includes('Invalid login credentials')) {

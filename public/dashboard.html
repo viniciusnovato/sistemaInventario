@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏢 ERP - Grupo AreLuna</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Supabase -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+
+    <style>
+        .module-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .module-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .module-card.locked:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .module-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="text-4xl">🏢</div>
+                    <div>
+                        <h1 class="text-3xl font-bold">ERP Grupo AreLuna</h1>
+                        <p class="text-purple-200 text-sm">Sistema Integrado de Gestão Empresarial</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- User Info -->
+                    <div class="text-right hidden md:block">
+                        <p class="font-semibold" id="userName">Carregando...</p>
+                        <p class="text-sm text-purple-200" id="userRole">-</p>
+                    </div>
+                    
+                    <!-- User Avatar -->
+                    <div class="relative">
+                        <button id="userMenuBtn" class="flex items-center space-x-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full px-4 py-2 transition">
+                            <i class="fas fa-user-circle text-2xl"></i>
+                            <i class="fas fa-chevron-down text-sm"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
+                            <a href="/settings.html" class="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                                <i class="fas fa-cog mr-2"></i> Configurações
+                            </a>
+                            <a href="#" id="adminPanelLink" class="hidden block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                                <i class="fas fa-shield-alt mr-2"></i> Painel Admin
+                            </a>
+                            <hr class="my-2">
+                            <a href="#" id="logoutBtn" class="block px-4 py-2 text-red-600 hover:bg-gray-100">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Sair
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        
+        <!-- Welcome Section -->
+        <div class="mb-8 fade-in">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">
+                Bem-vindo ao Sistema! 👋
+            </h2>
+            <p class="text-gray-600">
+                Selecione um módulo abaixo para começar a trabalhar
+            </p>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+            <div class="loading-spinner mb-4"></div>
+            <p class="text-gray-600">Carregando módulos disponíveis...</p>
+        </div>
+        
+        <!-- Modules Grid -->
+        <div id="modulesGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Modules will be loaded here dynamically -->
+        </div>
+        
+        <!-- No Modules Message -->
+        <div id="noModulesMessage" class="hidden text-center py-20">
+            <div class="text-6xl mb-4">🔒</div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Nenhum Módulo Disponível</h3>
+            <p class="text-gray-600 mb-4">
+                Você ainda não tem acesso a nenhum módulo do sistema.
+            </p>
+            <p class="text-gray-500 text-sm">
+                Entre em contato com o administrador para solicitar acesso.
+            </p>
+        </div>
+        
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row items-center justify-between">
+                <p class="text-gray-600 text-sm">
+                    © 2024 Grupo AreLuna. Todos os direitos reservados.
+                </p>
+                <div class="flex space-x-4 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-600 hover:text-purple-600 text-sm">Suporte</a>
+                    <a href="#" class="text-gray-600 hover:text-purple-600 text-sm">Documentação</a>
+                    <a href="#" class="text-gray-600 hover:text-purple-600 text-sm">Sobre</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Inicializar Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Color mapping for modules
+        const colorClasses = {
+            'blue': 'from-blue-500 to-blue-600',
+            'green': 'from-green-500 to-green-600',
+            'purple': 'from-purple-500 to-purple-600',
+            'orange': 'from-orange-500 to-orange-600',
+            'red': 'from-red-500 to-red-600',
+            'indigo': 'from-indigo-500 to-indigo-600',
+            'gray': 'from-gray-500 to-gray-600',
+            'teal': 'from-teal-500 to-teal-600',
+            'cyan': 'from-cyan-500 to-cyan-600',
+            'yellow': 'from-yellow-500 to-yellow-600',
+            'pink': 'from-pink-500 to-pink-600',
+            'slate': 'from-slate-500 to-slate-600',
+            'emerald': 'from-emerald-500 to-emerald-600'
+        };
+
+        let currentUser = null;
+        let userModules = [];
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadUserInfo();
+            await loadModules();
+            setupEventListeners();
+        });
+
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('Erro ao verificar sessão:', error);
+                    window.location.href = '/login.html';
+                    return;
+                }
+                if (!session) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Erro ao verificar autenticação:', error);
+                window.location.href = '/login.html';
+            }
+        }
+        
+        // Load user information
+        async function loadUserInfo() {
+            try {
+                const response = await authenticatedFetch('/api/auth/me');
+                currentUser = response;
+
+                // The API returns full_name directly, not nested in profile
+                document.getElementById('userName').textContent = response.full_name || response.email;
+                document.getElementById('userRole').textContent = response.roles.join(', ') || 'Usuário';
+
+                // Show admin panel link if user is admin
+                if (response.roles.includes('Admin')) {
+                    document.getElementById('adminPanelLink').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar informações do usuário:', error);
+            }
+        }
+        
+        // Load available modules
+        async function loadModules() {
+            try {
+                const response = await authenticatedFetch('/api/modules/available');
+                const data = await response.json();
+                
+                // A API retorna {success: true, modules: [...]}
+                userModules = data.modules || [];
+                
+                document.getElementById('loadingState').classList.add('hidden');
+                
+                if (userModules.length === 0) {
+                    document.getElementById('noModulesMessage').classList.remove('hidden');
+                } else {
+                    renderModules();
+                    document.getElementById('modulesGrid').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar módulos:', error);
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('noModulesMessage').classList.remove('hidden');
+            }
+        }
+        
+        // Render modules grid
+        function renderModules() {
+            const grid = document.getElementById('modulesGrid');
+            grid.innerHTML = '';
+            
+            userModules.forEach((module, index) => {
+                const colorClass = colorClasses[module.color] || 'from-gray-500 to-gray-600';
+                
+                const card = document.createElement('div');
+                card.className = 'module-card bg-white rounded-xl shadow-lg overflow-hidden fade-in';
+                card.style.animationDelay = `${index * 0.1}s`;
+                
+                card.innerHTML = `
+                    <div class="bg-gradient-to-br ${colorClass} p-6 text-white text-center">
+                        <div class="module-icon">
+                            ${module.emoji || '📦'}
+                        </div>
+                        <h3 class="text-xl font-bold">${module.name}</h3>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 text-sm mb-4 h-12">
+                            ${module.description || 'Módulo do sistema'}
+                        </p>
+                        <button 
+                            data-route="${module.route}"
+                            class="module-access-btn w-full bg-gradient-to-r ${colorClass} text-white py-2 px-4 rounded-lg hover:shadow-lg transition font-semibold"
+                        >
+                            <i class="${module.icon} mr-2"></i>
+                            Acessar
+                        </button>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+            
+            // Add event listeners to all module access buttons
+            const accessButtons = document.querySelectorAll('.module-access-btn');
+            accessButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const route = this.getAttribute('data-route');
+                    openModule(route);
+                });
+            });
+        }
+        
+        // Open module
+        function openModule(route) {
+            if (route) {
+                window.location.href = route;
+            }
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // User menu toggle
+            document.getElementById('userMenuBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('userMenu').classList.toggle('hidden');
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', () => {
+                document.getElementById('userMenu').classList.add('hidden');
+            });
+            
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+                e.preventDefault();
+                await supabase.auth.signOut();
+                window.location.href = '/login.html';
+            });
+            
+            // Admin panel
+            const adminLink = document.getElementById('adminPanelLink');
+            if (adminLink) {
+                adminLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = '/admin-modules.html';
+                });
+            }
+        }
+    </script>
+    
+</body>
+</html>

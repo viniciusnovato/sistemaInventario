@@ -1,13 +1,9 @@
 /**
- * Sistema de Autenticação - Supabase Auth
+ * Sistema de Autenticação
  * Grupo AreLuna - Sistema de Inventário
  */
 
-// Configuração do Supabase
-const SUPABASE_URL = 'https://hvqckoajxhdqaxfawisd.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2cWNrb2FqeGhkcWF4ZmF3aXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4OTMyMDksImV4cCI6MjA3NDQ2OTIwOX0.r260qHrvkLMHG60Pbld2zyjwXBY3B94Edk51YDpLXM4';
-
-// Inicializar cliente Supabase
+// Inicializar cliente Supabase usando configurações globais
 const supabaseAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
@@ -15,9 +11,14 @@ const supabaseAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KE
  */
 class AuthManager {
     constructor() {
+        this.supabase = window.supabase.createClient(
+            'https://hvqckoajxhdqaxfawisd.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2cWNrb2FqeGhkcWF4ZmF3aXNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4OTMyMDksImV4cCI6MjA3NDQ2OTIwOX0.r260qHrvkLMHG60Pbld2zyjwXBY3B94Edk51YDpLXM4'
+        );
         this.currentUser = null;
         this.session = null;
         this.isAuthenticated = false;
+        this.onAuthStateChange = null;
         this.init();
     }
 
@@ -207,7 +208,7 @@ class AuthManager {
      */
     redirectIfAuthenticated() {
         if (this.isUserAuthenticated()) {
-            console.log('Usuário já autenticado, redirecionando para dashboard');
+            console.log('Usuário já autenticado, redirecionando para index');
             window.location.href = 'index.html';
             return true;
         }
@@ -259,6 +260,192 @@ class AuthManager {
             return false;
         }
     }
+
+    /**
+     * Verificar se o usuário tem uma permissão específica
+     */
+    async hasPermission(permissionName) {
+        try {
+            if (!this.isUserAuthenticated()) {
+                return false;
+            }
+
+            const { data, error } = await this.supabase
+                .from('user_roles')
+                .select(`
+                    roles!inner(
+                        name,
+                        role_permissions!inner(
+                            permissions!inner(
+                                name
+                            )
+                        )
+                    )
+                `)
+                .eq('user_id', this.currentUser.id)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('Erro ao verificar permissões:', error);
+                return false;
+            }
+
+            // Verificar se o usuário tem a permissão específica ou é admin
+            for (const userRole of data) {
+                const role = userRole.roles;
+                
+                // Admin tem acesso total
+                if (role.name === 'admin') {
+                    return true;
+                }
+
+                // Verificar permissões específicas
+                for (const rolePermission of role.role_permissions) {
+                    if (rolePermission.permissions.name === permissionName) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+
+        } catch (error) {
+            console.error('Erro ao verificar permissão:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Verificar se o usuário tem um role específico
+     */
+    async hasRole(roleName) {
+        try {
+            if (!this.isUserAuthenticated()) {
+                return false;
+            }
+
+            const { data, error } = await this.supabase
+                .from('user_roles')
+                .select(`
+                    roles!inner(name)
+                `)
+                .eq('user_id', this.currentUser.id)
+                .eq('is_active', true)
+                .eq('roles.name', roleName);
+
+            if (error) {
+                console.error('Erro ao verificar role:', error);
+                return false;
+            }
+
+            return data && data.length > 0;
+
+        } catch (error) {
+            console.error('Erro ao verificar role:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Obter todas as permissões do usuário
+     */
+    async getUserPermissions() {
+        try {
+            if (!this.isUserAuthenticated()) {
+                return [];
+            }
+
+            const { data, error } = await this.supabase
+                .from('user_roles')
+                .select(`
+                    roles!inner(
+                        name,
+                        role_permissions!inner(
+                            permissions!inner(
+                                name,
+                                description,
+                                resource,
+                                action
+                            )
+                        )
+                    )
+                `)
+                .eq('user_id', this.currentUser.id)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('Erro ao obter permissões:', error);
+                return [];
+            }
+
+            const permissions = [];
+            const permissionSet = new Set(); // Para evitar duplicatas
+
+            for (const userRole of data) {
+                const role = userRole.roles;
+                
+                for (const rolePermission of role.role_permissions) {
+                    const permission = rolePermission.permissions;
+                    const permissionKey = permission.name;
+                    
+                    if (!permissionSet.has(permissionKey)) {
+                        permissions.push({
+                            name: permission.name,
+                            description: permission.description,
+                            resource: permission.resource,
+                            action: permission.action,
+                            role: role.name
+                        });
+                        permissionSet.add(permissionKey);
+                    }
+                }
+            }
+
+            return permissions;
+
+        } catch (error) {
+            console.error('Erro ao obter permissões do usuário:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Verificar se o usuário é admin
+     */
+    async isAdmin() {
+        return await this.hasRole('admin');
+    }
+
+    /**
+     * Verificar permissão e redirecionar se não autorizado
+     */
+    async requirePermission(permissionName, redirectUrl = 'login.html') {
+        const hasPermission = await this.hasPermission(permissionName);
+        
+        if (!hasPermission) {
+            console.warn(`Acesso negado. Permissão necessária: ${permissionName}`);
+            window.location.href = redirectUrl;
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Verificar role e redirecionar se não autorizado
+     */
+    async requireRole(roleName, redirectUrl = 'login.html') {
+        const hasRole = await this.hasRole(roleName);
+        
+        if (!hasRole) {
+            console.warn(`Acesso negado. Role necessário: ${roleName}`);
+            window.location.href = redirectUrl;
+            return false;
+        }
+        
+        return true;
+    }
+
 }
 
 /**
@@ -322,11 +509,8 @@ function getAccessToken() {
 function getAuthHeaders() {
     const token = getAccessToken();
     return token ? {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-    } : {
-        'Content-Type': 'application/json'
-    };
+        'Authorization': `Bearer ${token}`
+    } : {};
 }
 
 /**
