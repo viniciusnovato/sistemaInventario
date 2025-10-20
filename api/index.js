@@ -2269,15 +2269,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
 });
 
-// GET - Endpoint para servir QR Code como imagem
-// Middleware de tratamento de erros 404
-app.use((req, res) => {
-    res.status(404).json({ 
-        error: 'Rota não encontrada',
-        path: req.path 
-    });
-});
-
 // =====================================================
 // PROSTORAL - API ENDPOINTS
 // =====================================================
@@ -3848,6 +3839,14 @@ app.get('/api/prostoral/reports/cmv', authenticateToken, async (req, res) => {
         console.error('Erro ao gerar relatório de CMV:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// Middleware de tratamento de erros 404 - deve vir ANTES do error handler
+app.use((req, res, next) => {
+    res.status(404).json({ 
+        error: 'Rota não encontrada',
+        path: req.path 
+    });
 });
 
 // Middleware de tratamento de erros globais
