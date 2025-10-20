@@ -1,7 +1,7 @@
 # ✅ Módulo Laboratório ProStoral - O Que Já Foi Concluído
 
 **Data de Atualização:** 20 de Outubro de 2025  
-**Status do Projeto:** Estrutura Inicial Completa
+**Status do Projeto:** Backend Base Completo - 20% Concluído
 
 ---
 
@@ -197,25 +197,38 @@ colorClasses = {
 
 ### ✅ 8. Fase 1: Estrutura de Base de Dados COMPLETA!
 
-#### 8.1 Tabelas Criadas (16 tabelas)
+#### 8.1 Tabelas Criadas (18 tabelas)
 **Status:** ✅ COMPLETO
 
+**Clientes e Trabalho:**
 - [x] `prostoral_clients` - Clientes/Clínicas/Dentistas (25 colunas)
 - [x] `prostoral_work_types` - Tipos de trabalho/próteses (11 colunas)
 - [x] `prostoral_procedure_kits` - Kits de materiais (10 colunas)
 - [x] `prostoral_kit_items` - Itens dos kits (7 colunas)
+
+**Ordens de Serviço:**
 - [x] `prostoral_work_orders` - Ordens de Serviço (29 colunas)
 - [x] `prostoral_work_order_status_history` - Histórico de status (7 colunas)
 - [x] `prostoral_work_order_materials` - Materiais usados (14 colunas)
+
+**Controle de Produção:**
 - [x] `prostoral_time_tracking` - Registro de horas (12 colunas)
 - [x] `prostoral_technician_rates` - Taxas horárias (10 colunas)
+
+**Consertos e Intercorrências:**
 - [x] `prostoral_repairs` - Consertos/Retrabalhos (20 colunas)
 - [x] `prostoral_issues` - Intercorrências (17 colunas)
 - [x] `prostoral_issue_comments` - Comentários de intercorrências (7 colunas)
+
+**Financeiro:**
 - [x] `prostoral_cmv` - Cálculo de CMV (15 colunas)
 - [x] `prostoral_indirect_costs` - Custos indiretos (9 colunas)
 - [x] `prostoral_invoices` - Faturas (19 colunas)
 - [x] `prostoral_invoice_items` - Itens de faturas (9 colunas)
+
+**Estoque Independente:**
+- [x] `prostoral_inventory` - Materiais do laboratório (34 colunas)
+- [x] `prostoral_inventory_movements` - Movimentações de estoque (15 colunas)
 
 #### 8.2 Índices de Performance
 **Status:** ✅ COMPLETO
@@ -250,20 +263,159 @@ colorClasses = {
 - [x] 10 tipos de trabalho (coroas, pontes, facetas, próteses, etc.)
 - [x] 3 clientes de exemplo (clínicas em Lisboa, Porto, Faro)
 - [x] 7 custos indiretos (aluguel, energia, água, etc.)
+- [x] 24 materiais de estoque (cerâmica, resina, metal, gesso, ferramentas, etc.)
 
 **Evidências:**
 ```sql
 -- Verificação de tabelas
-16 tabelas criadas (prostoral_*)
-40+ índices otimizados
-10 triggers automáticos
-8 funções SQL auxiliares
+18 tabelas criadas (prostoral_*)
+50+ índices otimizados
+12 triggers automáticos
+12 funções SQL auxiliares
 
 -- Dados inseridos
 10 Tipos de Trabalho
 3 Clientes
 7 Custos Indiretos
+24 Materiais de Estoque
 ```
+
+---
+
+### ✅ 9. Fase 2: Sistema de Permissões COMPLETA!
+
+#### 9.1 Roles Específicos
+**Status:** ✅ COMPLETO
+
+- [x] **protetico** - Técnico de Laboratório (11 permissões)
+  - Ver/atualizar estoque, check-in/out, ver suas OS, registrar observações
+  - Não pode: ver CMV, relatórios financeiros, gerenciar clientes
+  
+- [x] **lab_manager** - Gerente de Laboratório (36 permissões)
+  - Acesso quase completo ao módulo
+  - Gestão de clientes, OS, estoque, relatórios, CMV
+  - Não pode: excluir OS e clientes (apenas admin)
+  
+- [x] **lab_client** - Cliente (Clínica/Dentista) (6 permissões)
+  - Criar OS, acompanhar status, abrir intercorrências
+  - Não pode: ver custos, CMV, dados internos do laboratório
+
+#### 9.2 Permissões Criadas (38 permissões)
+**Status:** ✅ COMPLETO
+
+**Inventário (5):**
+- [x] `prostoral:inventory:read`
+- [x] `prostoral:inventory:create`
+- [x] `prostoral:inventory:update`
+- [x] `prostoral:inventory:delete`
+- [x] `prostoral:inventory:manage`
+
+**Ordens de Serviço (5):**
+- [x] `prostoral:orders:read`
+- [x] `prostoral:orders:create`
+- [x] `prostoral:orders:update`
+- [x] `prostoral:orders:delete`
+- [x] `prostoral:orders:manage`
+
+**Clientes (5):**
+- [x] `prostoral:clients:read`
+- [x] `prostoral:clients:create`
+- [x] `prostoral:clients:update`
+- [x] `prostoral:clients:delete`
+- [x] `prostoral:clients:manage`
+
+**Timesheet (4):**
+- [x] `prostoral:timesheet:read`
+- [x] `prostoral:timesheet:create`
+- [x] `prostoral:timesheet:update`
+- [x] `prostoral:timesheet:delete`
+
+**CMV e Financeiro (4):**
+- [x] `prostoral:cmv:read`
+- [x] `prostoral:cmv:manage`
+- [x] `prostoral:financial:read`
+- [x] `prostoral:financial:manage`
+
+**Kits (4):**
+- [x] `prostoral:kits:read`
+- [x] `prostoral:kits:create`
+- [x] `prostoral:kits:update`
+- [x] `prostoral:kits:delete`
+
+**Consertos (4):**
+- [x] `prostoral:repairs:read`
+- [x] `prostoral:repairs:create`
+- [x] `prostoral:repairs:update`
+- [x] `prostoral:repairs:manage`
+
+**Intercorrências (4):**
+- [x] `prostoral:issues:read`
+- [x] `prostoral:issues:create`
+- [x] `prostoral:issues:update`
+- [x] `prostoral:issues:manage`
+
+**Relatórios (3):**
+- [x] `prostoral:reports:read`
+- [x] `prostoral:reports:export`
+- [x] `prostoral:dashboard:read`
+
+#### 9.3 Atribuições de Permissões
+**Status:** ✅ COMPLETO
+
+- [x] 11 permissões atribuídas ao role `protetico`
+- [x] 36 permissões atribuídas ao role `lab_manager`
+- [x] 6 permissões atribuídas ao role `lab_client`
+- [x] Total: 53 atribuições de permissões
+
+**Evidências:**
+```sql
+-- Verificação
+3 roles específicos criados
+38 permissões ProStoral
+53 atribuições role-permission
+```
+
+---
+
+### 🔄 10. Fase 3: Backend API (Parcial - 40%)
+
+#### 10.1 API de Clientes
+**Status:** ✅ COMPLETO
+
+- [x] `GET /api/prostoral/clients` - Listar clientes com filtros
+- [x] `GET /api/prostoral/clients/:id` - Buscar cliente específico
+- [x] `POST /api/prostoral/clients` - Criar novo cliente
+- [x] `PUT /api/prostoral/clients/:id` - Atualizar cliente
+- [x] `DELETE /api/prostoral/clients/:id` - Desativar cliente
+- [x] `GET /api/prostoral/clients/:id/stats` - Estatísticas do cliente
+
+#### 10.2 API de Estoque
+**Status:** ✅ COMPLETO
+
+- [x] `GET /api/prostoral/inventory` - Listar estoque com filtros
+- [x] `POST /api/prostoral/inventory` - Adicionar item
+- [x] `PUT /api/prostoral/inventory/:id` - Atualizar item
+- [x] `POST /api/prostoral/inventory/:id/movement` - Registrar movimentação
+- [x] `GET /api/prostoral/inventory/low-stock` - Itens com estoque baixo
+
+#### 10.3 Funcionalidades da API
+**Status:** ✅ COMPLETO
+
+- [x] Autenticação via JWT (middleware `authenticateToken`)
+- [x] Filtros de busca (search, category, is_active)
+- [x] Soft delete (desativação em vez de exclusão)
+- [x] Auditoria automática (created_by, updated_by)
+- [x] Multi-tenancy (tenant_id)
+- [x] Tratamento de erros
+- [x] Integração com funções SQL (RPC)
+
+**Pendente:**
+- [ ] API de Ordens de Serviço
+- [ ] API de Kits
+- [ ] API de Time Tracking
+- [ ] API de Consertos
+- [ ] API de Intercorrências
+- [ ] API de Relatórios
 
 ---
 
@@ -272,12 +424,12 @@ colorClasses = {
 | Fase | Status | Conclusão |
 |------|--------|-----------|
 | **Fase 0: Estrutura Inicial** | ✅ 100% | Módulo criado e visível |
-| **Fase 1: Base de Dados** | ✅ 100% | 16 tabelas + índices + triggers + funções |
-| Fase 2: Permissões | 🟡 30% | Estrutura pronta, falta roles específicos |
-| Fase 3: Gestão de Clientes | ⏳ 0% | Aguardando início |
+| **Fase 1: Base de Dados** | ✅ 100% | 18 tabelas + índices + triggers + funções |
+| **Fase 2: Permissões** | ✅ 100% | 3 roles + 38 permissões + 53 atribuições |
+| **Fase 3: Backend API** | 🟡 40% | Clientes e Estoque completos |
 | Fase 4: Sistema de OS | ⏳ 0% | Aguardando início |
 | Fase 5: Kits de Procedimentos | ⏳ 0% | Aguardando início |
-| Fase 6: Integração Estoque | 🟡 10% | Sistema base existe |
+| Fase 6: Integração Estoque | ✅ 100% | Estoque independente criado |
 | Fase 7: Controle de Produção | ⏳ 0% | Aguardando início |
 | Fase 8: Cálculo de CMV | ⏳ 0% | Aguardando início |
 | Fase 9: Consertos | ⏳ 0% | Aguardando início |
@@ -285,7 +437,7 @@ colorClasses = {
 | Fase 11: Faturação | ⏳ 0% | Aguardando início |
 | Fase 12: Dashboard | ⏳ 0% | Aguardando início |
 
-**Progresso Global: 15%** ✅
+**Progresso Global: 20%** ✅
 
 ---
 
