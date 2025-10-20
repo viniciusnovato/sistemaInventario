@@ -3077,13 +3077,96 @@ app.get('/api/prostoral/time-tracking/active', authenticateToken, async (req, re
             `)
             .is('check_out_time', null)
             .eq('technician_id', req.user.id)
-            .order('check_in_time', { ascending: false });
+            .order('check_in_time', { ascending: false});
         
         if (error) throw error;
         
         res.json({ success: true, activeTracking: data });
     } catch (error) {
         console.error('Erro ao buscar tempo ativo:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== CMV (CUSTO DE MERCADORIA VENDIDA) ====================
+
+// GET - Calcular CMV de uma OS
+app.get('/api/prostoral/orders/:id/cmv', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .rpc('calculate_work_order_cmv', { p_work_order_id: id });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, cmv: data });
+    } catch (error) {
+        console.error('Erro ao calcular CMV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Consultar CMV registrado
+app.get('/api/prostoral/cmv/:work_order_id', authenticateToken, async (req, res) => {
+    try {
+        const { work_order_id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_cmv')
+            .select('*')
+            .eq('work_order_id', work_order_id)
+            .order('calculated_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        res.json({ success: true, cmv: data || null });
+    } catch (error) {
+        console.error('Erro ao buscar CMV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Registrar/Atualizar CMV
+app.post('/api/prostoral/cmv', authenticateToken, async (req, res) => {
+    try {
+        const cmvData = {
+            ...req.body,
+            calculated_by: req.user.id,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+        };
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_cmv')
+            .upsert(cmvData, { onConflict: 'work_order_id' })
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, cmv: data });
+    } catch (error) {
+        console.error('Erro ao registrar CMV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Listar custos indiretos
+app.get('/api/prostoral/indirect-costs', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_indirect_costs')
+            .select('*')
+            .eq('is_active', true)
+            .order('cost_type', { ascending: true });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, costs: data });
+    } catch (error) {
+        console.error('Erro ao buscar custos indiretos:', error);
         res.status(500).json({ error: error.message });
     }
 });
