@@ -2764,6 +2764,212 @@ app.get('/api/prostoral/work-types', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== KITS DE PROCEDIMENTOS ====================
+
+// GET - Listar kits
+app.get('/api/prostoral/kits', authenticateToken, async (req, res) => {
+    try {
+        const { work_type_id, search } = req.query;
+        
+        let query = supabaseAdmin
+            .from('prostoral_procedure_kits')
+            .select(`
+                *,
+                work_type:prostoral_work_types(id, name, category),
+                items:prostoral_kit_items(
+                    id,
+                    standard_quantity,
+                    unit,
+                    display_order,
+                    inventory_item:prostoral_inventory(id, name, code, unit, unit_cost)
+                )
+            `)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        
+        if (work_type_id) {
+            query = query.eq('work_type_id', work_type_id);
+        }
+        
+        if (search) {
+            query = query.ilike('name', `%${search}%`);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        res.json({ success: true, kits: data });
+    } catch (error) {
+        console.error('Erro ao buscar kits:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Buscar kit por ID
+app.get('/api/prostoral/kits/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_procedure_kits')
+            .select(`
+                *,
+                work_type:prostoral_work_types(*),
+                items:prostoral_kit_items(
+                    *,
+                    inventory_item:prostoral_inventory(*)
+                )
+            `)
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, kit: data });
+    } catch (error) {
+        console.error('Erro ao buscar kit:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST - Criar novo kit
+app.post('/api/prostoral/kits', authenticateToken, async (req, res) => {
+    try {
+        const { items, ...kitData } = req.body;
+        
+        const dataToInsert = {
+            ...kitData,
+            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+            created_by: req.user.id
+        };
+        
+        const { data: kit, error: kitError } = await supabaseAdmin
+            .from('prostoral_procedure_kits')
+            .insert([dataToInsert])
+            .select()
+            .single();
+        
+        if (kitError) throw kitError;
+        
+        // Adicionar itens ao kit
+        if (items && items.length > 0) {
+            const kitItems = items.map((item, index) => ({
+                kit_id: kit.id,
+                inventory_item_id: item.inventory_item_id,
+                standard_quantity: item.standard_quantity,
+                unit: item.unit,
+                display_order: index
+            }));
+            
+            const { error: itemsError } = await supabaseAdmin
+                .from('prostoral_kit_items')
+                .insert(kitItems);
+            
+            if (itemsError) throw itemsError;
+        }
+        
+        res.json({ success: true, kit });
+    } catch (error) {
+        console.error('Erro ao criar kit:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT - Atualizar kit
+app.put('/api/prostoral/kits/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { items, ...kitData } = req.body;
+        
+        const dataToUpdate = {
+            ...kitData,
+            updated_by: req.user.id
+        };
+        
+        const { data: kit, error: kitError } = await supabaseAdmin
+            .from('prostoral_procedure_kits')
+            .update(dataToUpdate)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (kitError) throw kitError;
+        
+        // Se items foi fornecido, atualizar itens do kit
+        if (items !== undefined) {
+            // Remover itens antigos
+            await supabaseAdmin
+                .from('prostoral_kit_items')
+                .delete()
+                .eq('kit_id', id);
+            
+            // Adicionar novos itens
+            if (items.length > 0) {
+                const kitItems = items.map((item, index) => ({
+                    kit_id: id,
+                    inventory_item_id: item.inventory_item_id,
+                    standard_quantity: item.standard_quantity,
+                    unit: item.unit,
+                    display_order: index
+                }));
+                
+                const { error: itemsError } = await supabaseAdmin
+                    .from('prostoral_kit_items')
+                    .insert(kitItems);
+                
+                if (itemsError) throw itemsError;
+            }
+        }
+        
+        res.json({ success: true, kit });
+    } catch (error) {
+        console.error('Erro ao atualizar kit:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE - Desativar kit
+app.delete('/api/prostoral/kits/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .from('prostoral_procedure_kits')
+            .update({ 
+                is_active: false,
+                updated_by: req.user.id
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        res.json({ success: true, kit: data });
+    } catch (error) {
+        console.error('Erro ao desativar kit:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET - Verificar disponibilidade de materiais do kit
+app.get('/api/prostoral/kits/:id/availability', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const { data, error } = await supabaseAdmin
+            .rpc('check_kit_inventory_availability', { p_kit_id: id });
+        
+        if (error) throw error;
+        
+        res.json({ success: true, availability: data });
+    } catch (error) {
+        console.error('Erro ao verificar disponibilidade:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Middleware de tratamento de erros globais
 app.use((err, req, res, next) => {
     console.error('Erro não tratado:', err);

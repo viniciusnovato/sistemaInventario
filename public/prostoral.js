@@ -9,6 +9,8 @@ class ProstoralApp {
         this.inventory = [];
         this.orders = [];
         this.workTypes = [];
+        this.kits = [];
+        this.kitMaterialCounter = 0;
         this.apiBaseUrl = '/api/prostoral';
         this.init();
     }
@@ -56,6 +58,7 @@ class ProstoralApp {
             { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-chart-pie', permission: 'prostoral:dashboard:read' },
             { id: 'clients', name: 'Clientes', icon: 'fas fa-users', permission: 'prostoral:clients:read' },
             { id: 'orders', name: 'Ordens de Serviço', icon: 'fas fa-clipboard-list', permission: 'prostoral:orders:read' },
+            { id: 'kits', name: 'Kits', icon: 'fas fa-box-open', permission: 'prostoral:kits:read' },
             { id: 'inventory', name: 'Estoque', icon: 'fas fa-boxes', permission: 'prostoral:inventory:read' },
         ];
 
@@ -124,6 +127,9 @@ class ProstoralApp {
                 break;
             case 'orders':
                 await this.loadOrders();
+                break;
+            case 'kits':
+                await this.loadKits();
                 break;
         }
     }
@@ -516,6 +522,27 @@ class ProstoralApp {
         if (orderForm) {
             orderForm.addEventListener('submit', (e) => this.handleOrderSubmit(e));
         }
+
+        // Busca e filtros de kits
+        const kitSearch = document.getElementById('kit-search');
+        if (kitSearch) {
+            let debounceTimer;
+            kitSearch.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => this.loadKits(), 300);
+            });
+        }
+
+        const kitFilterType = document.getElementById('kit-filter-type');
+        if (kitFilterType) {
+            kitFilterType.addEventListener('change', () => this.loadKits());
+        }
+
+        // Form de kit
+        const kitForm = document.getElementById('kit-form');
+        if (kitForm) {
+            kitForm.addEventListener('submit', (e) => this.handleKitSubmit(e));
+        }
     }
 
     async handleOrderSubmit(e) {
@@ -602,6 +629,191 @@ class ProstoralApp {
         alert('Edição de OS em desenvolvimento');
     }
 
+    async loadKits() {
+        try {
+            const token = await window.authManager.getAccessToken();
+            const search = document.getElementById('kit-search')?.value || '';
+            const work_type_id = document.getElementById('kit-filter-type')?.value || '';
+
+            let url = `${this.apiBaseUrl}/kits?`;
+            if (search) url += `search=${encodeURIComponent(search)}&`;
+            if (work_type_id) url += `work_type_id=${work_type_id}&`;
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao carregar kits');
+            }
+
+            const data = await response.json();
+            this.kits = data.kits || [];
+
+            this.renderKits(this.kits);
+            
+            // Popula filtro de tipos de trabalho se necessário
+            await this.loadWorkTypesForKits();
+        } catch (error) {
+            console.error('Erro ao carregar kits:', error);
+            this.showError('Erro ao carregar kits');
+        }
+    }
+
+    async loadWorkTypesForKits() {
+        if (this.workTypes.length === 0) {
+            await this.loadWorkTypes();
+        }
+
+        const filterSelect = document.getElementById('kit-filter-type');
+        if (filterSelect && filterSelect.options.length === 1) {
+            this.workTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.id;
+                option.textContent = type.name;
+                filterSelect.appendChild(option);
+            });
+        }
+
+        // Popula select de tipos de trabalho no modal de kits
+        const modalSelect = document.querySelector('#kit-form select[name="work_type_id"]');
+        if (modalSelect && modalSelect.options.length === 1) {
+            modalSelect.innerHTML = '<option value="">Selecione o tipo</option>';
+            this.workTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.id;
+                option.textContent = type.name;
+                modalSelect.appendChild(option);
+            });
+        }
+    }
+
+    renderKits(kits) {
+        const grid = document.getElementById('kits-grid');
+        
+        if (!kits || kits.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
+                    Nenhum kit encontrado
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = kits.map(kit => {
+            const itemsCount = kit.items?.length || 0;
+            const estimatedCost = kit.items?.reduce((sum, item) => {
+                return sum + (item.standard_quantity * (item.inventory_item?.unit_cost || 0));
+            }, 0) || 0;
+
+            return `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 text-white">
+                        <h3 class="text-lg font-bold">${kit.name}</h3>
+                        <p class="text-sm text-emerald-100">${kit.work_type?.name || '-'}</p>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">${kit.description || 'Sem descrição'}</p>
+                        </div>
+                        <div class="flex items-center justify-between text-sm mb-2">
+                            <span class="text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-box mr-1"></i>
+                                ${itemsCount} ${itemsCount === 1 ? 'material' : 'materiais'}
+                            </span>
+                            ${kit.estimated_time_hours ? `
+                                <span class="text-gray-600 dark:text-gray-400">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    ${kit.estimated_time_hours}h
+                                </span>
+                            ` : ''}
+                        </div>
+                        <div class="text-sm mb-4">
+                            <span class="text-gray-600 dark:text-gray-400">Custo estimado:</span>
+                            <span class="text-lg font-bold text-emerald-600">€${estimatedCost.toFixed(2)}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="prostoralApp.viewKit('${kit.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm transition-colors">
+                                <i class="fas fa-eye mr-1"></i>
+                                Ver
+                            </button>
+                            <button onclick="prostoralApp.editKit('${kit.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm transition-colors">
+                                <i class="fas fa-edit mr-1"></i>
+                                Editar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async handleKitSubmit(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const kitData = {
+            name: formData.get('name'),
+            work_type_id: formData.get('work_type_id'),
+            description: formData.get('description'),
+            estimated_time_hours: formData.get('estimated_time_hours') ? parseFloat(formData.get('estimated_time_hours')) : null
+        };
+
+        // Coletar materiais
+        const materials = [];
+        document.querySelectorAll('.kit-material-row').forEach(row => {
+            const inventoryItemId = row.querySelector('select[name^="inventory_item_id"]').value;
+            const quantity = row.querySelector('input[name^="quantity"]').value;
+            const unit = row.querySelector('input[name^="unit"]').value;
+
+            if (inventoryItemId && quantity) {
+                materials.push({
+                    inventory_item_id: inventoryItemId,
+                    standard_quantity: parseFloat(quantity),
+                    unit: unit || 'un'
+                });
+            }
+        });
+
+        kitData.items = materials;
+
+        try {
+            const token = await window.authManager.getAccessToken();
+            
+            const response = await fetch(`${this.apiBaseUrl}/kits`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(kitData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao criar kit');
+            }
+
+            this.showSuccess('Kit criado com sucesso!');
+            closeKitModal();
+            this.loadKits();
+        } catch (error) {
+            console.error('Erro ao criar kit:', error);
+            this.showError('Erro ao criar kit');
+        }
+    }
+
+    viewKit(id) {
+        console.log('Ver kit:', id);
+        // TODO: Implementar visualização detalhada
+        alert('Visualização detalhada em desenvolvimento');
+    }
+
+    editKit(id) {
+        console.log('Editar kit:', id);
+        // TODO: Implementar edição
+        alert('Edição de kit em desenvolvimento');
+    }
+
     showSuccess(message) {
         // TODO: Implementar toast de sucesso
         alert(message);
@@ -638,6 +850,90 @@ function closeOrderModal() {
     document.getElementById('order-modal').classList.add('hidden');
     document.getElementById('order-modal').classList.remove('flex');
     document.getElementById('order-form').reset();
+}
+
+async function openKitModal() {
+    document.getElementById('kit-modal').classList.remove('hidden');
+    document.getElementById('kit-modal').classList.add('flex');
+    
+    // Carregar estoque para os selects de materiais
+    if (prostoralApp.inventory.length === 0) {
+        await prostoralApp.loadInventory();
+    }
+}
+
+function closeKitModal() {
+    document.getElementById('kit-modal').classList.add('hidden');
+    document.getElementById('kit-modal').classList.remove('flex');
+    document.getElementById('kit-form').reset();
+    
+    // Limpar lista de materiais
+    const materialsList = document.getElementById('kit-materials-list');
+    materialsList.innerHTML = `
+        <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+            Nenhum material adicionado. Clique em "Adicionar Material" para começar.
+        </p>
+    `;
+    prostoralApp.kitMaterialCounter = 0;
+}
+
+function addKitMaterial() {
+    const materialsList = document.getElementById('kit-materials-list');
+    const counter = prostoralApp.kitMaterialCounter++;
+    
+    // Remover mensagem "Nenhum material adicionado" se existir
+    const emptyMessage = materialsList.querySelector('p');
+    if (emptyMessage) {
+        materialsList.innerHTML = '';
+    }
+    
+    const materialRow = document.createElement('div');
+    materialRow.className = 'kit-material-row flex gap-3 items-start bg-gray-50 dark:bg-gray-700 p-3 rounded-lg';
+    materialRow.innerHTML = `
+        <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Material *
+            </label>
+            <select name="inventory_item_id_${counter}" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
+                <option value="">Selecione o material</option>
+                ${prostoralApp.inventory.map(item => `
+                    <option value="${item.id}">${item.name} (${item.code})</option>
+                `).join('')}
+            </select>
+        </div>
+        <div class="w-24">
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Quantidade *
+            </label>
+            <input type="number" name="quantity_${counter}" step="0.01" min="0.01" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
+        </div>
+        <div class="w-20">
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Unidade
+            </label>
+            <input type="text" name="unit_${counter}" value="un" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm">
+        </div>
+        <button type="button" onclick="removeKitMaterial(this)" class="mt-6 bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    
+    materialsList.appendChild(materialRow);
+}
+
+function removeKitMaterial(button) {
+    const row = button.closest('.kit-material-row');
+    row.remove();
+    
+    // Se não há mais materiais, mostrar mensagem
+    const materialsList = document.getElementById('kit-materials-list');
+    if (materialsList.querySelectorAll('.kit-material-row').length === 0) {
+        materialsList.innerHTML = `
+            <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                Nenhum material adicionado. Clique em "Adicionar Material" para começar.
+            </p>
+        `;
+    }
 }
 
 // Inicializar aplicação

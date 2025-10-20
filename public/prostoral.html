@@ -191,6 +191,41 @@
             </div>
         </div>
 
+        <!-- Kits View -->
+        <div id="view-kits" class="view-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">
+                    <i class="fas fa-box-open mr-2"></i>
+                    Kits de Procedimentos
+                </h2>
+                <button onclick="openKitModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg transition-all">
+                    <i class="fas fa-plus"></i>
+                    Novo Kit
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="kit-search" placeholder="Buscar kit..." 
+                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                    </div>
+                    <select id="kit-filter-type" class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                        <option value="">Todos os tipos de trabalho</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Kits Grid -->
+            <div id="kits-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
+                    Carregando kits...
+                </div>
+            </div>
+        </div>
+
         <!-- Inventory View -->
         <div id="view-inventory" class="view-content hidden">
             <div class="flex justify-between items-center mb-6">
@@ -431,6 +466,78 @@
                     <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
                         <i class="fas fa-save mr-2"></i>
                         Criar OS
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Kit Modal -->
+    <div id="kit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
+                    <i class="fas fa-box-open mr-2"></i>
+                    Novo Kit de Procedimento
+                </h3>
+            </div>
+            
+            <form id="kit-form" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Nome do Kit *
+                        </label>
+                        <input type="text" name="name" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Ex: Kit Coroa Cerâmica">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tipo de Trabalho *
+                        </label>
+                        <select name="work_type_id" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                            <option value="">Selecione o tipo</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tempo Estimado (horas)
+                        </label>
+                        <input type="number" name="estimated_time_hours" step="0.5" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
+                    </div>
+                    
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Descrição
+                        </label>
+                        <textarea name="description" rows="2" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Descreva os materiais e procedimentos..."></textarea>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-semibold text-gray-800 dark:text-white">Materiais do Kit</h4>
+                        <button type="button" onclick="addKitMaterial()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                            <i class="fas fa-plus mr-1"></i>
+                            Adicionar Material
+                        </button>
+                    </div>
+
+                    <div id="kit-materials-list" class="space-y-3">
+                        <p class="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                            Nenhum material adicionado. Clique em "Adicionar Material" para começar.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="closeKitModal()" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
+                        <i class="fas fa-save mr-2"></i>
+                        Salvar Kit
                     </button>
                 </div>
             </form>
