@@ -204,12 +204,12 @@ class AuthManager {
     }
 
     /**
-     * Redirecionar usuário autenticado (para página de login)
+     * Redirecionar usuário autenticado (para dashboard)
      */
     redirectIfAuthenticated() {
         if (this.isUserAuthenticated()) {
-            console.log('Usuário já autenticado, redirecionando para index');
-            window.location.href = 'index.html';
+            console.log('Usuário já autenticado, redirecionando para dashboard');
+            window.location.href = 'dashboard.html';
             return true;
         }
         return false;
