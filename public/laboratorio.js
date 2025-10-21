@@ -1227,13 +1227,26 @@ class LaboratorioModule {
         document.getElementById('alertsAvisos').textContent = alertsAvisos;
         document.getElementById('alertsInfo').textContent = alertsInfo;
 
-        // Atualizar badge na aba
+        // Atualizar badge na aba (mobile e desktop)
         const alertCount = document.getElementById('alertCount');
-        if (alertCount && alertsCount > 0) {
-            alertCount.textContent = alertsCount;
-            alertCount.classList.remove('hidden');
-        } else if (alertCount) {
-            alertCount.classList.add('hidden');
+        const alertCountDesktop = document.getElementById('alertCount-desktop');
+        
+        if (alertsCount > 0) {
+            if (alertCount) {
+                alertCount.textContent = alertsCount;
+                alertCount.classList.remove('hidden');
+            }
+            if (alertCountDesktop) {
+                alertCountDesktop.textContent = alertsCount;
+                alertCountDesktop.classList.remove('hidden');
+            }
+        } else {
+            if (alertCount) {
+                alertCount.classList.add('hidden');
+            }
+            if (alertCountDesktop) {
+                alertCountDesktop.classList.add('hidden');
+            }
         }
     }
 

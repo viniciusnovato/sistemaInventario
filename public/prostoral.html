@@ -480,23 +480,45 @@
             <!-- Inventory Tab -->
             <div id="inventory-content" class="tab-content">
                 <!-- Sub-navegação do Laboratório -->
-                <div class="mb-6 animate-fade-in">
-                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1">
-                        <div class="flex space-x-2">
-                            <button class="lab-tab active flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium" data-lab-tab="produtos">
+                <div class="mb-4 sm:mb-6 animate-fade-in">
+                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1">
+                        <!-- Mobile: Grid 2x2 -->
+                        <div class="grid grid-cols-2 gap-1 sm:hidden">
+                            <button class="lab-tab active flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
+                                <i class="fas fa-flask text-lg"></i>
+                                <span class="text-xs">Produtos</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="movimentacoes">
+                                <i class="fas fa-exchange-alt text-lg"></i>
+                                <span class="text-xs">Movimentações</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target relative" data-lab-tab="alertas">
+                                <i class="fas fa-bell text-lg"></i>
+                                <span class="text-xs">Alertas</span>
+                                <span id="alertCount" class="absolute top-1 right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full hidden">0</span>
+                            </button>
+                            <button class="lab-tab flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="relatorios">
+                                <i class="fas fa-chart-bar text-lg"></i>
+                                <span class="text-xs">Relatórios</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Desktop: Horizontal -->
+                        <div class="hidden sm:flex space-x-2">
+                            <button class="lab-tab active flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
                                 <i class="fas fa-flask"></i>
                                 <span>Produtos</span>
                             </button>
-                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="movimentacoes">
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="movimentacoes">
                                 <i class="fas fa-exchange-alt"></i>
                                 <span>Movimentações</span>
                             </button>
-                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="alertas">
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target relative" data-lab-tab="alertas">
                                 <i class="fas fa-bell"></i>
                                 <span>Alertas</span>
-                                <span id="alertCount" class="bg-red-500 text-white text-xs px-2 py-1 rounded-full hidden">0</span>
+                                <span id="alertCount-desktop" class="bg-red-500 text-white text-xs px-2 py-1 rounded-full ml-1 hidden">0</span>
                             </button>
-                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="relatorios">
+                            <button class="lab-tab flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 text-gray-600 dark:text-gray-400 font-medium touch-target" data-lab-tab="relatorios">
                                 <i class="fas fa-chart-bar"></i>
                                 <span>Relatórios</span>
                             </button>
