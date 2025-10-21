@@ -1,0 +1,479 @@
+/* 
+ * MELHORIAS DE RESPONSIVIDADE - PROSTORAL
+ * Sistema 100% Responsivo seguindo boas práticas
+ * Mobile-First Approach
+ */
+
+/* ==============================================
+   1. SAFE AREAS PARA iOS/NOTCH
+   ============================================== */
+:root {
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-right: env(safe-area-inset-right);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+}
+
+body {
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+}
+
+/* ==============================================
+   2. TOUCH-FRIENDLY SIZES (min 44x44px)
+   ============================================== */
+button,
+a.button,
+input[type="button"],
+input[type="submit"],
+.touch-target {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Botões pequenos (presets) - ainda touch-friendly */
+button.text-xs {
+    min-height: 36px;
+    padding: 0.5rem 0.75rem;
+}
+
+/* ==============================================
+   3. SCROLL HORIZONTAL PARA TABELAS
+   ============================================== */
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+@media (max-width: 768px) {
+    table {
+        font-size: 0.875rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+}
+
+/* ==============================================
+   4. MODAIS RESPONSIVOS
+   ============================================== */
+@media (max-width: 640px) {
+    .modal-content {
+        width: 95vw !important;
+        max-height: 90vh;
+        overflow-y: auto;
+        margin: 1rem;
+    }
+    
+    .modal-header {
+        padding: 1rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    .modal-footer {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .modal-footer button {
+        width: 100%;
+    }
+}
+
+/* ==============================================
+   5. CARDS DE KPI - MELHOR ESPAÇAMENTO
+   ============================================== */
+@media (max-width: 640px) {
+    .kpi-card {
+        padding: 1rem !important;
+    }
+    
+    .kpi-card i {
+        font-size: 1.5rem !important;
+    }
+    
+    .kpi-card .text-2xl {
+        font-size: 1.5rem !important;
+    }
+}
+
+/* ==============================================
+   6. FILTROS - STACK VERTICAL EM MOBILE
+   ============================================== */
+@media (max-width: 768px) {
+    .filter-container .grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .filter-actions {
+        flex-direction: column;
+    }
+    
+    .filter-actions button {
+        width: 100%;
+    }
+}
+
+/* ==============================================
+   7. NAVEGAÇÃO LATERAL - MOBILE MENU
+   ============================================== */
+@media (max-width: 1024px) {
+    #sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        height: 100vh;
+        width: 280px;
+        z-index: 1000;
+        transition: left 0.3s ease-in-out;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+    
+    #sidebar.active {
+        left: 0;
+    }
+    
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .sidebar-overlay.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    
+    .mobile-menu-button {
+        display: block !important;
+    }
+}
+
+@media (min-width: 1025px) {
+    .mobile-menu-button {
+        display: none !important;
+    }
+}
+
+/* ==============================================
+   8. BOTÕES DE RELATÓRIO - MELHOR LAYOUT
+   ============================================== */
+@media (max-width: 640px) {
+    .report-button {
+        padding: 1rem !important;
+    }
+    
+    .report-button i {
+        font-size: 2rem !important;
+    }
+    
+    .report-button h3 {
+        font-size: 1rem !important;
+    }
+    
+    .report-button p {
+        font-size: 0.75rem !important;
+    }
+}
+
+/* ==============================================
+   9. INPUTS E FORMS - MELHOR UX MOBILE
+   ============================================== */
+@media (max-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    select,
+    textarea {
+        font-size: 16px !important; /* Previne zoom no iOS */
+        padding: 0.75rem !important;
+    }
+}
+
+/* ==============================================
+   10. HEADER FIXO EM MOBILE
+   ============================================== */
+@media (max-width: 1024px) {
+    .page-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .dark .page-header {
+        background: #1f2937;
+    }
+}
+
+/* ==============================================
+   11. GRID RESPONSIVO INTELIGENTE
+   ============================================== */
+.responsive-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 640px) {
+    .responsive-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .responsive-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+}
+
+.responsive-grid-4 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 640px) {
+    .responsive-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .responsive-grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+    }
+}
+
+/* ==============================================
+   12. ANIMAÇÕES SUAVES
+   ============================================== */
+@media (prefers-reduced-motion: no-preference) {
+    * {
+        scroll-behavior: smooth;
+    }
+    
+    button, a, .card {
+        transition: all 0.2s ease-in-out;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ==============================================
+   13. MELHOR CONTRASTE PARA ACESSIBILIDADE
+   ============================================== */
+@media (prefers-contrast: high) {
+    .border {
+        border-width: 2px !important;
+    }
+    
+    button:focus,
+    input:focus,
+    select:focus,
+    textarea:focus {
+        outline: 3px solid currentColor !important;
+        outline-offset: 2px !important;
+    }
+}
+
+/* ==============================================
+   14. LANDSCAPE MODE EM MOBILE
+   ============================================== */
+@media (max-width: 768px) and (orientation: landscape) {
+    .modal-content {
+        max-height: 85vh;
+    }
+    
+    .kpi-card {
+        padding: 0.75rem !important;
+    }
+}
+
+/* ==============================================
+   15. PRINT STYLES
+   ============================================== */
+@media print {
+    .no-print,
+    button,
+    .filter-container,
+    .sidebar {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .page-break {
+        page-break-after: always;
+    }
+}
+
+/* ==============================================
+   16. DARK MODE ESPECÍFICO MOBILE
+   ============================================== */
+@media (max-width: 640px) {
+    .dark .modal-content {
+        background: #1f2937 !important;
+    }
+    
+    .dark input,
+    .dark select,
+    .dark textarea {
+        background: #374151 !important;
+        border-color: #4b5563 !important;
+    }
+}
+
+/* ==============================================
+   17. HOVER APENAS PARA DISPOSITIVOS COM MOUSE
+   ============================================== */
+@media (hover: hover) and (pointer: fine) {
+    .hover\:scale-105:hover {
+        transform: scale(1.05);
+    }
+    
+    .hover\:shadow-lg:hover {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* Para touch devices, remover hover effects */
+@media (hover: none) and (pointer: coarse) {
+    .hover\:scale-105:hover,
+    .hover\:shadow-lg:hover,
+    .group:hover .group-hover\:scale-110 {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+}
+
+/* ==============================================
+   18. MELHORIAS DE PERFORMANCE
+   ============================================== */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+img {
+    content-visibility: auto;
+}
+
+/* ==============================================
+   19. CONTAINER RESPONSIVO COM MAX-WIDTH
+   ============================================== */
+.container-responsive {
+    width: 100%;
+    max-width: 1536px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+    .container-responsive {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container-responsive {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+/* ==============================================
+   20. UTILITY CLASSES RESPONSIVAS
+   ============================================== */
+.text-responsive {
+    font-size: 0.875rem;
+}
+
+@media (min-width: 640px) {
+    .text-responsive {
+        font-size: 1rem;
+    }
+}
+
+.heading-responsive {
+    font-size: 1.25rem;
+}
+
+@media (min-width: 640px) {
+    .heading-responsive {
+        font-size: 1.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .heading-responsive {
+        font-size: 1.875rem;
+    }
+}
+
+/* Gap responsivo */
+.gap-responsive {
+    gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+    .gap-responsive {
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .gap-responsive {
+        gap: 1.5rem;
+    }
+}
+
+/* Padding responsivo */
+.p-responsive {
+    padding: 1rem;
+}
+
+@media (min-width: 640px) {
+    .p-responsive {
+        padding: 1.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .p-responsive {
+        padding: 2rem;
+    }
+}
+
