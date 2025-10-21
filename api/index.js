@@ -4257,8 +4257,8 @@ app.get('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
 
         let query = supabase
             .from('vw_produtos_estoque')
-            .select('*', { count: 'exact' })
-            .is('deleted_at', null);
+            .select('*', { count: 'exact' });
+        // Nota: a view já filtra por deleted_at IS NULL
 
         if (search) {
             query = query.or(`nome_material.ilike.%${search}%,marca.ilike.%${search}%,fornecedor.ilike.%${search}%,qr_code.ilike.%${search}%`);
@@ -4290,7 +4290,6 @@ app.get('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
             .from('vw_produtos_estoque')
             .select('*')
             .eq('id', req.params.id)
-            .is('deleted_at', null)
             .single();
 
         if (error) throw error;
@@ -4312,7 +4311,6 @@ app.get('/api/laboratorio/produtos/codigo/:codigo', authenticateToken, async (re
             .from('vw_produtos_estoque')
             .select('*')
             .or(`qr_code.eq.${codigo},codigo_barras.eq.${codigo}`)
-            .is('deleted_at', null)
             .single();
 
         if (error) throw error;
@@ -4332,7 +4330,6 @@ app.get('/api/laboratorio/produtos/:id/detalhes', authenticateToken, async (req,
             .from('vw_produtos_estoque')
             .select('*')
             .eq('id', req.params.id)
-            .is('deleted_at', null)
             .single();
 
         if (error) throw error;
@@ -4362,8 +4359,14 @@ app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
             observacoes,
             quantidade_inicial,
             quantidade_minima,
-            quantidade_maxima
+            estoque_minimo,
+            quantidade_maxima,
+            estoque_maximo
         } = req.body;
+        
+        // Aceitar ambos os nomes para compatibilidade
+        const quantidadeMin = quantidade_minima || estoque_minimo;
+        const quantidadeMax = quantidade_maxima || estoque_maximo;
 
         const userId = req.user.id;
 
@@ -4397,8 +4400,8 @@ app.post('/api/laboratorio/produtos', authenticateToken, async (req, res) => {
                 .insert({
                     produto_id: produto.id,
                     quantidade_atual: quantidade_inicial,
-                    quantidade_minima: quantidade_minima || 0,
-                    quantidade_maxima: quantidade_maxima || null,
+                    quantidade_minima: quantidadeMin || 0,
+                    quantidade_maxima: quantidadeMax || null,
                     atualizado_por: userId
                 });
 
@@ -4449,8 +4452,14 @@ app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
             observacoes,
             ativo,
             estoque_minimo,
-            quantidade_maxima
+            quantidade_minima,
+            quantidade_maxima,
+            estoque_maximo
         } = req.body;
+        
+        // Aceitar ambos os nomes para compatibilidade
+        const quantidadeMin = quantidade_minima || estoque_minimo;
+        const quantidadeMax = quantidade_maxima || estoque_maximo;
 
         // Update produto
         const { error: produtoError } = await supabaseAdmin
@@ -4475,15 +4484,15 @@ app.put('/api/laboratorio/produtos/:id', authenticateToken, async (req, res) => 
 
         if (produtoError) throw produtoError;
 
-        // Update estoque if estoque_minimo is provided
-        if (estoque_minimo !== undefined) {
+        // Update estoque if values are provided
+        if (quantidadeMin !== undefined || quantidadeMax !== undefined) {
             // Use upsert to handle both insert and update in one operation
             const { error: estoqueError } = await supabaseAdmin
                 .from('estoquelaboratorio')
                 .upsert({
                     produto_id: req.params.id,
-                    quantidade_minima: estoque_minimo || 0,
-                    quantidade_maxima: quantidade_maxima || null,
+                    quantidade_minima: quantidadeMin || 0,
+                    quantidade_maxima: quantidadeMax || null,
                     atualizado_por: req.user.id
                 }, {
                     onConflict: 'produto_id',
@@ -4505,8 +4514,7 @@ app.get('/api/laboratorio/produtos/stats', authenticateToken, async (req, res) =
     try {
         const { data, error } = await supabase
             .from('vw_produtos_estoque')
-            .select('status')
-            .is('deleted_at', null);
+            .select('status');
 
         if (error) throw error;
 
@@ -4520,6 +4528,115 @@ app.get('/api/laboratorio/produtos/stats', authenticateToken, async (req, res) =
         res.json(stats);
     } catch (error) {
         console.error('Erro ao buscar estatísticas:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get alertas
+app.get('/api/laboratorio/alertas', authenticateToken, async (req, res) => {
+    try {
+        const { data: produtos, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*');
+
+        if (error) throw error;
+
+        const alertas = [];
+        const hoje = new Date();
+        const em30Dias = new Date();
+        em30Dias.setDate(hoje.getDate() + 30);
+
+        produtos.forEach(produto => {
+            // Alerta: Estoque Crítico (esgotado)
+            if (parseFloat(produto.quantidade_atual || 0) === 0) {
+                alertas.push({
+                    id: `critico-${produto.id}`,
+                    tipo: 'critico',
+                    titulo: 'Estoque Esgotado',
+                    mensagem: `${produto.nome_material} está sem estoque`,
+                    produto_id: produto.id,
+                    produto_nome: produto.nome_material,
+                    quantidade_atual: produto.quantidade_atual,
+                    data_criacao: new Date().toISOString()
+                });
+            }
+            // Alerta: Estoque Baixo
+            else if (parseFloat(produto.quantidade_atual || 0) <= parseFloat(produto.quantidade_minima || 0) && 
+                     parseFloat(produto.quantidade_minima || 0) > 0) {
+                alertas.push({
+                    id: `aviso-${produto.id}`,
+                    tipo: 'aviso',
+                    titulo: 'Estoque Baixo',
+                    mensagem: `${produto.nome_material} está com estoque baixo (${produto.quantidade_atual} ${produto.unidade_medida})`,
+                    produto_id: produto.id,
+                    produto_nome: produto.nome_material,
+                    quantidade_atual: produto.quantidade_atual,
+                    quantidade_minima: produto.quantidade_minima,
+                    data_criacao: new Date().toISOString()
+                });
+            }
+
+            // Alerta: Produto Vencido
+            if (produto.data_validade) {
+                const dataValidade = new Date(produto.data_validade);
+                
+                if (dataValidade < hoje) {
+                    alertas.push({
+                        id: `vencido-${produto.id}`,
+                        tipo: 'critico',
+                        titulo: 'Produto Vencido',
+                        mensagem: `${produto.nome_material} venceu em ${new Date(produto.data_validade).toLocaleDateString('pt-BR')}`,
+                        produto_id: produto.id,
+                        produto_nome: produto.nome_material,
+                        data_validade: produto.data_validade,
+                        data_criacao: new Date().toISOString()
+                    });
+                }
+                // Alerta: Produto Próximo ao Vencimento
+                else if (dataValidade <= em30Dias && dataValidade > hoje) {
+                    const diasRestantes = Math.ceil((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+                    alertas.push({
+                        id: `vencimento-${produto.id}`,
+                        tipo: diasRestantes <= 7 ? 'aviso' : 'informativo',
+                        titulo: 'Próximo ao Vencimento',
+                        mensagem: `${produto.nome_material} vence em ${diasRestantes} dia${diasRestantes > 1 ? 's' : ''} (${new Date(produto.data_validade).toLocaleDateString('pt-BR')})`,
+                        produto_id: produto.id,
+                        produto_nome: produto.nome_material,
+                        data_validade: produto.data_validade,
+                        dias_restantes: diasRestantes,
+                        data_criacao: new Date().toISOString()
+                    });
+                }
+            }
+
+            // Alerta: Estoque Acima do Máximo
+            if (produto.quantidade_maxima && 
+                parseFloat(produto.quantidade_atual || 0) > parseFloat(produto.quantidade_maxima)) {
+                alertas.push({
+                    id: `excesso-${produto.id}`,
+                    tipo: 'informativo',
+                    titulo: 'Estoque Acima do Máximo',
+                    mensagem: `${produto.nome_material} está acima do estoque máximo (${produto.quantidade_atual}/${produto.quantidade_maxima} ${produto.unidade_medida})`,
+                    produto_id: produto.id,
+                    produto_nome: produto.nome_material,
+                    quantidade_atual: produto.quantidade_atual,
+                    quantidade_maxima: produto.quantidade_maxima,
+                    data_criacao: new Date().toISOString()
+                });
+            }
+        });
+
+        // Ordenar por tipo (crítico > aviso > informativo) e depois por data
+        const ordemTipo = { 'critico': 0, 'aviso': 1, 'informativo': 2 };
+        alertas.sort((a, b) => {
+            const diff = ordemTipo[a.tipo] - ordemTipo[b.tipo];
+            if (diff !== 0) return diff;
+            return new Date(b.data_criacao) - new Date(a.data_criacao);
+        });
+
+        res.json({ data: alertas });
+    } catch (error) {
+        console.error('Erro ao buscar alertas:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -4589,7 +4706,11 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
             quantidade,
             motivo,
             observacoes,
-            responsavel
+            responsavel,
+            preco_unitario,
+            custo_unitario,
+            fornecedor,
+            numero_pedido
         } = req.body;
 
         const userId = req.user.id;
@@ -4601,6 +4722,7 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
             .eq('id', userId)
             .single();
 
+        // Registrar movimentação
         const { data: movimentacao, error } = await supabaseAdmin
             .from('movimentacoeslaboratorio')
             .insert({
@@ -4616,6 +4738,37 @@ app.post('/api/laboratorio/movimentacoes/entrada', authenticateToken, async (req
             .single();
 
         if (error) throw error;
+        
+        console.log('🔥 [ENTRADA] Movimentação registrada! ID:', movimentacao.id);
+        console.log('🔥 [ENTRADA] Dados recebidos:', { custo_unitario, preco_unitario, quantidade, produto_id });
+
+        // Se foi informado um custo unitário, registrar na tabela de custos
+        const custoFinal = custo_unitario || preco_unitario;
+        console.log('💰 [CUSTO] custoFinal:', custoFinal, 'quantidade:', quantidade);
+        
+        if (custoFinal && parseFloat(custoFinal) > 0) {
+            const custoData = {
+                produto_id,
+                movimentacao_id: movimentacao.id,
+                custo_unitario: parseFloat(custoFinal),
+                quantidade: parseFloat(quantidade),
+                registrado_por: userId
+            };
+            console.log('💰 [CUSTO] Tentando inserir:', custoData);
+            
+            const { data: custoResult, error: custoError } = await supabaseAdmin
+                .from('custoslaboratorio')
+                .insert(custoData)
+                .select();
+
+            if (custoError) {
+                console.error('❌ [CUSTO] Erro ao registrar custo:', custoError);
+            } else {
+                console.log('✅ [CUSTO] Custo registrado com sucesso:', custoResult);
+            }
+        } else {
+            console.log('⚠️ [CUSTO] Custo não informado ou inválido');
+        }
 
         res.json({ success: true, data: movimentacao });
     } catch (error) {
@@ -4846,8 +4999,8 @@ app.get('/api/laboratorio/relatorios/movimentacoes', authenticateToken, async (r
         const { data, error } = await query;
         if (error) throw error;
 
-        const totalEntradas = data.filter(m => m.tipo_movimento === 'entrada').length;
-        const totalSaidas = data.filter(m => m.tipo_movimento === 'saida').length;
+        const totalEntradas = data.filter(m => m.tipo === 'entrada').length;
+        const totalSaidas = data.filter(m => m.tipo === 'saida').length;
 
         res.json({
             movimentacoes: data,
@@ -5036,19 +5189,11 @@ app.get('/api/laboratorio/relatorios/compras', authenticateToken, async (req, re
 // Relatório: Entradas do mês
 app.get('/api/laboratorio/relatorios/entradas-mes', authenticateToken, async (req, res) => {
     try {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const { count, error } = await supabase
-            .from('movimentacoeslaboratorio')
-            .select('*', { count: 'exact', head: true })
-            .eq('tipo', 'entrada')
-            .gte('data_movimentacao', startOfMonth.toISOString());
+        const { data, error } = await supabase.rpc('contar_entradas_mes');
 
         if (error) throw error;
 
-        res.json({ total: count || 0 });
+        res.json({ total: data || 0 });
     } catch (error) {
         console.error('Erro ao buscar entradas do mês:', error);
         res.status(500).json({ error: error.message });
@@ -5058,21 +5203,266 @@ app.get('/api/laboratorio/relatorios/entradas-mes', authenticateToken, async (re
 // Relatório: Saídas do mês
 app.get('/api/laboratorio/relatorios/saidas-mes', authenticateToken, async (req, res) => {
     try {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const { count, error } = await supabase
-            .from('movimentacoeslaboratorio')
-            .select('*', { count: 'exact', head: true })
-            .eq('tipo', 'saida')
-            .gte('data_movimentacao', startOfMonth.toISOString());
+        const { data, error } = await supabase.rpc('contar_saidas_mes');
 
         if (error) throw error;
 
-        res.json({ total: count || 0 });
+        res.json({ total: data || 0 });
     } catch (error) {
         console.error('Erro ao buscar saídas do mês:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================================
+// EXPORTAÇÃO DE RELATÓRIOS
+// =====================================================
+
+// Exportar Relatório de Estoque (CSV)
+app.get('/api/laboratorio/relatorios/estoque/export', authenticateToken, async (req, res) => {
+    try {
+        const { data: produtos, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .order('nome_material');
+
+        if (error) throw error;
+
+        // Gerar CSV
+        const csv = [];
+        csv.push('Código,Nome,Categoria,Quantidade,Unidade,Qtd Mínima,Qtd Máxima,Custo Unitário,Valor Total,Data Validade,Localização');
+        
+        produtos.forEach(p => {
+            const valorTotal = (parseFloat(p.quantidade_atual || 0) * parseFloat(p.custo_unitario || 0)).toFixed(2);
+            const dataValidade = p.data_validade ? new Date(p.data_validade).toLocaleDateString('pt-BR') : 'N/A';
+            
+            csv.push([
+                p.codigo_produto || '',
+                `"${p.nome_material || ''}"`,
+                p.categoria || '',
+                p.quantidade_atual || 0,
+                p.unidade_medida || '',
+                p.quantidade_minima || 0,
+                p.quantidade_maxima || '',
+                `€${parseFloat(p.custo_unitario || 0).toFixed(2)}`,
+                `€${valorTotal}`,
+                dataValidade,
+                `"${p.localizacao || ''}"`
+            ].join(','));
+        });
+
+        const csvContent = csv.join('\n');
+        const filename = `relatorio_estoque_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('\uFEFF' + csvContent); // BOM para UTF-8
+    } catch (error) {
+        console.error('Erro ao exportar relatório de estoque:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Exportar Relatório de Movimentações (CSV)
+app.get('/api/laboratorio/relatorios/movimentacoes/export', authenticateToken, async (req, res) => {
+    try {
+        const { data: movimentacoes, error } = await supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*')
+            .order('data_movimentacao', { ascending: false })
+            .limit(1000);
+
+        if (error) throw error;
+
+        // Gerar CSV
+        const csv = [];
+        csv.push('Data,Tipo,Produto,Quantidade,Unidade,Responsável,Caso/Procedimento,Fornecedor,Número Pedido,Observações');
+        
+        movimentacoes.forEach(m => {
+            const data = new Date(m.data_movimentacao).toLocaleDateString('pt-BR') + ' ' + new Date(m.data_movimentacao).toLocaleTimeString('pt-BR');
+            const tipo = m.tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA';
+            
+            csv.push([
+                data,
+                tipo,
+                `"${m.nome_material || ''}"`,
+                m.quantidade || 0,
+                m.unidade_medida || '',
+                `"${m.nome_responsavel || ''}"`,
+                `"${m.caso_procedimento || ''}"`,
+                `"${m.fornecedor || ''}"`,
+                `"${m.numero_pedido || ''}"`,
+                `"${m.observacoes || ''}"`
+            ].join(','));
+        });
+
+        const csvContent = csv.join('\n');
+        const filename = `relatorio_movimentacoes_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('\uFEFF' + csvContent);
+    } catch (error) {
+        console.error('Erro ao exportar relatório de movimentações:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Exportar Análise de Valor (CSV)
+app.get('/api/laboratorio/relatorios/valor/export', authenticateToken, async (req, res) => {
+    try {
+        const { data: produtos, error } = await supabase
+            .from('vw_produtos_estoque')
+            .select('*')
+            .order('categoria');
+
+        if (error) throw error;
+
+        // Agrupar por categoria
+        const categorias = {};
+        let totalGeral = 0;
+
+        produtos.forEach(p => {
+            const categoria = p.categoria || 'Sem Categoria';
+            const valorProduto = parseFloat(p.quantidade_atual || 0) * parseFloat(p.custo_unitario || 0);
+            
+            if (!categorias[categoria]) {
+                categorias[categoria] = {
+                    produtos: [],
+                    total: 0
+                };
+            }
+            
+            categorias[categoria].produtos.push({
+                nome: p.nome_material,
+                quantidade: p.quantidade_atual,
+                unidade: p.unidade_medida,
+                custoUnitario: p.custo_unitario,
+                valorTotal: valorProduto
+            });
+            
+            categorias[categoria].total += valorProduto;
+            totalGeral += valorProduto;
+        });
+
+        // Gerar CSV
+        const csv = [];
+        csv.push('Categoria,Produto,Quantidade,Unidade,Custo Unitário,Valor Total');
+        
+        Object.keys(categorias).sort().forEach(categoria => {
+            const cat = categorias[categoria];
+            
+            cat.produtos.forEach((p, index) => {
+                csv.push([
+                    index === 0 ? categoria : '',
+                    `"${p.nome}"`,
+                    p.quantidade || 0,
+                    p.unidade || '',
+                    `€${parseFloat(p.custoUnitario || 0).toFixed(2)}`,
+                    `€${p.valorTotal.toFixed(2)}`
+                ].join(','));
+            });
+            
+            csv.push([
+                '',
+                `SUBTOTAL ${categoria}`,
+                '',
+                '',
+                '',
+                `€${cat.total.toFixed(2)}`
+            ].join(','));
+            csv.push('');
+        });
+        
+        csv.push([
+            '',
+            'TOTAL GERAL',
+            '',
+            '',
+            '',
+            `€${totalGeral.toFixed(2)}`
+        ].join(','));
+
+        const csvContent = csv.join('\n');
+        const filename = `analise_valor_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('\uFEFF' + csvContent);
+    } catch (error) {
+        console.error('Erro ao exportar análise de valor:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Exportar Análise de Consumo (CSV)
+app.get('/api/laboratorio/relatorios/consumo/export', authenticateToken, async (req, res) => {
+    try {
+        // Últimos 30 dias
+        const dataInicio = new Date();
+        dataInicio.setDate(dataInicio.getDate() - 30);
+
+        const { data: movimentacoes, error } = await supabase
+            .from('vw_movimentacoes_detalhadas')
+            .select('*')
+            .eq('tipo', 'saida')
+            .gte('data_movimentacao', dataInicio.toISOString())
+            .order('data_movimentacao', { ascending: false });
+
+        if (error) throw error;
+
+        // Agrupar por produto
+        const produtos = {};
+        
+        movimentacoes.forEach(m => {
+            const produtoId = m.produto_id;
+            const nomeProduto = m.nome_material;
+            
+            if (!produtos[produtoId]) {
+                produtos[produtoId] = {
+                    nome: nomeProduto,
+                    unidade: m.unidade_medida,
+                    quantidadeTotal: 0,
+                    numeroSaidas: 0
+                };
+            }
+            
+            produtos[produtoId].quantidadeTotal += parseFloat(m.quantidade || 0);
+            produtos[produtoId].numeroSaidas += 1;
+        });
+
+        // Converter para array e ordenar por quantidade
+        const produtosArray = Object.values(produtos).sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
+
+        // Gerar CSV
+        const csv = [];
+        csv.push('Posição,Produto,Quantidade Consumida,Unidade,Número de Saídas,Média por Saída');
+        
+        produtosArray.forEach((p, index) => {
+            const mediaPorSaida = p.quantidadeTotal / p.numeroSaidas;
+            
+            csv.push([
+                index + 1,
+                `"${p.nome}"`,
+                p.quantidadeTotal.toFixed(2),
+                p.unidade || '',
+                p.numeroSaidas,
+                mediaPorSaida.toFixed(2)
+            ].join(','));
+        });
+
+        csv.push('');
+        csv.push(`"Período: ${dataInicio.toLocaleDateString('pt-BR')} até ${new Date().toLocaleDateString('pt-BR')}"`);
+        csv.push(`"Total de produtos: ${produtosArray.length}"`);
+
+        const csvContent = csv.join('\n');
+        const filename = `analise_consumo_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('\uFEFF' + csvContent);
+    } catch (error) {
+        console.error('Erro ao exportar análise de consumo:', error);
         res.status(500).json({ error: error.message });
     }
 });

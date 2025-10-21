@@ -7,6 +7,7 @@ class LaboratorioModule {
         this.products = [];
         this.movements = [];
         this.alerts = [];
+        this.alertFilter = 'all'; // 'all', 'critico', 'aviso', 'informativo'
         this.currentPage = 1;
         this.itemsPerPage = 20;
         this.apiBaseUrl = '/api/laboratorio';
@@ -19,6 +20,9 @@ class LaboratorioModule {
         
         // Carregar produtos inicialmente
         await this.loadProducts();
+        
+        // Carregar estatísticas dos relatórios
+        await this.loadReportStats();
     }
 
     setupEventListeners() {
@@ -138,6 +142,50 @@ class LaboratorioModule {
                 this.loadProducts();
             });
         }
+
+        // Filtros de alertas
+        const filterAllAlerts = document.getElementById('filterAllAlerts');
+        const filterCriticosAlerts = document.getElementById('filterCriticosAlerts');
+        const filterAvisosAlerts = document.getElementById('filterAvisosAlerts');
+        const filterInformativosAlerts = document.getElementById('filterInformativosAlerts');
+
+        if (filterAllAlerts) {
+            filterAllAlerts.addEventListener('click', () => this.setAlertFilter('all', filterAllAlerts));
+        }
+        if (filterCriticosAlerts) {
+            filterCriticosAlerts.addEventListener('click', () => this.setAlertFilter('critico', filterCriticosAlerts));
+        }
+        if (filterAvisosAlerts) {
+            filterAvisosAlerts.addEventListener('click', () => this.setAlertFilter('aviso', filterAvisosAlerts));
+        }
+        if (filterInformativosAlerts) {
+            filterInformativosAlerts.addEventListener('click', () => this.setAlertFilter('informativo', filterInformativosAlerts));
+        }
+    }
+
+    setAlertFilter(filter, clickedButton) {
+        this.alertFilter = filter;
+        
+        // Atualizar estilos dos botões
+        const buttons = [
+            document.getElementById('filterAllAlerts'),
+            document.getElementById('filterCriticosAlerts'),
+            document.getElementById('filterAvisosAlerts'),
+            document.getElementById('filterInformativosAlerts')
+        ];
+
+        buttons.forEach(btn => {
+            if (btn) {
+                btn.className = 'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+            }
+        });
+
+        if (clickedButton) {
+            clickedButton.className = 'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-emerald-600 text-white shadow-md';
+        }
+
+        // Re-renderizar alertas com filtro
+        this.renderAlerts();
     }
 
     debounce(func, wait) {
@@ -344,6 +392,7 @@ class LaboratorioModule {
             document.getElementById('productLocalizacao').value = product.localizacao || '';
             document.getElementById('productDataValidade').value = product.data_validade || '';
             document.getElementById('productEstoqueMinimo').value = product.quantidade_minima || '';
+            document.getElementById('productEstoqueMaximo').value = product.quantidade_maxima || '';
             document.getElementById('productQuantidadeInicial').value = product.quantidade_atual || 0;
             document.getElementById('productCustoUnitario').value = product.custo_unitario || '';
             document.getElementById('productDescricao').value = product.descricao || '';
@@ -379,6 +428,7 @@ class LaboratorioModule {
             localizacao: document.getElementById('productLocalizacao').value,
             data_validade: document.getElementById('productDataValidade').value || null,
             estoque_minimo: parseFloat(document.getElementById('productEstoqueMinimo').value) || 0,
+            estoque_maximo: parseFloat(document.getElementById('productEstoqueMaximo').value) || 0,
             quantidade_inicial: parseFloat(document.getElementById('productQuantidadeInicial').value) || 0,
             custo_unitario: parseFloat(document.getElementById('productCustoUnitario').value) || 0,
             descricao: document.getElementById('productDescricao').value,
@@ -1098,32 +1148,58 @@ class LaboratorioModule {
         const container = document.getElementById('alertsList');
         if (!container) return;
 
-        if (this.alerts.length === 0) {
+        // Filtrar alertas baseado no filtro ativo
+        let filteredAlerts = this.alerts;
+        if (this.alertFilter !== 'all') {
+            filteredAlerts = this.alerts.filter(alert => alert.tipo === this.alertFilter);
+        }
+
+        if (filteredAlerts.length === 0) {
+            const mensagem = this.alertFilter === 'all' 
+                ? 'Nenhum alerta ativo' 
+                : `Nenhum alerta do tipo "${this.alertFilter}"`;
             container.innerHTML = `
                 <div class="text-center py-12 text-gray-500 dark:text-gray-400">
                     <i class="fas fa-check-circle text-4xl mb-2 opacity-50"></i>
-                    <p>Nenhum alerta ativo</p>
+                    <p>${mensagem}</p>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = this.alerts.map(alert => {
-            const iconConfig = {
-                'estoque_baixo': { icon: 'fa-exclamation-circle', color: 'yellow' },
-                'estoque_critico': { icon: 'fa-exclamation-triangle', color: 'orange' },
-                'estoque_esgotado': { icon: 'fa-times-circle', color: 'red' },
-                'validade_proxima': { icon: 'fa-calendar-times', color: 'orange' },
-                'produto_vencido': { icon: 'fa-ban', color: 'red' }
+        container.innerHTML = filteredAlerts.map(alert => {
+            // Mapear tipo para cor e ícone
+            const tipoConfig = {
+                'critico': { 
+                    icon: 'fa-exclamation-triangle', 
+                    color: 'red',
+                    bgColor: 'bg-red-50 dark:bg-red-900/20',
+                    borderColor: 'border-red-500',
+                    textColor: 'text-red-700 dark:text-red-400'
+                },
+                'aviso': { 
+                    icon: 'fa-exclamation-circle', 
+                    color: 'yellow',
+                    bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+                    borderColor: 'border-yellow-500',
+                    textColor: 'text-yellow-700 dark:text-yellow-400'
+                },
+                'informativo': { 
+                    icon: 'fa-info-circle', 
+                    color: 'blue',
+                    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                    borderColor: 'border-blue-500',
+                    textColor: 'text-blue-700 dark:text-blue-400'
+                }
             };
 
-            const config = iconConfig[alert.tipo] || { icon: 'fa-info-circle', color: 'blue' };
+            const config = tipoConfig[alert.tipo] || tipoConfig['informativo'];
 
             return `
-                <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border-l-4 border-${config.color}-500">
+                <div class="${config.bgColor} rounded-xl p-4 border-l-4 ${config.borderColor}">
                     <div class="flex items-start justify-between">
                         <div class="flex items-start space-x-3">
-                            <i class="fas ${config.icon} text-${config.color}-500 text-xl mt-1"></i>
+                            <i class="fas ${config.icon} ${config.textColor} text-xl mt-1"></i>
                             <div>
                                 <h4 class="font-semibold text-gray-900 dark:text-white">${alert.titulo}</h4>
                                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">${alert.mensagem}</p>
@@ -1216,24 +1292,261 @@ class LaboratorioModule {
         }
     }
 
-    exportInventoryReport() {
-        this.showNotification('Exportando relatório de estoque...', 'info');
-        window.open(`${this.apiBaseUrl}/relatorios/estoque/export`, '_blank');
+    // =====================================================
+    // RELATÓRIOS - ESTATÍSTICAS
+    // =====================================================
+
+    async loadReportStats() {
+        try {
+            const token = localStorage.getItem('sb-hvqckoajxhdqaxfawisd-auth-token');
+            if (!token) return;
+
+            // Buscar valor total em estoque
+            const valorEstoqueResponse = await fetch(`${this.apiBaseUrl}/relatorios/valor-estoque`, {
+                headers: {
+                    'Authorization': `Bearer ${JSON.parse(token).access_token}`
+                }
+            });
+            
+            if (valorEstoqueResponse.ok) {
+                const valorData = await valorEstoqueResponse.json();
+                const valorElement = document.getElementById('totalStockValue');
+                if (valorElement && valorData.valor_total !== undefined) {
+                    valorElement.textContent = `€${parseFloat(valorData.valor_total || 0).toFixed(2)}`;
+                }
+            }
+
+            // Buscar entradas do mês
+            const entradasResponse = await fetch(`${this.apiBaseUrl}/relatorios/entradas-mes`, {
+                headers: {
+                    'Authorization': `Bearer ${JSON.parse(token).access_token}`
+                }
+            });
+            
+            if (entradasResponse.ok) {
+                const entradasData = await entradasResponse.json();
+                const entradasElement = document.getElementById('totalMonthEntries');
+                if (entradasElement && entradasData.total !== undefined) {
+                    entradasElement.textContent = entradasData.total || 0;
+                }
+            }
+
+            // Buscar saídas do mês
+            const saidasResponse = await fetch(`${this.apiBaseUrl}/relatorios/saidas-mes`, {
+                headers: {
+                    'Authorization': `Bearer ${JSON.parse(token).access_token}`
+                }
+            });
+            
+            if (saidasResponse.ok) {
+                const saidasData = await saidasResponse.json();
+                const saidasElement = document.getElementById('totalMonthExits');
+                if (saidasElement && saidasData.total !== undefined) {
+                    saidasElement.textContent = saidasData.total || 0;
+                }
+            }
+
+            // Total de produtos
+            const produtosElement = document.getElementById('totalProducts');
+            if (produtosElement) {
+                produtosElement.textContent = this.products.length || 0;
+            }
+
+            // Inicializar filtros de data
+            this.initializeDateFilters();
+
+        } catch (error) {
+            console.error('Erro ao carregar estatísticas de relatórios:', error);
+        }
     }
 
-    exportMovementsReport() {
-        this.showNotification('Exportando relatório de movimentações...', 'info');
-        window.open(`${this.apiBaseUrl}/relatorios/movimentacoes/export`, '_blank');
+    // =====================================================
+    // FILTROS DE DATA
+    // =====================================================
+
+    initializeDateFilters() {
+        // Definir datas padrão (mês atual)
+        const primeiroDia = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const hoje = new Date();
+        
+        const dataInicioInput = document.getElementById('filtroDataInicio');
+        const dataFimInput = document.getElementById('filtroDataFim');
+        
+        if (dataInicioInput && !dataInicioInput.value) {
+            dataInicioInput.value = primeiroDia.toISOString().split('T')[0];
+        }
+        if (dataFimInput && !dataFimInput.value) {
+            dataFimInput.value = hoje.toISOString().split('T')[0];
+        }
+
+        // Event listeners
+        const btnAplicar = document.getElementById('btnAplicarFiltro');
+        const btnLimpar = document.getElementById('btnLimparFiltro');
+        
+        if (btnAplicar) {
+            btnAplicar.removeEventListener('click', this.aplicarFiltroHandler);
+            this.aplicarFiltroHandler = () => this.aplicarFiltroRelatorios();
+            btnAplicar.addEventListener('click', this.aplicarFiltroHandler);
+        }
+        if (btnLimpar) {
+            btnLimpar.removeEventListener('click', this.limparFiltroHandler);
+            this.limparFiltroHandler = () => this.limparFiltroRelatorios();
+            btnLimpar.addEventListener('click', this.limparFiltroHandler);
+        }
+
+        // Event listeners para botões preset
+        const presetButtons = document.querySelectorAll('[data-preset]');
+        presetButtons.forEach(btn => {
+            const preset = btn.getAttribute('data-preset');
+            btn.addEventListener('click', () => this.setFiltroPreset(preset));
+        });
     }
 
-    exportValueReport() {
-        this.showNotification('Exportando análise de valor...', 'info');
-        window.open(`${this.apiBaseUrl}/relatorios/valor/export`, '_blank');
+    setFiltroPreset(preset) {
+        const dataFim = new Date();
+        let dataInicio = new Date();
+        
+        switch(preset) {
+            case 'hoje':
+                dataInicio = new Date();
+                break;
+            case 'semana':
+                dataInicio.setDate(dataInicio.getDate() - 7);
+                break;
+            case 'mes':
+                dataInicio = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), 1);
+                break;
+            case 'trimestre':
+                dataInicio.setMonth(dataInicio.getMonth() - 3);
+                break;
+            case 'ano':
+                dataInicio = new Date(dataInicio.getFullYear(), 0, 1);
+                break;
+        }
+        
+        document.getElementById('filtroDataInicio').value = dataInicio.toISOString().split('T')[0];
+        document.getElementById('filtroDataFim').value = dataFim.toISOString().split('T')[0];
     }
 
-    exportConsumptionReport() {
-        this.showNotification('Exportando análise de consumo...', 'info');
-        window.open(`${this.apiBaseUrl}/relatorios/consumo/export`, '_blank');
+    async aplicarFiltroRelatorios() {
+        const dataInicio = document.getElementById('filtroDataInicio').value;
+        const dataFim = document.getElementById('filtroDataFim').value;
+        
+        if (!dataInicio || !dataFim) {
+            this.showNotification('Por favor, selecione as datas de início e fim', 'error');
+            return;
+        }
+
+        const token = localStorage.getItem('sb-hvqckoajxhdqaxfawisd-auth-token');
+        if (!token) return;
+
+        try {
+            const accessToken = JSON.parse(token).access_token;
+            
+            // Buscar movimentações com filtro
+            const response = await fetch(`${this.apiBaseUrl}/relatorios/movimentacoes?dataInicio=${dataInicio}&dataFim=${dataFim}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            
+            if (!response.ok) throw new Error('Erro ao buscar movimentações');
+            
+            const data = await response.json();
+            
+            // Atualizar KPIs
+            document.getElementById('totalMonthEntries').textContent = data.total_entradas || 0;
+            document.getElementById('totalMonthExits').textContent = data.total_saidas || 0;
+            
+            // Mensagem de sucesso
+            const periodoTexto = `${new Date(dataInicio).toLocaleDateString('pt-PT')} - ${new Date(dataFim).toLocaleDateString('pt-PT')}`;
+            this.showNotification(`✅ Período: ${periodoTexto} | Entradas: ${data.total_entradas} | Saídas: ${data.total_saidas}`, 'success');
+            
+            return data;
+        } catch (error) {
+            console.error('Erro ao aplicar filtro:', error);
+            this.showNotification('Erro ao aplicar filtro: ' + error.message, 'error');
+        }
+    }
+
+    limparFiltroRelatorios() {
+        const primeiroDia = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const hoje = new Date();
+        
+        document.getElementById('filtroDataInicio').value = primeiroDia.toISOString().split('T')[0];
+        document.getElementById('filtroDataFim').value = hoje.toISOString().split('T')[0];
+        
+        // Recarregar dados do mês atual
+        this.loadReportStats();
+        this.showNotification('Filtro limpo! Mostrando dados do mês atual', 'info');
+    }
+
+    // =====================================================
+    // RELATÓRIOS - EXPORTAÇÃO
+    // =====================================================
+
+    async exportInventoryReport() {
+        try {
+            this.showNotification('Exportando relatório de estoque...', 'info');
+            await this.downloadReport('/relatorios/estoque/export', 'relatorio-estoque.csv');
+        } catch (error) {
+            this.showNotification('Erro ao exportar relatório: ' + error.message, 'error');
+        }
+    }
+
+    async exportMovementsReport() {
+        try {
+            this.showNotification('Exportando relatório de movimentações...', 'info');
+            await this.downloadReport('/relatorios/movimentacoes/export', 'relatorio-movimentacoes.csv');
+        } catch (error) {
+            this.showNotification('Erro ao exportar relatório: ' + error.message, 'error');
+        }
+    }
+
+    async exportValueReport() {
+        try {
+            this.showNotification('Exportando análise de valor...', 'info');
+            await this.downloadReport('/relatorios/valor/export', 'analise-valor.csv');
+        } catch (error) {
+            this.showNotification('Erro ao exportar relatório: ' + error.message, 'error');
+        }
+    }
+
+    async exportConsumptionReport() {
+        try {
+            this.showNotification('Exportando análise de consumo...', 'info');
+            await this.downloadReport('/relatorios/consumo/export', 'analise-consumo.csv');
+        } catch (error) {
+            this.showNotification('Erro ao exportar relatório: ' + error.message, 'error');
+        }
+    }
+
+    async downloadReport(endpoint, filename) {
+        const token = localStorage.getItem('sb-hvqckoajxhdqaxfawisd-auth-token');
+        if (!token) {
+            throw new Error('Token de autenticação não encontrado');
+        }
+
+        const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
+            headers: {
+                'Authorization': `Bearer ${JSON.parse(token).access_token}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao exportar relatório');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        this.showNotification('Relatório exportado com sucesso!', 'success');
     }
 
     // =====================================================

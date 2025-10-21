@@ -160,53 +160,32 @@ COMMENT ON TABLE movimentacoeslaboratorio IS 'Histórico completo de movimentaç
 COMMENT ON COLUMN movimentacoeslaboratorio.tipo_movimento IS 'entrada, saida, ajuste, perda, transferencia';
 
 -- =====================================================
--- 4. TABELA: custoslaboratorio
+-- 4. TABELA: custoslaboratorio (ESTRUTURA REAL DO BANCO)
 -- =====================================================
--- Gerencia preços e informações de compra
+-- Gerencia custos de movimentações de entrada
+-- NOTA: Esta é a estrutura REAL que existe no Supabase
 CREATE TABLE IF NOT EXISTS custoslaboratorio (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     produto_id UUID NOT NULL REFERENCES produtoslaboratorio(id) ON DELETE CASCADE,
+    movimentacao_id UUID REFERENCES movimentacoeslaboratorio(id),
     
     -- Valores
-    preco_unitario NUMERIC(10,2) NOT NULL CHECK (preco_unitario >= 0),
-    quantidade_comprada NUMERIC(10,2) NOT NULL CHECK (quantidade_comprada > 0),
-    custo_total NUMERIC(10,2) GENERATED ALWAYS AS (preco_unitario * quantidade_comprada) STORED,
+    custo_unitario NUMERIC(10,2) NOT NULL CHECK (custo_unitario >= 0),
+    quantidade NUMERIC(10,2) NOT NULL CHECK (quantidade > 0),
+    custo_total NUMERIC(10,2) GENERATED ALWAYS AS (custo_unitario * quantidade) STORED,
     
-    -- Informações da compra
-    data_compra DATE NOT NULL DEFAULT CURRENT_DATE,
-    data_validade DATE,
-    fornecedor TEXT NOT NULL,
-    numero_pedido TEXT,
-    numero_nota_fiscal TEXT,
-    
-    -- Lote
-    lote TEXT,
-    
-    -- Moeda (padrão EUR)
-    moeda TEXT DEFAULT 'EUR' CHECK (moeda IN ('EUR', 'USD', 'BRL', 'GBP')),
-    
-    -- Status
-    ativo BOOLEAN DEFAULT TRUE,
-    
-    -- Auditoria
-    data_criacao TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    criado_por UUID REFERENCES user_profiles(id),
-    
-    -- Soft delete
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    
-    -- Alerta de validade
-    dias_alerta_validade INTEGER DEFAULT 30 -- Alertar X dias antes de vencer
+    -- Data e auditoria
+    data_registro TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    registrado_por UUID REFERENCES profiles(id)
 );
 
 -- Índices
-CREATE INDEX idx_custos_produto ON custoslaboratorio(produto_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_custos_data_compra ON custoslaboratorio(data_compra DESC) WHERE deleted_at IS NULL;
-CREATE INDEX idx_custos_fornecedor ON custoslaboratorio(fornecedor) WHERE deleted_at IS NULL;
-CREATE INDEX idx_custos_validade ON custoslaboratorio(data_validade) WHERE data_validade IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX idx_custos_produto ON custoslaboratorio(produto_id);
+CREATE INDEX idx_custos_data_registro ON custoslaboratorio(data_registro DESC);
+CREATE INDEX idx_custos_movimentacao ON custoslaboratorio(movimentacao_id);
 
-COMMENT ON TABLE custoslaboratorio IS 'Histórico de compras e custos de produtos';
-COMMENT ON COLUMN custoslaboratorio.custo_total IS 'Calculado automaticamente: preco_unitario * quantidade_comprada';
+COMMENT ON TABLE custoslaboratorio IS 'Registro de custos associados a movimentações de entrada';
+COMMENT ON COLUMN custoslaboratorio.custo_total IS 'Calculado automaticamente: custo_unitario * quantidade';
 
 -- =====================================================
 -- 5. TABELA: alertaslaboratorio
@@ -415,9 +394,12 @@ SELECT
     p.nome_material,
     p.marca,
     p.fornecedor,
+    p.referencia_lote,
     p.unidade_medida,
     p.localizacao,
     p.data_validade,
+    p.descricao,
+    p.observacoes,
     p.ativo,
     COALESCE(e.quantidade_atual, 0) AS quantidade_atual,
     COALESCE(e.quantidade_minima, 0) AS quantidade_minima,
@@ -425,7 +407,23 @@ SELECT
     COALESCE(e.status, 'ok') AS status,
     e.ultima_entrada,
     e.ultima_saida,
-    e.ultima_atualizacao
+    e.ultima_atualizacao,
+    (
+        SELECT AVG(c.preco_unitario)
+        FROM custoslaboratorio c
+        WHERE c.produto_id = p.id
+        AND c.deleted_at IS NULL 
+        AND c.ativo = TRUE
+    ) AS custo_medio_unitario,
+    (
+        SELECT c.preco_unitario
+        FROM custoslaboratorio c
+        WHERE c.produto_id = p.id
+        AND c.deleted_at IS NULL 
+        AND c.ativo = TRUE
+        ORDER BY c.data_compra DESC
+        LIMIT 1
+    ) AS custo_unitario
 FROM produtoslaboratorio p
 LEFT JOIN estoquelaboratorio e ON p.id = e.produto_id
 WHERE p.deleted_at IS NULL;

@@ -127,3 +127,4 @@ O arquivo `database/laboratorio-schema.sql` parece ser uma **versão futura** do
 
 A estrutura atual é **funcional e suficiente** para as necessidades do sistema de laboratório.
 
+

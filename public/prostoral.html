@@ -11,6 +11,19 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- QR Code Generator (Local) -->
+    <script src="qrcode.min.js"></script>
+    <script>
+        // Verificar se a biblioteca QRCode carregou
+        window.addEventListener('load', () => {
+            if (typeof QRCode !== 'undefined') {
+                console.log('✅ Biblioteca QRCode.js carregada com sucesso!');
+            } else {
+                console.error('❌ Biblioteca QRCode.js não foi carregada!');
+            }
+        });
+    </script>
+    
     <!-- Estilos principais -->
     <link rel="stylesheet" href="styles.css">
     
@@ -93,6 +106,42 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
+        }
+        
+        /* Lab tab content */
+        .lab-tab-content {
+            display: none;
+        }
+        .lab-tab-content.active {
+            display: block !important;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slide-in-right {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .animate-slide-in-right {
+            animation: slide-in-right 0.3s ease-out;
         }
     </style>
 </head>
@@ -423,18 +472,557 @@
 
             <!-- Inventory Tab -->
             <div id="inventory-content" class="tab-content">
-                <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
-                        <i class="fas fa-boxes text-emerald-600"></i>
-                        Gestão de Estoque
-                    </h2>
-                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-boxes text-6xl mb-4 opacity-50"></i>
-                        <p class="text-lg">Funcionalidade em desenvolvimento...</p>
+                <!-- Sub-navegação do Laboratório -->
+                <div class="mb-6 animate-fade-in">
+                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1">
+                        <div class="flex space-x-2">
+                            <button class="lab-tab active flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium" data-lab-tab="produtos">
+                                <i class="fas fa-flask"></i>
+                                <span>Produtos</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="movimentacoes">
+                                <i class="fas fa-exchange-alt"></i>
+                                <span>Movimentações</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="alertas">
+                                <i class="fas fa-bell"></i>
+                                <span>Alertas</span>
+                                <span id="alertCount" class="bg-red-500 text-white text-xs px-2 py-1 rounded-full hidden">0</span>
+                            </button>
+                            <button class="lab-tab flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium" data-lab-tab="relatorios">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Relatórios</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Produtos -->
+                <div id="lab-produtos-content" class="lab-tab-content active">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <!-- Cabeçalho -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                                <i class="fas fa-flask text-emerald-600"></i>
+                                Produtos do Laboratório
+                            </h2>
+                            <button id="btnNewProduct" class="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                <i class="fas fa-plus"></i>
+                                <span>Novo Produto</span>
+                            </button>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="product-search" placeholder="Buscar produto..." class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all">
+                            </div>
+                            <select id="product-filter-categoria" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todas as categorias</option>
+                                <option value="resinas">Resinas</option>
+                                <option value="ceras">Ceras</option>
+                                <option value="metais">Metais</option>
+                                <option value="gesso">Gesso</option>
+                                <option value="silicone">Silicone</option>
+                                <option value="ceramica">Cerâmica</option>
+                                <option value="acrilico">Acrílico</option>
+                                <option value="instrumentos">Instrumentos</option>
+                                <option value="equipamentos">Equipamentos</option>
+                                <option value="consumiveis">Consumíveis</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                            <select id="product-filter-status" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todos os status</option>
+                                <option value="disponivel">Disponível</option>
+                                <option value="baixo">Estoque Baixo</option>
+                                <option value="critico">Crítico</option>
+                                <option value="esgotado">Esgotado</option>
+                            </select>
+                            <button id="btnScanQR" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center space-x-2">
+                                <i class="fas fa-qrcode"></i>
+                                <span>Escanear QR</span>
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Produtos -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">QR Code</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Material</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Marca</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Categoria</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Estoque</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Status</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                            <i class="fas fa-flask text-4xl mb-2 opacity-50"></i>
+                                            <p>Carregando produtos...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        <div id="productsPagination" class="flex justify-between items-center mt-6">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span id="productsCount">0</span> produtos encontrados
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="productsPrevPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="px-4 py-2 text-gray-700 dark:text-gray-300" id="productsPageInfo">Página 1 de 1</span>
+                                <button id="productsNextPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Movimentações -->
+                <div id="lab-movimentacoes-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                                <i class="fas fa-exchange-alt text-emerald-600"></i>
+                                Movimentações de Estoque
+                            </h2>
+                            <div class="flex space-x-2">
+                                <button id="btnNewEntry" class="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                    <i class="fas fa-arrow-down"></i>
+                                    <span>Entrada</span>
+                                </button>
+                                <button id="btnNewExit" class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>Saída</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="movement-search" placeholder="Buscar..." class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all">
+                            </div>
+                            <select id="movement-filter-tipo" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                <option value="">Todos os tipos</option>
+                                <option value="entrada">Entrada</option>
+                                <option value="saida">Saída</option>
+                            </select>
+                            <input type="date" id="movement-filter-data-inicio" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <input type="date" id="movement-filter-data-fim" class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <button id="btnApplyMovementFilter" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300">
+                                Aplicar
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Movimentações -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Data</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Tipo</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Produto</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Quantidade</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Responsável</th>
+                                        <th class="text-left py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="movementsTableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                            <i class="fas fa-exchange-alt text-4xl mb-2 opacity-50"></i>
+                                            <p>Nenhuma movimentação encontrada</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        <div id="movementsPagination" class="flex justify-between items-center mt-6">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span id="movementsCount">0</span> movimentações encontradas
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="movementsPrevPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="px-4 py-2 text-gray-700 dark:text-gray-300" id="movementsPageInfo">Página 1 de 1</span>
+                                <button id="movementsNextPage" class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Alertas -->
+                <div id="lab-alertas-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 mb-6">
+                            <i class="fas fa-bell text-emerald-600"></i>
+                            Alertas do Sistema
+                        </h2>
+
+                        <!-- Estatísticas de Alertas -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-red-600 dark:text-red-400 mb-1">Críticos</p>
+                                        <p class="text-2xl font-bold text-red-700 dark:text-red-300" id="alertsCriticos">0</p>
+                                    </div>
+                                    <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                                </div>
+                            </div>
+                            <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-yellow-600 dark:text-yellow-400 mb-1">Avisos</p>
+                                        <p class="text-2xl font-bold text-yellow-700 dark:text-yellow-300" id="alertsAvisos">0</p>
+                                    </div>
+                                    <i class="fas fa-exclamation-circle text-3xl text-yellow-500"></i>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-blue-600 dark:text-blue-400 mb-1">Informativos</p>
+                                        <p class="text-2xl font-bold text-blue-700 dark:text-blue-300" id="alertsInfo">0</p>
+                                    </div>
+                                    <i class="fas fa-info-circle text-3xl text-blue-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros de Alertas -->
+                        <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 mb-6">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por tipo:</span>
+                                <button id="filterAllAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-emerald-600 text-white shadow-md">
+                                    <i class="fas fa-list mr-2"></i>Todos
+                                </button>
+                                <button id="filterCriticosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>Críticos
+                                </button>
+                                <button id="filterAvisosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 hover:text-yellow-700 dark:hover:text-yellow-400">
+                                    <i class="fas fa-exclamation-circle mr-2"></i>Avisos
+                                </button>
+                                <button id="filterInformativosAlerts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400">
+                                    <i class="fas fa-info-circle mr-2"></i>Informativos
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lista de Alertas -->
+                        <div id="alertsList" class="space-y-4">
+                            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-bell text-4xl mb-2 opacity-50"></i>
+                                <p>Carregando alertas...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Relatórios -->
+                <div id="lab-relatorios-content" class="lab-tab-content">
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 mb-6">
+                            <i class="fas fa-chart-bar text-emerald-600"></i>
+                            Relatórios e Análises
+                        </h2>
+
+                        <!-- Filtros de Período -->
+                        <div class="bg-white dark:bg-gray-700 rounded-xl shadow-sm p-6 mb-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+                                <i class="fas fa-filter text-blue-600"></i>
+                                Filtros de Período
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Data Início
+                                    </label>
+                                    <input type="date" id="filtroDataInicio" 
+                                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Data Fim
+                                    </label>
+                                    <input type="date" id="filtroDataFim" 
+                                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white">
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <button id="btnAplicarFiltro" 
+                                            class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                        <i class="fas fa-search mr-2"></i>Aplicar Filtro
+                                    </button>
+                                    <button id="btnLimparFiltro" 
+                                            class="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex gap-2 flex-wrap">
+                                <button class="text-xs bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" data-preset="hoje">
+                                    Hoje
+                                </button>
+                                <button class="text-xs bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" data-preset="semana">
+                                    Esta Semana
+                                </button>
+                                <button class="text-xs bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" data-preset="mes">
+                                    Este Mês
+                                </button>
+                                <button class="text-xs bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" data-preset="trimestre">
+                                    Trimestre
+                                </button>
+                                <button class="text-xs bg-gray-100 dark:bg-gray-600 px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-500" data-preset="ano">
+                                    Este Ano
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+                                <i class="fas fa-euro-sign text-3xl mb-2"></i>
+                                <p class="text-sm opacity-90">Valor Total em Estoque</p>
+                                <p class="text-2xl font-bold" id="totalStockValue">€0.00</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
+                                <i class="fas fa-arrow-down text-3xl mb-2"></i>
+                                <p class="text-sm opacity-90">Entradas (Mês)</p>
+                                <p class="text-2xl font-bold" id="totalMonthEntries">0</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white">
+                                <i class="fas fa-arrow-up text-3xl mb-2"></i>
+                                <p class="text-sm opacity-90">Saídas (Mês)</p>
+                                <p class="text-2xl font-bold" id="totalMonthExits">0</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                                <i class="fas fa-flask text-3xl mb-2"></i>
+                                <p class="text-sm opacity-90">Total de Produtos</p>
+                                <p class="text-2xl font-bold" id="totalProducts">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Ações de Relatórios -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button id="btnExportInventory" class="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 text-left hover:border-emerald-500 transition-all duration-300 hover:shadow-lg group">
+                                <i class="fas fa-file-excel text-3xl text-green-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Relatório de Estoque</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Exportar lista completa de produtos e quantidades</p>
+                            </button>
+
+                            <button id="btnExportMovements" class="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 text-left hover:border-emerald-500 transition-all duration-300 hover:shadow-lg group">
+                                <i class="fas fa-file-pdf text-3xl text-red-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Relatório de Movimentações</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Exportar histórico de entradas e saídas</p>
+                            </button>
+
+                            <button id="btnExportValue" class="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 text-left hover:border-emerald-500 transition-all duration-300 hover:shadow-lg group">
+                                <i class="fas fa-chart-pie text-3xl text-purple-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Análise de Valor</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Relatório de valor investido por categoria</p>
+                            </button>
+
+                            <button id="btnExportConsumption" class="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 text-left hover:border-emerald-500 transition-all duration-300 hover:shadow-lg group">
+                                <i class="fas fa-chart-line text-3xl text-blue-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Análise de Consumo</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Produtos mais consumidos no período</p>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Modal de Produto do Laboratório -->
+    <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 id="productModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Novo Produto</h3>
+                <button id="btnCloseProductModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="productForm" class="p-6 space-y-6">
+                <input type="hidden" id="productId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Material *</label>
+                        <input type="text" id="productNomeMaterial" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categoria *</label>
+                        <select id="productCategoria" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <option value="">Selecione...</option>
+                            <option value="resinas">Resinas</option>
+                            <option value="ceras">Ceras</option>
+                            <option value="metais">Metais</option>
+                            <option value="gesso">Gesso</option>
+                            <option value="silicone">Silicone</option>
+                            <option value="ceramica">Cerâmica</option>
+                            <option value="acrilico">Acrílico</option>
+                            <option value="instrumentos">Instrumentos</option>
+                            <option value="equipamentos">Equipamentos</option>
+                            <option value="consumiveis">Consumíveis</option>
+                            <option value="outros">Outros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Marca</label>
+                        <input type="text" id="productMarca" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Fornecedor</label>
+                        <input type="text" id="productFornecedor" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Código de Barras</label>
+                        <input type="text" id="productCodigoBarras" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Referência/Lote</label>
+                        <input type="text" id="productReferenciaLote" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Unidade de Medida *</label>
+                        <select id="productUnidadeMedida" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                            <option value="">Selecione...</option>
+                            <option value="g">Gramas (g)</option>
+                            <option value="kg">Quilogramas (kg)</option>
+                            <option value="ml">Mililitros (ml)</option>
+                            <option value="l">Litros (l)</option>
+                            <option value="un">Unidade (un)</option>
+                            <option value="barra">Barra</option>
+                            <option value="frasco">Frasco</option>
+                            <option value="caixa">Caixa</option>
+                            <option value="embalagem">Embalagem</option>
+                            <option value="metro">Metro</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Localização</label>
+                        <input type="text" id="productLocalizacao" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data de Validade</label>
+                        <input type="date" id="productDataValidade" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estoque Mínimo</label>
+                        <input type="number" id="productEstoqueMinimo" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estoque Máximo</label>
+                        <input type="number" id="productEstoqueMaximo" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade Inicial</label>
+                        <input type="number" id="productQuantidadeInicial" step="0.01" min="0" value="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custo Unitário (€)</label>
+                        <input type="number" id="productCustoUnitario" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição</label>
+                    <textarea id="productDescricao" rows="3" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="productObservacoes" rows="2" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelProduct" class="px-6 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium transition-all duration-300 hover:scale-105 shadow-lg">
+                        Salvar Produto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Movimentação -->
+    <div id="movementModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+                <h3 id="movementModalTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Nova Movimentação</h3>
+                <button id="btnCloseMovementModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="movementForm" class="p-6 space-y-6">
+                <input type="hidden" id="movementTipo">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Produto *</label>
+                    <select id="movementProduto" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <option value="">Selecione um produto...</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade *</label>
+                        <input type="number" id="movementQuantidade" required step="0.01" min="0.01" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                    <div id="movementCustoUnitarioDiv" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custo Unitário (€)</label>
+                        <input type="number" id="movementCustoUnitario" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    </div>
+                </div>
+                
+                <div id="movementResponsavelDiv">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Responsável/Caso</label>
+                    <input type="text" id="movementResponsavel" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Motivo *</label>
+                    <select id="movementMotivo" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                    <textarea id="movementObservacoes" rows="3" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnCancelMovement" class="px-6 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium transition-all duration-300 hover:scale-105 shadow-lg">
+                        Registrar Movimentação
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -685,6 +1273,50 @@
                 }
             });
         });
+
+        // Lab tabs navigation
+        document.querySelectorAll('.lab-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.getAttribute('data-lab-tab');
+                
+                // Remove active de todas as abas
+                document.querySelectorAll('.lab-tab').forEach(t => {
+                    t.classList.remove('active', 'bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                    t.classList.add('hover:bg-gray-100', 'dark:hover:bg-gray-700', 'text-gray-600', 'dark:text-gray-400');
+                });
+                
+                // Adicionar active à aba clicada
+                tab.classList.add('active', 'bg-emerald-100', 'dark:bg-emerald-900', 'text-emerald-700', 'dark:text-emerald-300');
+                tab.classList.remove('hover:bg-gray-100', 'dark:hover:bg-gray-700', 'text-gray-600', 'dark:text-gray-400');
+                
+                // Ocultar todo o conteúdo
+                document.querySelectorAll('.lab-tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Mostrar o conteúdo correspondente
+                const targetContent = document.getElementById(`lab-${targetTab}-content`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    
+                    // Carregar dados da aba se necessário
+                    if (window.prostoralLab) {
+                        if (targetTab === 'produtos') {
+                            window.prostoralLab.loadProducts();
+                        } else if (targetTab === 'movimentacoes') {
+                            window.prostoralLab.loadMovements();
+                        } else if (targetTab === 'alertas') {
+                            window.prostoralLab.loadAlerts();
+                        } else if (targetTab === 'relatorios') {
+                            window.prostoralLab.loadReports();
+                        }
+                    }
+                }
+            });
+        });
     </script>
+
+    <!-- Módulo de Laboratório -->
+    <script src="laboratorio.js"></script>
 </body>
 </html>

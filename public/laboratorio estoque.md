@@ -21,7 +21,7 @@
 Contém o cadastro base de cada item do estoque.
 
 | Campo | Tipo | Descrição |
-|--------|------|------------|
+|--------|------|------------|  
 | `id` | `uuid` (PK) | Identificador único do produto (gerado automaticamente) |
 | `qr_code` | `text` UNIQUE | QR Code único (gerado automaticamente pelo trigger a partir do UUID) |
 | `codigo_barras` | `text` | Código de barras físico do produto (opcional) |
