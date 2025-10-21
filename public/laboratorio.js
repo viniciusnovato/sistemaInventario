@@ -36,10 +36,10 @@ class LaboratorioModule {
             btnNewProduct.addEventListener('click', () => this.showProductModal());
         }
         if (btnNewEntry) {
-            btnNewEntry.addEventListener('click', () => this.showMovementModal('entrada'));
+            btnNewEntry.addEventListener('click', () => this.quickScanQRForMovement('entrada'));
         }
         if (btnNewExit) {
-            btnNewExit.addEventListener('click', () => this.showMovementModal('saida'));
+            btnNewExit.addEventListener('click', () => this.quickScanQRForMovement('saida'));
         }
         if (btnScanQR) {
             btnScanQR.addEventListener('click', () => this.scanQRCode());
@@ -907,9 +907,352 @@ class LaboratorioModule {
         };
     }
 
+    // Scan QR Code rápido antes de abrir modal de movimentação
+    async quickScanQRForMovement(tipo) {
+        // Mostrar notificação com opções
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-down';
+        notification.innerHTML = `
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fas fa-qrcode text-6xl text-blue-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    ${tipo === 'entrada' ? 'Nova Entrada' : 'Nova Saída'}
+                </h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                    Escolha como deseja registrar a movimentação
+                </p>
+                <div class="space-y-3">
+                    <button id="btnQuickScanQR" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 touch-target">
+                        <i class="fas fa-camera text-2xl"></i>
+                        <span>Escanear Código</span>
+                    </button>
+                    <button id="btnManualSelect" class="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 touch-target">
+                        <i class="fas fa-hand-pointer text-2xl"></i>
+                        <span>Seleção Manual</span>
+                    </button>
+                    <button id="btnCancelQuickScan" class="w-full text-gray-600 dark:text-gray-400 py-2 hover:text-gray-800 dark:hover:text-white transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Event listeners
+        document.getElementById('btnQuickScanQR').addEventListener('click', async () => {
+            document.body.removeChild(notification);
+            await this.startQRScanForMovement(tipo);
+        });
+        
+        document.getElementById('btnManualSelect').addEventListener('click', () => {
+            document.body.removeChild(notification);
+            this.showMovementModal(tipo);
+        });
+        
+        document.getElementById('btnCancelQuickScan').addEventListener('click', () => {
+            document.body.removeChild(notification);
+        });
+    }
+    
+    // Iniciar scanner de QR Code para movimentação
+    async startQRScanForMovement(tipo) {
+        try {
+            // Criar modal de scanner
+            const scannerModal = document.createElement('div');
+            scannerModal.id = 'qrScannerModal';
+            scannerModal.className = 'fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4';
+            scannerModal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-2xl w-full">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                            <i class="fas fa-qrcode mr-2"></i>
+                            Escanear Código
+                        </h3>
+                        <button id="btnCloseScannerModal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white text-2xl">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="relative bg-black rounded-xl overflow-hidden mb-4" style="height: 400px;">
+                        <video id="qrVideo" class="w-full h-full object-cover"></video>
+                        <div class="absolute inset-0 border-4 border-blue-500 m-12 rounded-xl pointer-events-none"></div>
+                        <div id="scannerStatus" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded-full text-sm">
+                            Posicione o código dentro da moldura
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <p class="text-gray-600 dark:text-gray-400 mb-4">
+                            Ou digite o código manualmente:
+                        </p>
+                        <div class="flex gap-2">
+                            <input type="text" id="manualQRInput" placeholder="QR Code ou Código de Barras" 
+                                   class="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base">
+                            <button id="btnManualQRSubmit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(scannerModal);
+            
+            // Configurar câmera
+            const video = document.getElementById('qrVideo');
+            const statusDiv = document.getElementById('scannerStatus');
+            let stream = null;
+            let scanning = true;
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                video.srcObject = stream;
+                video.play();
+                
+                // Iniciar scanner híbrido (QR Code + Código de Barras)
+                this.startHybridScanner(video, statusDiv, tipo, stream, scanning);
+            } catch (err) {
+                console.error('Erro ao acessar câmera:', err);
+                statusDiv.textContent = 'Erro ao acessar câmera. Use entrada manual.';
+                statusDiv.className += ' bg-red-600';
+            }
+            
+            // Fechar modal
+            const closeScanner = () => {
+                scanning = false;
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                // Parar Quagga se estiver rodando
+                if (typeof Quagga !== 'undefined') {
+                    try {
+                        Quagga.stop();
+                    } catch (e) {
+                        // Quagga pode não estar rodando
+                    }
+                }
+                if (document.body.contains(scannerModal)) {
+                    document.body.removeChild(scannerModal);
+                }
+            };
+            
+            document.getElementById('btnCloseScannerModal').addEventListener('click', closeScanner);
+            
+            // Input manual
+            document.getElementById('btnManualQRSubmit').addEventListener('click', async () => {
+                const code = document.getElementById('manualQRInput').value.trim();
+                if (code) {
+                    // Parar Quagga
+                    if (typeof Quagga !== 'undefined') {
+                        try {
+                            Quagga.stop();
+                        } catch (e) {}
+                    }
+                    closeScanner();
+                    await this.findProductByQRAndOpenModal(code, tipo);
+                }
+            });
+            
+            document.getElementById('manualQRInput').addEventListener('keypress', async (e) => {
+                if (e.key === 'Enter') {
+                    const code = e.target.value.trim();
+                    if (code) {
+                        // Parar Quagga
+                        if (typeof Quagga !== 'undefined') {
+                            try {
+                                Quagga.stop();
+                            } catch (e) {}
+                        }
+                        closeScanner();
+                        await this.findProductByQRAndOpenModal(code, tipo);
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('Erro ao iniciar scanner:', error);
+            this.showNotification('Erro ao iniciar scanner. Use seleção manual.', 'error');
+            this.showMovementModal(tipo);
+        }
+    }
+    
+    // Buscar produto por QR Code ou Código de Barras e abrir modal
+    async findProductByQRAndOpenModal(code, tipo) {
+        try {
+            // Buscar produto por QR Code OU Código de Barras
+            const produto = this.products.find(p => 
+                p.qr_code === code || p.codigo_barras === code
+            );
+            
+            if (produto) {
+                // Determinar qual código foi usado
+                const codeType = produto.qr_code === code ? 'QR Code' : 'Código de Barras';
+                this.showNotification(`✅ Produto encontrado (${codeType}): ${produto.nome_material}`, 'success');
+                // Abrir modal com produto pré-selecionado
+                this.showMovementModal(tipo, produto.id);
+            } else {
+                this.showNotification(`❌ Produto não encontrado: ${code}`, 'error');
+                // Abrir modal normal
+                this.showMovementModal(tipo);
+            }
+        } catch (error) {
+            console.error('Erro ao buscar produto:', error);
+            this.showNotification('Erro ao buscar produto', 'error');
+            this.showMovementModal(tipo);
+        }
+    }
+    
+    // Scanner híbrido (QR Code + Código de Barras)
+    startHybridScanner(video, statusDiv, tipo, stream, scanningRef) {
+        let scanning = true;
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        // Variável para armazenar referência do scanner
+        const scannerState = { scanning: true };
+        
+        const stopScanning = (code, codeType) => {
+            scannerState.scanning = false;
+            scanning = false;
+            stream.getTracks().forEach(track => track.stop());
+            
+            statusDiv.textContent = `✅ ${codeType} detectado!`;
+            statusDiv.className = statusDiv.className.replace('bg-black', 'bg-green-600');
+            
+            // Remover modal
+            const modal = document.getElementById('qrScannerModal');
+            if (modal && document.body.contains(modal)) {
+                document.body.removeChild(modal);
+            }
+            
+            // Buscar produto
+            this.findProductByQRAndOpenModal(code, tipo);
+        };
+        
+        // Tentar iniciar Quagga para código de barras
+        if (typeof Quagga !== 'undefined') {
+            try {
+                const videoElement = document.getElementById('qrVideo');
+                Quagga.init({
+                    inputStream: {
+                        type: "LiveStream",
+                        target: videoElement,
+                        constraints: {
+                            facingMode: "environment"
+                        }
+                    },
+                    decoder: {
+                        readers: [
+                            "ean_reader",      // EAN-13, EAN-8
+                            "ean_8_reader",
+                            "code_128_reader",  // Code 128
+                            "code_39_reader",   // Code 39
+                            "upc_reader",       // UPC-A, UPC-E
+                            "upc_e_reader"
+                        ]
+                    },
+                    locate: true
+                }, (err) => {
+                    if (!err) {
+                        Quagga.start();
+                        console.log('✅ Quagga iniciado para código de barras');
+                        
+                        // Detectar código de barras
+                        Quagga.onDetected((result) => {
+                            if (scannerState.scanning && result && result.codeResult && result.codeResult.code) {
+                                const code = result.codeResult.code;
+                                console.log('Código de barras detectado:', code);
+                                Quagga.stop();
+                                stopScanning(code, 'Código de Barras');
+                            }
+                        });
+                    } else {
+                        console.error('Erro ao iniciar Quagga:', err);
+                    }
+                });
+            } catch (error) {
+                console.error('Erro ao configurar Quagga:', error);
+            }
+        }
+        
+        // Scanner de QR Code com jsQR (em paralelo)
+        if (typeof jsQR !== 'undefined') {
+            const scanQR = () => {
+                if (!scannerState.scanning) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    
+                    if (code) {
+                        console.log('QR Code detectado:', code.data);
+                        if (typeof Quagga !== 'undefined') {
+                            Quagga.stop();
+                        }
+                        stopScanning(code.data, 'QR Code');
+                        return;
+                    }
+                }
+                
+                requestAnimationFrame(scanQR);
+            };
+            
+            scanQR();
+        } else {
+            statusDiv.textContent = 'jsQR não carregado. Apenas código de barras disponível.';
+        }
+    }
+    
+    // Scanner com jsQR (mantido para compatibilidade)
+    scanWithJsQR(video, statusDiv, tipo, stream, scanning) {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        const scan = () => {
+            if (!scanning) return;
+            
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    scanning = false;
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    statusDiv.textContent = '✅ QR Code detectado!';
+                    statusDiv.className += ' bg-green-600';
+                    
+                    // Remover modal
+                    const modal = document.getElementById('qrScannerModal');
+                    if (modal) document.body.removeChild(modal);
+                    
+                    // Buscar produto
+                    this.findProductByQRAndOpenModal(code.data, tipo);
+                    return;
+                }
+            }
+            
+            requestAnimationFrame(scan);
+        };
+        
+        scan();
+    }
+
     scanQRCode() {
-        this.showNotification('Funcionalidade de scanner em desenvolvimento', 'info');
-        // Implementar scanner de QR Code aqui
+        this.showNotification('Use os botões de Entrada ou Saída para escanear QR Code', 'info');
     }
 
     // =====================================================
@@ -999,7 +1342,7 @@ class LaboratorioModule {
         if (pageInfo) pageInfo.textContent = `Página 1 de ${result.totalPages || 1}`;
     }
 
-    async showMovementModal(tipo) {
+    async showMovementModal(tipo, preSelectedProductId = null) {
         const modal = document.getElementById('movementModal');
         const title = document.getElementById('movementModalTitle');
         const form = document.getElementById('movementForm');
@@ -1015,6 +1358,19 @@ class LaboratorioModule {
 
         // Carregar produtos no select
         await this.loadProductsForMovement();
+
+        // Pré-selecionar produto se fornecido
+        if (preSelectedProductId) {
+            const productSelect = document.getElementById('movementProduto');
+            if (productSelect) {
+                productSelect.value = preSelectedProductId;
+                // Destacar o select
+                productSelect.classList.add('ring-4', 'ring-green-500');
+                setTimeout(() => {
+                    productSelect.classList.remove('ring-4', 'ring-green-500');
+                }, 2000);
+            }
+        }
 
         // Configurar opções de motivo
         const motivoSelect = document.getElementById('movementMotivo');

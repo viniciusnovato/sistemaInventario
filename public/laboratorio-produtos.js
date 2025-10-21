@@ -1,13 +1,28 @@
 // laboratorio-produtos.js
 
+// Inicializar cliente Supabase
+const supabase = window.supabase.createClient(
+    window.SUPABASE_CONFIG.url,
+    window.SUPABASE_CONFIG.anonKey
+);
+
 let currentPage = 1;
 let totalPages = 1;
 let currentSort = { field: 'nome_material', order: 'asc' };
 let allProducts = [];
+let currentSession = null;
+
+// Helper function to get session
+async function getSession() {
+    if (currentSession) return currentSession;
+    const { data: { session } } = await supabase.auth.getSession();
+    currentSession = session;
+    return session;
+}
 
 // Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuth();
+document.addEventListener('DOMContentLoaded', async function() {
+    await checkAuth();
     loadProducts();
     loadStats();
     
@@ -21,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Check authentication
 async function checkAuth() {
-    const session = getSession();
+    const session = await getSession();
     if (!session) {
         window.location.href = 'login.html';
         return;
@@ -37,16 +52,17 @@ async function loadProducts() {
         const categoria = document.getElementById('filter-categoria').value;
         const status = document.getElementById('filter-status').value;
         
-        let url = `${API_URL}/laboratorio/produtos?page=${currentPage}&limit=20`;
+        let url = `${window.CONFIG.API_URL}/laboratorio/produtos?page=${currentPage}&limit=20`;
         
         if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
         if (categoria) url += `&categoria=${categoria}`;
         if (status) url += `&status=${status}`;
         if (currentSort.field) url += `&sort=${currentSort.field}&order=${currentSort.order}`;
         
+        const session = await getSession();
         const response = await fetch(url, {
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`
+                'Authorization': `Bearer ${session.access_token}`
             }
         });
         
@@ -141,9 +157,9 @@ function showEmptyState() {
 // Load statistics
 async function loadStats() {
     try {
-        const response = await fetch(`${API_URL}/laboratorio/produtos/stats`, {
+        const response = await fetch(`${window.CONFIG.API_URL}/laboratorio/produtos/stats`, {
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`
+                'Authorization': `Bearer ${(await getSession()).access_token}`
             }
         });
         
@@ -241,15 +257,15 @@ async function saveProduct() {
         }
         
         const url = isEdit 
-            ? `${API_URL}/laboratorio/produtos/${productId}`
-            : `${API_URL}/laboratorio/produtos`;
+            ? `${window.CONFIG.API_URL}/laboratorio/produtos/${productId}`
+            : `${window.CONFIG.API_URL}/laboratorio/produtos`;
         
         const method = isEdit ? 'PUT' : 'POST';
         
         const response = await fetch(url, {
             method: method,
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`,
+                'Authorization': `Bearer ${(await getSession()).access_token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(productData)
@@ -274,9 +290,9 @@ async function saveProduct() {
 // Edit product
 async function editProduct(productId) {
     try {
-        const response = await fetch(`${API_URL}/laboratorio/produtos/${productId}`, {
+        const response = await fetch(`${window.CONFIG.API_URL}/laboratorio/produtos/${productId}`, {
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`
+                'Authorization': `Bearer ${(await getSession()).access_token}`
             }
         });
         
@@ -315,9 +331,9 @@ async function editProduct(productId) {
 // View product details
 async function viewProduct(productId) {
     try {
-        const response = await fetch(`${API_URL}/laboratorio/produtos/${productId}/detalhes`, {
+        const response = await fetch(`${window.CONFIG.API_URL}/laboratorio/produtos/${productId}/detalhes`, {
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`
+                'Authorization': `Bearer ${(await getSession()).access_token}`
             }
         });
         
@@ -436,10 +452,10 @@ async function quickEntry(productId) {
     const motivo = prompt('Motivo da entrada (opcional):') || 'Entrada rápida';
     
     try {
-        const response = await fetch(`${API_URL}/laboratorio/movimentacoes/entrada`, {
+        const response = await fetch(`${window.CONFIG.API_URL}/laboratorio/movimentacoes/entrada`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`,
+                'Authorization': `Bearer ${(await getSession()).access_token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -475,10 +491,10 @@ async function quickExit(productId) {
     const motivo = prompt('Motivo da saída (opcional):') || 'Saída rápida';
     
     try {
-        const response = await fetch(`${API_URL}/laboratorio/movimentacoes/saida`, {
+        const response = await fetch(`${window.CONFIG.API_URL}/laboratorio/movimentacoes/saida`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${getSession().access_token}`,
+                'Authorization': `Bearer ${(await getSession()).access_token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
