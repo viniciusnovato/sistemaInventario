@@ -513,13 +513,35 @@ async function saveItem() {
         formData.append('image', imageFile);
     }
 
-    // Adicionar novos PDFs se selecionados
+    // Fazer upload dos novos PDFs para o Supabase Storage primeiro
     if (selectedPdfs && selectedPdfs.length > 0) {
-        console.log('Adicionando PDFs ao FormData:', selectedPdfs.length);
-        selectedPdfs.forEach((pdf, index) => {
-            console.log(`PDF ${index}:`, pdf.name, pdf.size);
-            formData.append('pdf', pdf);
-        });
+        console.log('Fazendo upload de PDFs para Supabase Storage:', selectedPdfs.length);
+        
+        for (let i = 0; i < selectedPdfs.length; i++) {
+            const pdfFile = selectedPdfs[i];
+            const sanitizedName = pdfFile.name.replace(/[^a-z0-9_.-]/gi, '_').toLowerCase();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
+            
+            console.log(`Uploading PDF ${i + 1}/${selectedPdfs.length}: ${fileName}`);
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('item-pdfs')
+                .upload(fileName, pdfFile, {
+                    cacheControl: '3600',
+                    upsert: false,
+                    contentType: 'application/pdf'
+                });
+            
+            if (uploadError) {
+                console.error('Erro no upload do PDF:', uploadError);
+                throw new Error(`Erro ao fazer upload do PDF: ${uploadError.message}`);
+            }
+            
+            console.log('PDF uploaded:', uploadData.path);
+            formData.append('pdf_paths', uploadData.path);
+        }
+        
+        console.log('Upload de PDFs concluído. Caminhos:', Array.from(formData.getAll('pdf_paths')));
     }
 
     // Adicionar lista de PDFs para remover se houver

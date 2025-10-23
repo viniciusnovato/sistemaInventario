@@ -101,137 +101,241 @@
         .dark .status-quality_control { background-color: #312e81; color: #e0e7ff; }
         .dark .status-delivered { background-color: #065f46; color: #d1fae5; }
         .dark .status-cancelled { background-color: #7f1d1d; color: #fee2e2; }
+        
+        /* Animações */
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-slide-up {
+            animation: slide-up 0.5s ease-out;
+        }
+        
+        /* Tab buttons */
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            background-color: rgb(209 250 229) !important;
+            color: rgb(5 150 105) !important;
+        }
+        
+        .dark .tab-button.active {
+            background-color: rgb(6 78 59) !important;
+            color: rgb(167 243 208) !important;
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
     <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-40 border-b border-gray-200 dark:border-gray-700">
+    <header class="bg-gradient-to-r from-emerald-600 to-teal-700 dark:from-gray-900 dark:to-gray-800 sticky top-0 z-40 shadow-2xl border-b-4 border-emerald-500 dark:border-emerald-600">
         <div class="container mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <!-- Logo e Nome -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-tooth text-white text-xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Portal do Cliente</h1>
-                        <p class="text-xs text-gray-600 dark:text-gray-400">ProStoral - Grupo AreLuna</p>
+                <div class="flex items-center space-x-4">
+                    <button id="openMobileMenu" class="md:hidden p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300">
+                        <i class="fas fa-bars text-white text-xl"></i>
+                    </button>
+                    
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl hover:scale-110 transition-transform duration-300">
+                            <i class="fas fa-tooth text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl md:text-2xl font-black text-white tracking-tight">Portal do Cliente</h1>
+                            <p class="text-xs text-white/80 font-medium">ProStoral - Grupo AreLuna</p>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- User Info e Actions -->
-                <div class="flex items-center space-x-4">
+                <!-- Desktop Actions -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Voltar ao Dashboard -->
+                    <a href="dashboard.html" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 hover:scale-110 group" title="Voltar ao Dashboard">
+                        <i class="fas fa-home text-white"></i>
+                    </a>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="dark-mode-toggle" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 hover:scale-110">
+                        <i class="fas fa-moon dark:hidden text-white"></i>
+                        <i class="fas fa-sun hidden dark:block text-yellow-300"></i>
+                    </button>
+                    
                     <!-- User Info -->
-                    <div class="hidden md:flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                        <i class="fas fa-user-circle text-emerald-600 dark:text-emerald-400"></i>
-                        <div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Usuário</p>
-                            <p class="text-sm font-semibold" id="user-email">Logado</p>
+                    <div class="bg-white/10 backdrop-blur-sm text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-user-circle text-lg"></i>
+                            <div class="text-left">
+                                <p class="text-xs font-medium opacity-90">Usuário</p>
+                                <p id="user-email" class="text-sm font-bold">Logado</p>
+                            </div>
                         </div>
                     </div>
                     
-                    <!-- Dark Mode Toggle -->
-                    <button id="dark-mode-toggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                        <i class="fas fa-moon dark:fa-sun text-gray-700 dark:text-gray-300"></i> Modo Escuro
-                    </button>
-                    
                     <!-- Logout -->
-                    <button id="logout-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400">
-                        <i class="fas fa-sign-out-alt"></i> Sair
+                    <button id="logout-btn" class="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm transition-all duration-300 hover:scale-110" title="Sair">
+                        <i class="fas fa-sign-out-alt text-white"></i>
                     </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 opacity-0 invisible transition-all duration-300"></div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+            <div class="flex flex-col h-full">
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Menu</h2>
+                    <button id="closeMobileMenu" class="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-times text-gray-600 dark:text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 p-6 space-y-6">
+                    <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 rounded-2xl">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold" id="mobileUserEmail">Usuário</p>
+                                <p class="text-sm opacity-90">Logado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <a href="dashboard.html" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-home text-emerald-600 dark:text-emerald-400"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">Dashboard Principal</span>
+                        </a>
+                        
+                        <button id="mobileDarkModeToggle" class="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors w-full text-left">
+                            <i class="fas fa-moon dark:hidden text-emerald-600"></i>
+                            <i class="fas fa-sun hidden dark:block text-yellow-500"></i>
+                            <span class="font-medium text-gray-900 dark:text-white">
+                                <span class="dark:hidden">Modo Escuro</span>
+                                <span class="hidden dark:block">Modo Claro</span>
+                            </span>
+                        </button>
+                        
+                        <button id="mobileLogoutBtn" class="flex items-center space-x-3 p-4 rounded-xl bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors w-full text-left">
+                            <i class="fas fa-sign-out-alt text-red-600 dark:text-red-400"></i>
+                            <span class="font-medium text-red-700 dark:text-red-300">Sair</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </header>
     
-    <!-- Navigation Tabs -->
-    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-[73px] z-30">
-        <div class="container mx-auto px-4">
-            <div class="flex space-x-1 overflow-x-auto">
-                <button class="tab-button active px-6 py-4 font-medium text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 border-b-2 border-transparent hover:border-emerald-600 transition-all" data-tab="dashboard">
-                    <i class="fas fa-chart-line mr-2"></i>Dashboard
-                </button>
-                <button class="tab-button px-6 py-4 font-medium text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 border-b-2 border-transparent hover:border-emerald-600 transition-all" data-tab="orders">
-                    <i class="fas fa-clipboard-list mr-2"></i>Minhas Ordens
-                </button>
-            </div>
-        </div>
-    </nav>
-    
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
-        <!-- Dashboard Tab -->
-        <div id="dashboard-content" class="tab-content active">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                <i class="fas fa-chart-line text-emerald-600 dark:text-emerald-400 mr-2"></i>
-                Dashboard
-            </h2>
+    <!-- Main Content Container -->
+    <main class="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-8">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Navigation Tabs - Estilo Menu Horizontal -->
+            <nav class="mb-6 sm:mb-8 animate-slide-up">
+                <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-0.5 sm:p-1">
+                    <div class="flex justify-between sm:justify-around items-center gap-0.5 sm:gap-1">
+                        <button class="tab-button active group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex-1" data-tab="dashboard">
+                            <i class="fas fa-chart-line text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Dashboard</span>
+                        </button>
+                        <button class="tab-button group flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 flex-1" data-tab="orders">
+                            <i class="fas fa-clipboard-list text-base sm:text-2xl mb-0.5 sm:mb-1 group-hover:scale-110 transition-transform duration-300"></i>
+                            <span class="text-[10px] sm:text-xs font-medium">Minhas Ordens</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
             
-            <!-- KPIs -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <!-- Total OSs -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total de OSs</h3>
-                        <i class="fas fa-clipboard-list text-2xl text-blue-500"></i>
+            <!-- Dashboard Tab -->
+            <div id="dashboard-content" class="tab-content active">
+                <div class="space-y-6">
+                    <!-- KPIs Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- KPI 1: Total OSs -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl">
+                                    <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Total de OSs</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-total-orders">0</p>
+                        </div>
+
+                        <!-- KPI 2: Em Andamento -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-yellow-500 to-orange-700 rounded-2xl">
+                                    <i class="fas fa-cog fa-spin text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Em Andamento</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-orders">0</p>
+                        </div>
+
+                        <!-- KPI 3: Concluídas -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl">
+                                    <i class="fas fa-check-circle text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Concluídas</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-completed-orders">0</p>
+                        </div>
+
+                        <!-- KPI 4: Intercorrências -->
+                        <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white/20 dark:border-gray-700/20 hover:scale-105 transition-all duration-300">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-gradient-to-br from-red-500 to-orange-700 rounded-2xl">
+                                    <i class="fas fa-exclamation-triangle text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Intercorrências</p>
+                            <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-open-issues">0</p>
+                        </div>
                     </div>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-total-orders">0</p>
-                </div>
-                
-                <!-- OSs Em Andamento -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Em Andamento</h3>
-                        <i class="fas fa-cog fa-spin text-2xl text-yellow-500"></i>
+
+                    <!-- Atividades Recentes -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 dark:border-gray-700/20">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+                            <i class="fas fa-history text-emerald-600 dark:text-emerald-400 mr-3"></i>
+                            Atividades Recentes
+                        </h3>
+                        <div id="recent-activities" class="space-y-3">
+                            <p class="text-gray-500 dark:text-gray-400">Carregando...</p>
+                        </div>
                     </div>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-orders">0</p>
-                </div>
-                
-                <!-- OSs Concluídas -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Concluídas</h3>
-                        <i class="fas fa-check-circle text-2xl text-green-500"></i>
-                    </div>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-completed-orders">0</p>
-                </div>
-                
-                <!-- Intercorrências Abertas -->
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center justify-between mb-2">
-                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Intercorrências</h3>
-                        <i class="fas fa-exclamation-triangle text-2xl text-orange-500"></i>
-                    </div>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-open-issues">0</p>
                 </div>
             </div>
-            
-            <!-- Atividades Recentes -->
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    <i class="fas fa-history text-emerald-600 dark:text-emerald-400 mr-2"></i>
-                    Atividades Recentes
-                </h3>
-                <div id="recent-activities" class="space-y-3">
-                    <p class="text-gray-500 dark:text-gray-400">Carregando...</p>
-                </div>
-            </div>
-        </div>
         
-        <!-- Orders Tab -->
-        <div id="orders-content" class="tab-content">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    <i class="fas fa-clipboard-list text-emerald-600 dark:text-emerald-400 mr-2"></i>
-                    Minhas Ordens de Serviço
-                </h2>
-                <button id="btn-new-order" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-all">
-                    <i class="fas fa-plus mr-2"></i>Nova Ordem
-                </button>
-            </div>
-            
-            <!-- Filtros -->
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+            <!-- Orders Tab -->
+            <div id="orders-content" class="tab-content">
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            <i class="fas fa-clipboard-list text-emerald-600 dark:text-emerald-400 mr-2"></i>
+                            Minhas Ordens de Serviço
+                        </h2>
+                        <button id="btn-new-order" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+                            <i class="fas fa-plus mr-2"></i>Nova Ordem
+                        </button>
+                    </div>
+                    
+                    <!-- Filtros -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 dark:border-gray-700/20">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -262,9 +366,9 @@
                 </div>
             </div>
             
-            <!-- Lista de Ordens -->
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                <div class="overflow-x-auto">
+                    <!-- Lista de Ordens -->
+                    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl overflow-hidden border border-white/20 dark:border-gray-700/20">
+                        <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-900">
                             <tr>
@@ -283,6 +387,8 @@
                             </tr>
                         </tbody>
                     </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

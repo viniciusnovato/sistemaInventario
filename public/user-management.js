@@ -8,6 +8,7 @@ class UserManagement {
         this.apiBaseUrl = window.CONFIG.API_URL;
         this.currentEditingUserId = null;
         this.users = [];
+        this.clientsData = []; // Armazena informação de clientes
         this.init();
     }
 
@@ -96,6 +97,17 @@ class UserManagement {
             this.filterUsers();
         });
 
+        // Client checkbox toggle
+        document.getElementById('isClient').addEventListener('change', (e) => {
+            const clientSelectContainer = document.getElementById('clientSelectContainer');
+            if (e.target.checked) {
+                clientSelectContainer.classList.remove('hidden');
+                this.loadClients();
+            } else {
+                clientSelectContainer.classList.add('hidden');
+            }
+        });
+
         // Event delegation for user action buttons
         document.getElementById('usersTableBody').addEventListener('click', (e) => {
             const button = e.target.closest('.user-action-btn');
@@ -152,20 +164,90 @@ class UserManagement {
     async loadUsers() {
         try {
             const token = getAccessToken();
-            const response = await fetch(`${this.apiBaseUrl}/admin/users`, {
+            
+            // Carregar usuários
+            const usersResponse = await fetch(`${this.apiBaseUrl}/admin/users`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            if (!response.ok) throw new Error('Failed to load users');
+            if (!usersResponse.ok) throw new Error('Failed to load users');
 
-            const data = await response.json();
-            this.users = data.users || [];
+            const usersData = await usersResponse.json();
+            this.users = usersData.users || [];
+            
+            // Carregar clientes para identificar quem é cliente
+            const clientsResponse = await fetch(`${this.apiBaseUrl}/prostoral/clients/all`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (clientsResponse.ok) {
+                const clientsData = await clientsResponse.json();
+                this.clientsData = clientsData.clients || [];
+            }
+            
             this.renderUsers(this.users);
         } catch (error) {
             console.error('Error loading users:', error);
             this.showError('Erro ao carregar usuários');
+        }
+    }
+
+    async loadClients() {
+        try {
+            const token = getAccessToken();
+            const selectElement = document.getElementById('clientSelect');
+            
+            console.log('Carregando clientes Prostoral...');
+            selectElement.innerHTML = '<option value="">Carregando clientes Prostoral...</option>';
+            
+            const response = await fetch(`${this.apiBaseUrl}/prostoral/clients/all`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            console.log('Response status:', response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Error response:', errorData);
+                throw new Error(errorData.error || 'Failed to load clients');
+            }
+
+            const data = await response.json();
+            console.log('Clientes carregados:', data);
+            
+            const clients = data.clients || [];
+            
+            if (clients.length === 0) {
+                selectElement.innerHTML = '<option value="">Nenhum cliente Prostoral cadastrado</option>';
+                console.warn('⚠️ Nenhum cliente encontrado na tabela prostoral_clients');
+                return;
+            }
+            
+            selectElement.innerHTML = '<option value="">-- Selecione um Cliente Prostoral --</option>';
+            
+            clients.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = `${client.name} (${client.email})`;
+                if (client.user_id) {
+                    option.textContent += ' ⚠️ Já vinculado';
+                    option.disabled = true;
+                }
+                selectElement.appendChild(option);
+            });
+            
+            console.log('✅ Clientes carregados com sucesso:', clients.length);
+        } catch (error) {
+            console.error('❌ Error loading clients:', error);
+            const selectElement = document.getElementById('clientSelect');
+            selectElement.innerHTML = '<option value="">Erro ao carregar clientes</option>';
+            this.showError('Erro ao carregar clientes Prostoral. Verifique se há clientes cadastrados.');
         }
     }
 
@@ -229,6 +311,7 @@ class UserManagement {
                 <td class="px-6 py-4">
                     <div class="flex flex-wrap gap-1">
                         ${this.renderRoles(user.roles)}
+                        ${this.isUserClient(user.id) ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-800"><i class="fas fa-tooth mr-1"></i>Cliente Prostoral</span>' : ''}
                     </div>
                 </td>
                 <td class="px-6 py-4">
@@ -293,6 +376,11 @@ class UserManagement {
                 ${moduleIcons[module] || '📋'} ${module}
             </span>
         `).join('');
+    }
+
+    isUserClient(userId) {
+        // Verifica se o usuário está vinculado a algum cliente
+        return this.clientsData.some(client => client.user_id === userId);
     }
 
     openUserModal(userId = null) {
@@ -368,6 +456,35 @@ class UserManagement {
                 cb.disabled = true;
             });
         }
+
+        // Carregar cliente vinculado
+        await this.loadClientForUser(userId);
+    }
+
+    async loadClientForUser(userId) {
+        try {
+            const token = getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/prostoral/clients/by-user/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (data.client) {
+                // Usuário está vinculado a um cliente
+                document.getElementById('isClient').checked = true;
+                document.getElementById('clientSelectContainer').classList.remove('hidden');
+                
+                // Carregar lista de clientes e selecionar o atual
+                await this.loadClients();
+                document.getElementById('clientSelect').value = data.client.id;
+            }
+        } catch (error) {
+            console.error('Error loading client for user:', error);
+        }
     }
 
     async saveUser() {
@@ -376,6 +493,8 @@ class UserManagement {
             const email = document.getElementById('userEmail_input').value;
             const password = document.getElementById('userPassword').value;
             const isAdmin = document.getElementById('isAdmin').checked;
+            const isClient = document.getElementById('isClient').checked;
+            const clientId = document.getElementById('clientSelect').value;
 
             // Get selected permissions
             const permissions = [];
@@ -417,12 +536,75 @@ class UserManagement {
                 throw new Error(error.message || 'Failed to save user');
             }
 
+            const result = await response.json();
+            const userId = this.currentEditingUserId || result.user?.id;
+
+            // Vincular ou desvincular cliente
+            if (userId) {
+                if (isClient && clientId) {
+                    // Vincular usuário ao cliente
+                    await this.linkUserToClient(userId, clientId);
+                } else if (!isClient) {
+                    // Desvincular usuário de cliente (se estava vinculado)
+                    await this.unlinkUserFromClient(userId);
+                }
+            }
+
             this.showSuccess(this.currentEditingUserId ? 'Usuário atualizado!' : 'Usuário criado!');
             this.closeUserModal();
             await this.loadUsers();
         } catch (error) {
             console.error('Error saving user:', error);
             this.showError(error.message || 'Erro ao salvar usuário');
+        }
+    }
+
+    async linkUserToClient(userId, clientId) {
+        try {
+            const token = getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/prostoral/clients/link-user`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId, clientId })
+            });
+
+            if (!response.ok) throw new Error('Failed to link user to client');
+
+            console.log('✅ Usuário vinculado ao cliente com sucesso');
+        } catch (error) {
+            console.error('Error linking user to client:', error);
+            throw error;
+        }
+    }
+
+    async unlinkUserFromClient(userId) {
+        try {
+            const token = getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/prostoral/clients/unlink-user`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId })
+            });
+
+            if (!response.ok) {
+                // Se não houver cliente vinculado, não é um erro
+                const data = await response.json();
+                if (data.affectedClients && data.affectedClients.length === 0) {
+                    return;
+                }
+                throw new Error('Failed to unlink user from client');
+            }
+
+            console.log('✅ Usuário desvinculado do cliente');
+        } catch (error) {
+            console.error('Error unlinking user from client:', error);
+            // Não fazer throw aqui para não bloquear o salvamento do usuário
         }
     }
 

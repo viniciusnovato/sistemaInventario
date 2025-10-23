@@ -219,6 +219,18 @@ async function createClientOrder(req, res) {
             return res.status(400).json({ error: 'Campos obrigatórios faltando' });
         }
 
+        // Buscar tenant_id do cliente
+        const { data: client, error: clientError } = await supabase
+            .from('prostoral_clients')
+            .select('tenant_id')
+            .eq('id', clientId)
+            .single();
+
+        if (clientError || !client || !client.tenant_id) {
+            console.error('Erro ao buscar tenant_id:', clientError);
+            return res.status(500).json({ error: 'Erro ao identificar tenant do cliente' });
+        }
+
         // Gerar número da OS
         const orderNumber = `OS-${Date.now()}`;
 
@@ -226,6 +238,7 @@ async function createClientOrder(req, res) {
         const newOrder = {
             order_number: orderNumber,
             client_id: clientId,
+            tenant_id: client.tenant_id,
             patient_name,
             work_type: work_type || null,
             work_description,
@@ -403,6 +416,154 @@ async function createClientIssue(req, res) {
 }
 
 // =====================================================
+// LISTAR TODOS OS CLIENTES (PARA ADMINS)
+// GET /api/prostoral/clients/all
+// =====================================================
+async function getAllClients(req, res) {
+    try {
+        const { data: clients, error } = await supabase
+            .from('prostoral_clients')
+            .select(`
+                id,
+                name,
+                email,
+                phone,
+                address,
+                user_id,
+                created_at
+            `)
+            .order('name');
+
+        if (error) throw error;
+
+        return res.json({
+            success: true,
+            clients: clients || []
+        });
+
+    } catch (error) {
+        console.error('Erro ao listar clientes:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+}
+
+// =====================================================
+// VINCULAR USUÁRIO A CLIENTE
+// POST /api/prostoral/clients/link-user
+// Body: { userId, clientId }
+// =====================================================
+async function linkUserToClient(req, res) {
+    try {
+        const { userId, clientId } = req.body;
+
+        if (!userId || !clientId) {
+            return res.status(400).json({
+                success: false,
+                error: 'userId e clientId são obrigatórios'
+            });
+        }
+
+        // Atualizar o cliente com o user_id
+        const { data, error } = await supabase
+            .from('prostoral_clients')
+            .update({ user_id: userId })
+            .eq('id', clientId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return res.json({
+            success: true,
+            message: 'Usuário vinculado ao cliente com sucesso',
+            client: data
+        });
+
+    } catch (error) {
+        console.error('Erro ao vincular usuário ao cliente:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// =====================================================
+// DESVINCULAR USUÁRIO DE CLIENTE
+// POST /api/prostoral/clients/unlink-user
+// Body: { userId }
+// =====================================================
+async function unlinkUserFromClient(req, res) {
+    try {
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'userId é obrigatório'
+            });
+        }
+
+        // Remover o user_id do cliente
+        const { data, error } = await supabase
+            .from('prostoral_clients')
+            .update({ user_id: null })
+            .eq('user_id', userId)
+            .select();
+
+        if (error) throw error;
+
+        return res.json({
+            success: true,
+            message: 'Usuário desvinculado do cliente com sucesso',
+            affectedClients: data
+        });
+
+    } catch (error) {
+        console.error('Erro ao desvincular usuário do cliente:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// =====================================================
+// OBTER CLIENTE VINCULADO AO USUÁRIO
+// GET /api/prostoral/clients/by-user/:userId
+// =====================================================
+async function getClientByUser(req, res) {
+    try {
+        const { userId } = req.params;
+
+        const { data, error } = await supabase
+            .from('prostoral_clients')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+            throw error;
+        }
+
+        return res.json({
+            success: true,
+            client: data || null
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar cliente por usuário:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// =====================================================
 // EXPORTS
 // =====================================================
 module.exports = {
@@ -412,6 +573,10 @@ module.exports = {
     listClientOrders,
     createClientOrder,
     getClientOrderDetails,
-    createClientIssue
+    createClientIssue,
+    getAllClients,
+    linkUserToClient,
+    unlinkUserFromClient,
+    getClientByUser
 };
 

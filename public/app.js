@@ -199,10 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateImageProgressBar(100, 'Processando imagem...');
                 }
                 
-                // Verificar se há um PDF selecionado
-                const pdfFile = document.getElementById('itemPdf')?.files[0];
+                // Verificar se há PDFs selecionados (múltiplos)
+                const pdfFiles = document.getElementById('itemPdf')?.files;
                 
-                if (pdfFile) {
+                if (pdfFiles && pdfFiles.length > 0) {
                     // Mostrar progresso do upload
                     const pdfUploadProgress = document.getElementById('pdfUploadProgress');
                     const pdfPreview = document.getElementById('pdfPreview');
@@ -210,37 +210,49 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (pdfPreview) pdfPreview.classList.add('hidden');
                     if (pdfUploadProgress) pdfUploadProgress.classList.remove('hidden');
                     
-                    updateProgressBar(0, 'Iniciando upload...');
+                    updatePdfProgressBar(0, 'Preparando upload de PDFs...');
                     
-                    // Upload do PDF para o Supabase Storage
-                    // Sanitizar o nome do arquivo para remover caracteres especiais
-                    const sanitizedPdfName = pdfFile.name
-                        .normalize('NFD') // Normalizar caracteres acentuados
-                        .replace(/[\u0300-\u036f]/g, '') // Remover acentos
-                        .replace(/[^\w\s.-]/g, '') // Remover emojis e caracteres especiais
-                        .replace(/\s+/g, '_') // Substituir espaços por underscore
-                        .toLowerCase(); // Converter para minúsculas
+                    console.log('Fazendo upload de PDFs para Supabase Storage:', pdfFiles.length);
                     
-                    const fileName = `${Date.now()}_${sanitizedPdfName}`;
-                    
-                    updateProgressBar(25, 'Enviando arquivo...');
-                    
-                    const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('item-pdfs')
-                        .upload(fileName, pdfFile);
-                    
-                    if (uploadError) {
-                        if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
-                        if (pdfPreview) pdfPreview.classList.remove('hidden');
-                        throw new Error('Erro ao fazer upload do PDF: ' + uploadError.message);
+                    // Upload de cada PDF para o Supabase Storage
+                    for (let i = 0; i < pdfFiles.length; i++) {
+                        const pdfFile = pdfFiles[i];
+                        
+                        // Sanitizar o nome do arquivo para remover caracteres especiais
+                        const sanitizedPdfName = pdfFile.name
+                            .normalize('NFD') // Normalizar caracteres acentuados
+                            .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+                            .replace(/[^\w\s.-]/g, '') // Remover emojis e caracteres especiais
+                            .replace(/\s+/g, '_') // Substituir espaços por underscore
+                            .toLowerCase(); // Converter para minúsculas
+                        
+                        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedPdfName}`;
+                        
+                        updatePdfProgressBar((i / pdfFiles.length) * 50, `Uploading PDF ${i + 1}/${pdfFiles.length}...`);
+                        console.log(`Uploading PDF ${i + 1}/${pdfFiles.length}: ${fileName}`);
+                        
+                        const { data: uploadData, error: uploadError } = await supabase.storage
+                            .from('item-pdfs')
+                            .upload(fileName, pdfFile, {
+                                cacheControl: '3600',
+                                upsert: false,
+                                contentType: 'application/pdf'
+                            });
+                        
+                        if (uploadError) {
+                            console.error('Erro no upload do PDF:', uploadError);
+                            if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
+                            if (pdfPreview) pdfPreview.classList.remove('hidden');
+                            throw new Error(`Erro ao fazer upload do PDF: ${uploadError.message}`);
+                        }
+                        
+                        console.log('PDF uploaded:', uploadData.path);
+                        // IMPORTANTE: usar 'pdf_paths' (plural) para múltiplos PDFs
+                        formData.append('pdf_paths', uploadData.path);
                     }
                     
-                    updateProgressBar(75, 'Upload concluído!');
-                    
-                    // Adicionar o caminho do PDF ao FormData
-                    formData.append('pdf_path', fileName);
-                    
-                    updateProgressBar(100, 'Processando...');
+                    updatePdfProgressBar(100, 'PDFs enviados com sucesso!');
+                    console.log('Upload de PDFs concluído. Caminhos:', Array.from(formData.getAll('pdf_paths')));
                 }
                 
                 // Enviar dados do item
@@ -870,6 +882,16 @@ function updateImageProgressBar(percent, text) {
     const progressBar = document.getElementById('imageProgressBar');
     const progressText = document.getElementById('imageProgressText');
     const progressPercent = document.getElementById('imageProgressPercent');
+    
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.textContent = text;
+    if (progressPercent) progressPercent.textContent = percent + '%';
+}
+
+function updatePdfProgressBar(percent, text) {
+    const progressBar = document.getElementById('pdfProgressBar');
+    const progressText = document.getElementById('pdfProgressText');
+    const progressPercent = document.getElementById('pdfProgressPercent');
     
     if (progressBar) progressBar.style.width = percent + '%';
     if (progressText) progressText.textContent = text;

@@ -31,8 +31,14 @@ class ClientPortalApp {
         await this.checkClientRole();
 
         // Exibir email do usuário
-        const user = await window.authManager.getUser();
-        document.getElementById('user-email').textContent = user.email;
+        const { data: { user } } = await window.authManager.supabase.auth.getUser();
+        if (user) {
+            document.getElementById('user-email').textContent = user.email;
+            const mobileUserEmail = document.getElementById('mobileUserEmail');
+            if (mobileUserEmail) {
+                mobileUserEmail.textContent = user.email;
+            }
+        }
 
         // Setup event listeners
         this.setupEventListeners();
@@ -83,11 +89,48 @@ class ClientPortalApp {
         if (darkModeToggle) {
             darkModeToggle.addEventListener('click', () => this.toggleDarkMode());
         }
+        
+        const mobileDarkModeToggle = document.getElementById('mobileDarkModeToggle');
+        if (mobileDarkModeToggle) {
+            mobileDarkModeToggle.addEventListener('click', () => this.toggleDarkMode());
+        }
+
+        // Mobile menu
+        const openMobileMenu = document.getElementById('openMobileMenu');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+        const mobileMenu = document.getElementById('mobileMenu');
+        
+        if (openMobileMenu) {
+            openMobileMenu.addEventListener('click', () => {
+                mobileMenu.classList.remove('translate-x-full');
+                mobileMenuOverlay.classList.remove('opacity-0', 'invisible');
+            });
+        }
+        
+        if (closeMobileMenu) {
+            closeMobileMenu.addEventListener('click', () => {
+                mobileMenu.classList.add('translate-x-full');
+                mobileMenuOverlay.classList.add('opacity-0', 'invisible');
+            });
+        }
+        
+        if (mobileMenuOverlay) {
+            mobileMenuOverlay.addEventListener('click', () => {
+                mobileMenu.classList.add('translate-x-full');
+                mobileMenuOverlay.classList.add('opacity-0', 'invisible');
+            });
+        }
 
         // Logout
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
+        }
+        
+        const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+        if (mobileLogoutBtn) {
+            mobileLogoutBtn.addEventListener('click', () => this.logout());
         }
 
         // Nova ordem
@@ -177,8 +220,12 @@ class ClientPortalApp {
     }
 
     async logout() {
-        await window.authManager.logout();
-        window.location.href = '/login.html';
+        const result = await window.authManager.signOut();
+        if (result.success) {
+            window.location.href = '/login.html';
+        } else {
+            alert('Erro ao fazer logout. Tente novamente.');
+        }
     }
 
     // =====================================================

@@ -36,7 +36,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB - mesmo limite do Express
+        fileSize: 50 * 1024 * 1024, // 50MB - suporte para PDFs grandes
         fieldSize: 10 * 1024 * 1024, // 10MB para campos de texto
         fields: 50, // Máximo de 50 campos
         files: 15 // Máximo de 15 arquivos
@@ -464,8 +464,34 @@ app.post('/api/items', authenticateToken, requirePermission('inventory', 'create
             }
         }
 
-        // Se há PDFs, fazer upload para o Supabase Storage
-        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+        // Processar PDFs - pode vir como caminhos pré-enviados ou arquivos via multer
+        console.log('=== DEBUG PDF PATHS (POST) ===');
+        console.log('req.body:', req.body);
+        console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
+        console.log('req.body.pdf_paths:', req.body.pdf_paths);
+        console.log('req.body.pdf_path:', req.body.pdf_path);
+        console.log('req.files:', req.files);
+
+        // Aceitar tanto pdf_paths[] quanto pdf_paths (com ou sem colchetes) e pdf_path (singular)
+        const pdfPaths = req.body['pdf_paths[]'] || req.body.pdf_paths;
+        const pdfPath = req.body.pdf_path;
+
+        if (pdfPaths) {
+            // Múltiplos PDFs já foram enviados para o Supabase Storage pelo frontend
+            console.log('PDF paths (plural) encontrados:', pdfPaths);
+            const paths = Array.isArray(pdfPaths) ? pdfPaths : [pdfPaths];
+            const urls = paths.map(path => `${supabaseUrl}/storage/v1/object/public/item-pdfs/${path}`);
+            pdfUrls.push(...urls);
+            console.log('PDFs adicionados ao array:', urls);
+        } else if (pdfPath) {
+            // Um único PDF já foi enviado para o Supabase Storage pelo frontend
+            console.log('PDF path (singular) encontrado:', pdfPath);
+            const pdfUrl = `${supabaseUrl}/storage/v1/object/public/item-pdfs/${pdfPath}`;
+            pdfUrls.push(pdfUrl);
+            console.log('PDF adicionado ao array:', pdfUrl);
+        } else if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            // Fallback: upload tradicional via multer (ambiente local)
+            console.log('Fazendo upload de PDFs via multer:', req.files.pdf.length);
             for (const pdfFile of req.files.pdf) {
                 const sanitizedName = sanitizeFileName(pdfFile.originalname);
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
@@ -481,6 +507,8 @@ app.post('/api/items', authenticateToken, requirePermission('inventory', 'create
                 }
             }
         }
+
+        console.log('pdfUrls final:', pdfUrls);
 
         // Primeiro, criar o item sem o QR code
         const itemData = {
@@ -686,13 +714,35 @@ app.put('/api/items/:id', authenticateToken, requirePermission('inventory', 'man
             }
         }
 
-        // Debug: Verificar o que está sendo recebido
+        // Processar PDFs - pode vir como caminhos pré-enviados ou arquivos via multer
+        console.log('=== DEBUG PDF PATHS (PUT) ===');
+        console.log('req.body:', req.body);
+        console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
+        console.log('req.body.pdf_paths:', req.body.pdf_paths);
+        console.log('req.body.pdf_path:', req.body.pdf_path);
         console.log('req.files:', req.files);
         console.log('req.files.pdf:', req.files ? req.files.pdf : 'undefined');
-        
-        // Se há novos PDFs, fazer upload para o Supabase Storage
-        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
-            console.log('Fazendo upload de novos PDFs:', req.files.pdf.length);
+
+        // Aceitar tanto pdf_paths[] quanto pdf_paths (com ou sem colchetes) e pdf_path (singular)
+        const pdfPaths = req.body['pdf_paths[]'] || req.body.pdf_paths;
+        const pdfPath = req.body.pdf_path;
+
+        if (pdfPaths) {
+            // Múltiplos PDFs já foram enviados para o Supabase Storage pelo frontend
+            console.log('Processando PDFs já enviados ao Storage (plural):', pdfPaths);
+            const paths = Array.isArray(pdfPaths) ? pdfPaths : [pdfPaths];
+            const newPdfUrls = paths.map(path => `${supabaseUrl}/storage/v1/object/public/item-pdfs/${path}`);
+            pdfUrls.push(...newPdfUrls);
+            console.log('PDFs adicionados ao array:', newPdfUrls);
+        } else if (pdfPath) {
+            // Um único PDF já foi enviado para o Supabase Storage pelo frontend
+            console.log('Processando PDF já enviado ao Storage (singular):', pdfPath);
+            const newPdfUrl = `${supabaseUrl}/storage/v1/object/public/item-pdfs/${pdfPath}`;
+            pdfUrls.push(newPdfUrl);
+            console.log('PDF adicionado ao array:', newPdfUrl);
+        } else if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            // Fallback: upload tradicional via multer (ambiente local)
+            console.log('Fazendo upload de novos PDFs via multer:', req.files.pdf.length);
             console.log('Array pdfUrls antes do upload:', pdfUrls);
             for (const pdfFile of req.files.pdf) {
                 const sanitizedName = sanitizeFileName(pdfFile.originalname);
@@ -2301,6 +2351,12 @@ app.get('/', (req, res) => {
 // =====================================================
 
 // ==================== CLIENTES ====================
+
+// IMPORTANTE: Rotas específicas devem vir ANTES das rotas com parâmetros dinâmicos
+
+// Rotas para gerenciamento de clientes (admin) - DEVEM VIR ANTES de /:id
+app.get('/api/prostoral/clients/all', authenticateToken, prostoralClients.getAllClients);
+app.get('/api/prostoral/clients/by-user/:userId', authenticateToken, prostoralClients.getClientByUser);
 
 // GET - Listar todos os clientes
 app.get('/api/prostoral/clients', authenticateToken, async (req, res) => {
@@ -5322,6 +5378,10 @@ app.get('/api/prostoral/client/orders', authenticateToken, prostoralClients.list
 app.get('/api/prostoral/client/orders/:id', authenticateToken, prostoralClients.getClientOrderDetails);
 app.post('/api/prostoral/client/orders', authenticateToken, prostoralClients.createClientOrder);
 app.post('/api/prostoral/client/orders/:id/issues', authenticateToken, prostoralClients.createClientIssue);
+
+// Rotas POST para gerenciamento de clientes (já declaradas acima junto com GET)
+app.post('/api/prostoral/clients/link-user', authenticateToken, prostoralClients.linkUserToClient);
+app.post('/api/prostoral/clients/unlink-user', authenticateToken, prostoralClients.unlinkUserFromClient);
 
 // Middleware de tratamento de erros 404 - deve vir ANTES do error handler
 app.use((req, res, next) => {
