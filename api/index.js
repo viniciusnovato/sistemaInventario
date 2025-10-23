@@ -655,10 +655,21 @@ app.put('/api/items/:id', upload.fields([
         // Debug: Verificar o que está sendo recebido
         console.log('req.files:', req.files);
         console.log('req.files.pdf:', req.files ? req.files.pdf : 'undefined');
+        console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
         
-        // Se há novos PDFs, fazer upload para o Supabase Storage
-        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
-            console.log('Fazendo upload de novos PDFs:', req.files.pdf.length);
+        // Processar PDFs - pode vir como arquivo (multer) ou como caminhos já enviados
+        const pdfPaths = req.body['pdf_paths[]'];
+        
+        if (pdfPaths) {
+            // PDFs já foram enviados para o Supabase Storage pelo frontend
+            console.log('Processando PDFs já enviados ao Storage:', pdfPaths);
+            const paths = Array.isArray(pdfPaths) ? pdfPaths : [pdfPaths];
+            const newPdfUrls = paths.map(path => `${supabaseUrl}/storage/v1/object/public/item-pdfs/${path}`);
+            pdfUrls.push(...newPdfUrls);
+            console.log('PDFs adicionados ao array:', newPdfUrls);
+        } else if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            // Fallback: upload tradicional via multer (pode exceder 4.5MB na Vercel)
+            console.log('Fazendo upload de novos PDFs via multer:', req.files.pdf.length);
             console.log('Array pdfUrls antes do upload:', pdfUrls);
             for (const pdfFile of req.files.pdf) {
                 const sanitizedName = sanitizeFileName(pdfFile.originalname);

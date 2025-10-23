@@ -513,12 +513,43 @@ async function saveItem() {
         formData.append('image', imageFile);
     }
 
-    // Adicionar novos PDFs se selecionados
+    // Upload de PDFs diretamente para o Supabase Storage (evita limite de 4.5MB da Vercel)
     if (selectedPdfs && selectedPdfs.length > 0) {
-        console.log('Adicionando PDFs ao FormData:', selectedPdfs.length);
-        selectedPdfs.forEach((pdf, index) => {
-            console.log(`PDF ${index}:`, pdf.name, pdf.size);
-            formData.append('pdf', pdf);
+        console.log('Fazendo upload de PDFs para Supabase Storage:', selectedPdfs.length);
+        
+        const pdfPaths = [];
+        
+        for (let i = 0; i < selectedPdfs.length; i++) {
+            const pdfFile = selectedPdfs[i];
+            
+            // Sanitizar o nome do arquivo
+            const sanitizedFileName = pdfFile.name
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w\s.-]/g, '')
+                .replace(/\s+/g, '_')
+                .toLowerCase();
+            
+            const pdfFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedFileName}`;
+            
+            console.log(`Uploading PDF ${i + 1}/${selectedPdfs.length}: ${pdfFileName}`);
+            
+            const { data: pdfUploadData, error: pdfUploadError } = await supabase.storage
+                .from('item-pdfs')
+                .upload(pdfFileName, pdfFile);
+            
+            if (pdfUploadError) {
+                throw new Error(`Erro ao fazer upload do PDF ${i + 1}: ` + pdfUploadError.message);
+            }
+            
+            pdfPaths.push(pdfFileName);
+        }
+        
+        console.log('Upload de PDFs concluído. Caminhos:', pdfPaths);
+        
+        // Adicionar apenas os caminhos ao FormData
+        pdfPaths.forEach(path => {
+            formData.append('pdf_paths[]', path);
         });
     }
 
