@@ -901,6 +901,16 @@ function updateImageProgressBar(percent, text) {
     if (progressPercent) progressPercent.textContent = percent + '%';
 }
 
+function updatePdfProgressBar(percent, text) {
+    const progressBar = document.getElementById('pdfProgressBar');
+    const progressText = document.getElementById('pdfProgressText');
+    const progressPercent = document.getElementById('pdfProgressPercent');
+    
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (progressText) progressText.textContent = text;
+    if (progressPercent) progressPercent.textContent = percent + '%';
+}
+
 function removeImagePreview() {
     const preview = document.getElementById('imagePreview');
     const previewImg = document.getElementById('previewImg');
