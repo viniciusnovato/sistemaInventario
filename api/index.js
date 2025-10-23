@@ -717,14 +717,16 @@ app.put('/api/items/:id', upload.fields([
         }
 
         const itemData = {
+            name: name.trim(),
+            description: description?.trim() || null,
+            category: category?.trim() || null,
+            location: location?.trim() || null,
+            status: status.trim(),
+            categoria_id: categoria_id || null,
+            colaborador_id: colaborador_id || null,
             pdfs: pdfUrls, // Novo campo para múltiplos PDFs
             module_data: {
-                name: name.trim(),
-                description: description?.trim() || null,
-                category: category?.trim() || null,
                 company: company.trim(),
-                location: location?.trim() || null,
-                status: status.trim(),
                 value: value ? parseFloat(value) : null,
                 brand: brand?.trim() || null,
                 model: model?.trim() || null,
@@ -734,8 +736,6 @@ app.put('/api/items/:id', upload.fields([
                 image: imageUrl,
                 pdf: pdfUrls.length > 0 ? pdfUrls[0] : null // Manter compatibilidade com PDF único
             },
-            categoria_id: categoria_id || null,
-            colaborador_id: colaborador_id || null,
             updated_at: new Date().toISOString()
         };
 
