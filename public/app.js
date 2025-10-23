@@ -276,6 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const result = await response.json();
                 
+                console.log('=== RESPONSE FROM SERVER ===');
+                console.log('Status:', response.status);
+                console.log('Result:', result);
+                console.log('Success?:', result.success);
+                
                 if (result.success) {
                     ToastSystem.success('✅ Item criado com sucesso!');
                     addItemForm.reset();
@@ -299,8 +304,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (pdfButtonText) pdfButtonText.textContent = 'Selecionar PDF';
                     
                     // Recarregar itens se disponível
+                    console.log('window.AdvancedSearch:', window.AdvancedSearch);
+                    console.log('loadItems function:', window.AdvancedSearch?.loadItems);
+                    
                     if (window.AdvancedSearch && typeof window.AdvancedSearch.loadItems === 'function') {
+                        console.log('Recarregando itens...');
                         await window.AdvancedSearch.loadItems();
+                        console.log('Itens recarregados!');
+                    } else {
+                        console.warn('AdvancedSearch.loadItems não está disponível. Recarregando página...');
+                        window.location.reload();
                     }
                 } else {
                     // Em caso de erro, esconder progresso e mostrar preview novamente

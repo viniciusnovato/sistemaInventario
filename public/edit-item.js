@@ -567,6 +567,11 @@ async function saveItem() {
         });
 
         const result = await response.json();
+        
+        console.log('=== RESPONSE FROM SERVER (EDIT) ===');
+        console.log('Status:', response.status);
+        console.log('Result:', result);
+        console.log('Success?:', result.success);
         console.log('Resposta da API:', result);
 
         if (response.ok && result.success) {

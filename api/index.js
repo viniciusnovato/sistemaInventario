@@ -477,6 +477,9 @@ app.post('/api/items', upload.fields([
             }
         };
 
+        console.log('=== TENTANDO INSERIR ITEM ===');
+        console.log('pdfUrls:', pdfUrls);
+        console.log('imageUrl:', imageUrl);
         console.log('Item data before insert:', JSON.stringify(itemData, null, 2));
 
         // Inserir o item primeiro para obter o ID
