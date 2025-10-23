@@ -24,7 +24,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB
+        fileSize: 50 * 1024 * 1024 // 50MB - aumentado para permitir PDFs maiores
     },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {

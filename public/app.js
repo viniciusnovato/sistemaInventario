@@ -155,6 +155,20 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const formData = new FormData(addItemForm);
                 
+                // Validar categoria_id antes de enviar
+                const categoria_id = formData.get('categoria_id');
+                
+                if (!categoria_id || categoria_id === '' || categoria_id === 'create_new') {
+                    ToastSystem.error('❌ Por favor, selecione uma categoria válida');
+                    return;
+                }
+                
+                // Remover colaborador_id se estiver vazio (este é opcional)
+                const colaborador_id = formData.get('colaborador_id');
+                if (!colaborador_id || colaborador_id === '' || colaborador_id === 'create_new') {
+                    formData.delete('colaborador_id');
+                }
+                
                 // Verificar se há uma imagem selecionada
                 const imageFile = document.getElementById('itemImage')?.files[0];
                 
@@ -199,49 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateImageProgressBar(100, 'Processando imagem...');
                 }
                 
-                // Verificar se há um PDF selecionado
-                const pdfFile = document.getElementById('itemPdf')?.files[0];
-                
-                if (pdfFile) {
-                    // Mostrar progresso do upload
-                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
-                    const pdfPreview = document.getElementById('pdfPreview');
-                    
-                    if (pdfPreview) pdfPreview.classList.add('hidden');
-                    if (pdfUploadProgress) pdfUploadProgress.classList.remove('hidden');
-                    
-                    updateProgressBar(0, 'Iniciando upload...');
-                    
-                    // Upload do PDF para o Supabase Storage
-                    // Sanitizar o nome do arquivo para remover caracteres especiais
-                    const sanitizedPdfName = pdfFile.name
-                        .normalize('NFD') // Normalizar caracteres acentuados
-                        .replace(/[\u0300-\u036f]/g, '') // Remover acentos
-                        .replace(/[^\w\s.-]/g, '') // Remover emojis e caracteres especiais
-                        .replace(/\s+/g, '_') // Substituir espaços por underscore
-                        .toLowerCase(); // Converter para minúsculas
-                    
-                    const fileName = `${Date.now()}_${sanitizedPdfName}`;
-                    
-                    updateProgressBar(25, 'Enviando arquivo...');
-                    
-                    const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('item-pdfs')
-                        .upload(fileName, pdfFile);
-                    
-                    if (uploadError) {
-                        if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
-                        if (pdfPreview) pdfPreview.classList.remove('hidden');
-                        throw new Error('Erro ao fazer upload do PDF: ' + uploadError.message);
-                    }
-                    
-                    updateProgressBar(75, 'Upload concluído!');
-                    
-                    // Adicionar o caminho do PDF ao FormData
-                    formData.append('pdf_path', fileName);
-                    
-                    updateProgressBar(100, 'Processando...');
-                }
+                // O PDF será enviado diretamente no FormData
+                // O servidor fará o upload para o Supabase Storage
+                // Não precisamos fazer upload aqui no frontend
                 
                 // Enviar dados do item
                 const response = await fetch('/api/items', {
@@ -287,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (imageUploadProgress) imageUploadProgress.classList.add('hidden');
                     if (imagePreview && imageFile) imagePreview.classList.remove('hidden');
                     if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
-                    if (pdfPreview && pdfFile) pdfPreview.classList.remove('hidden');
+                    if (pdfPreview) pdfPreview.classList.remove('hidden');
                     
                     throw new Error(result.message || 'Erro ao criar item');
                 }
