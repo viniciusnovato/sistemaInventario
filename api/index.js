@@ -424,10 +424,16 @@ app.post('/api/items', upload.fields([
         }
 
         // Processar PDFs - pode vir como arquivo (multer) ou como caminhos já enviados
+        console.log('=== DEBUG PDF PATHS (POST) ===');
+        console.log('req.body:', req.body);
+        console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
+        console.log('req.files:', req.files);
+        
         const pdfPaths = req.body['pdf_paths[]'];
         
         if (pdfPaths) {
             // PDFs já foram enviados para o Supabase Storage pelo frontend
+            console.log('PDF paths encontrados:', pdfPaths);
             const paths = Array.isArray(pdfPaths) ? pdfPaths : [pdfPaths];
             pdfUrls = paths.map(path => `${supabaseUrl}/storage/v1/object/public/item-pdfs/${path}`);
         } else if (req.files && req.files.pdf && req.files.pdf.length > 0) {
