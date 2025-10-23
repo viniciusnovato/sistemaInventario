@@ -563,13 +563,9 @@ body {
    UTILIDADES
    ===================================================== */
 
-.hidden {
-    display: none !important;
-}
+/* Classe .hidden removida - será gerenciada pelo Tailwind CSS para responsividade */
 
-.flex {
-    display: flex !important;
-}
+/* Classe .flex removida - será gerenciada pelo Tailwind CSS */
 
 .text-center {
     text-align: center;
@@ -591,5 +587,41 @@ body {
     font-size: 4rem;
     margin-bottom: 20px;
     opacity: 0.5;
+}
+
+/* =====================================================
+   FIX SUBMENU LABORATÓRIO - Responsividade FORÇADA
+   ===================================================== */
+
+/* Forçar exibição dos submenus */
+#lab-submenu-mobile,
+#lab-submenu-desktop {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: 50px !important;
+}
+
+/* Mobile: Mostrar grid 2x2, esconder horizontal */
+@media (max-width: 640px) {
+    #lab-submenu-mobile {
+        display: grid !important;
+    }
+    
+    #lab-submenu-desktop {
+        display: none !important;
+    }
+}
+
+/* Desktop (sm e acima): Esconder grid 2x2, mostrar horizontal */
+@media (min-width: 641px) {
+    #lab-submenu-mobile {
+        display: none !important;
+    }
+    
+    #lab-submenu-desktop {
+        display: flex !important;
+    }
 }
 

@@ -15,6 +15,9 @@ class ProstoralOrdersApp {
         this.apiBaseUrl = '/api/prostoral';
         this.accessibleIssueIds = []; // IDs das intercorrências acessíveis (para filtrar histórico)
         
+        // Realtime subscriptions
+        this.realtimeSubscriptions = [];
+        
         // Filtros
         this.filters = {
             search: '',
@@ -47,6 +50,9 @@ class ProstoralOrdersApp {
         
         // Carregar ordens
         await this.loadOrders();
+        
+        // Iniciar subscriptions real-time
+        this.setupRealtimeSubscriptions();
         
         console.log('Módulo de Ordens de Serviço inicializado!');
     }
@@ -165,6 +171,39 @@ class ProstoralOrdersApp {
             btnStartWork.addEventListener('click', () => this.startWork());
         }
 
+        // Botões do modal de adicionar etapa
+        const btnSaveStage = document.getElementById('btn-save-stage');
+        if (btnSaveStage) {
+            btnSaveStage.addEventListener('click', () => this.saveNewStage());
+        }
+
+        const btnCancelStage = document.getElementById('btn-cancel-stage');
+        if (btnCancelStage) {
+            btnCancelStage.addEventListener('click', () => this.closeAddStageModal());
+        }
+
+        // Enter no input de nova etapa
+        const newStageInput = document.getElementById('new-stage-name');
+        if (newStageInput) {
+            newStageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.saveNewStage();
+                }
+            });
+        }
+
+        // Detectar quando seleciona "Adicionar etapa" no dropdown
+        const workStageSelect = document.getElementById('work-stage');
+        if (workStageSelect) {
+            workStageSelect.addEventListener('change', (e) => {
+                if (e.target.value === '__add_new__') {
+                    this.showAddStageModal();
+                    // Resetar select para vazio
+                    e.target.value = '';
+                }
+            });
+        }
+
         // Botão Scanner QR
         const btnScanQr = document.getElementById('btn-scan-qr');
         if (btnScanQr) {
@@ -174,6 +213,12 @@ class ProstoralOrdersApp {
         const btnCloseQrScanner = document.getElementById('btn-close-qr-scanner');
         if (btnCloseQrScanner) {
             btnCloseQrScanner.addEventListener('click', () => this.closeQrScanner());
+        }
+
+        // Botão Confirmar Criar OS de Reparo
+        const btnConfirmCreateRepair = document.getElementById('btn-confirm-create-repair');
+        if (btnConfirmCreateRepair) {
+            btnConfirmCreateRepair.addEventListener('click', () => this.createRepairOrder());
         }
 
         // Botões de fechar modais
@@ -216,6 +261,12 @@ class ProstoralOrdersApp {
         modalIssueCloseButtons.forEach(btn => {
             btn.addEventListener('click', () => this.closeModal('modal-add-issue'));
         });
+
+        // Modal de criar OS de reparo
+        const modalRepairCloseButtons = document.querySelectorAll('[data-close-modal="modal-create-repair"]');
+        modalRepairCloseButtons.forEach(btn => {
+            btn.addEventListener('click', () => this.closeModal('modal-create-repair'));
+        });
     }
 
     setupDetailsActionButtons() {
@@ -242,6 +293,12 @@ class ProstoralOrdersApp {
         if (btnShowAddIssue) {
             btnShowAddIssue.replaceWith(btnShowAddIssue.cloneNode(true)); // Remove listeners antigos
             document.getElementById('btn-show-add-issue').addEventListener('click', () => this.showAddIssueModal());
+        }
+
+        const btnCreateRepair = document.getElementById('btn-create-repair');
+        if (btnCreateRepair) {
+            btnCreateRepair.replaceWith(btnCreateRepair.cloneNode(true)); // Remove listeners antigos
+            document.getElementById('btn-create-repair').addEventListener('click', () => this.showCreateRepairModal());
         }
 
         const btnConfirmAddIssue = document.getElementById('btn-confirm-add-issue');
@@ -850,8 +907,11 @@ class ProstoralOrdersApp {
         // Materiais
         this.renderOrderMaterials(order.materials || []);
         
-        // Time tracking
-        this.renderOrderTimeTracking(order.time_tracking || []);
+        // Time tracking - passar order completo para calcular tempo em produção
+        this.renderOrderTimeTracking(order.time_tracking || [], order.history || [], order.status);
+        
+        // Reparos vinculados
+        this.renderOrderRepairs(order);
         
         // Intercorrências - guardar IDs acessíveis para filtrar histórico
         this.accessibleIssueIds = (order.issues || []).map(issue => issue.id);
@@ -1066,7 +1126,7 @@ class ProstoralOrdersApp {
         }
     }
 
-    renderOrderTimeTracking(tracking) {
+    renderOrderTimeTracking(tracking, history = [], currentStatus = '') {
         const container = document.getElementById('order-time-tracking-list');
         if (!container) return;
 
@@ -1079,29 +1139,181 @@ class ProstoralOrdersApp {
             this.hideActiveTimer();
         }
 
+        // Calcular tempo em produção (desde status production até delivered/cancelled)
+        let productionTimeHtml = '';
+        
+        const productionStart = history.find(h => 
+            h.change_type === 'status_change' && 
+            h.new_status === 'production'
+        );
+        
+        if (productionStart) {
+            const startDate = new Date(productionStart.changed_at);
+            let endDate = new Date();
+            
+            // Se já foi finalizada, usar a data de finalização
+            const deliveredChange = history.find(h => 
+                h.change_type === 'status_change' && 
+                (h.new_status === 'delivered' || h.new_status === 'cancelled')
+            );
+            
+            if (deliveredChange) {
+                endDate = new Date(deliveredChange.changed_at);
+            }
+            
+            // Calcular diferença em minutos
+            const diffMs = endDate - startDate;
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffMins = diffMinutes % 60;
+            const diffDays = Math.floor(diffHours / 24);
+            const remainingHours = diffHours % 24;
+            
+            let productionTimeDisplay = '';
+            if (diffDays > 0) {
+                productionTimeDisplay = `${diffDays}d ${remainingHours}h ${diffMins}min`;
+            } else if (diffHours > 0) {
+                productionTimeDisplay = `${diffHours}h ${diffMins}min`;
+            } else {
+                productionTimeDisplay = `${diffMins}min`;
+            }
+            
+            const isFinished = deliveredChange ? true : false;
+            const statusText = isFinished ? 'Tempo Total em Produção' : 'Tempo em Produção (Em andamento)';
+            
+            // Classes CSS fixas para Tailwind
+            const bgClass = isFinished 
+                ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700'
+                : 'bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/30 border-2 border-blue-300 dark:border-blue-700';
+            
+            const textClass = isFinished
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-blue-600 dark:text-blue-400';
+            
+            productionTimeHtml = `
+                <!-- Tempo em Produção -->
+                <div class="${bgClass} rounded-lg p-4 mb-4">
+                    <div class="text-center">
+                        <p class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">
+                            <i class="fas fa-clock mr-1"></i>${statusText}
+                        </p>
+                        <p class="text-4xl font-black ${textClass}">${productionTimeDisplay}</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                            <i class="fas fa-play-circle mr-1"></i>Iniciado: ${this.formatDateTime(productionStart.changed_at)}
+                            ${deliveredChange ? `<br><i class="fas fa-check-circle mr-1"></i>Finalizado: ${this.formatDateTime(deliveredChange.changed_at)}` : ''}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
         if (tracking.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-sm">Nenhum registro de tempo</p>';
+            container.innerHTML = productionTimeHtml + '<p class="text-gray-500 text-sm">Nenhum registro de tempo de trabalho</p>';
             return;
         }
 
-        container.innerHTML = tracking.map(t => `
-            <div class="border-l-4 border-blue-500 pl-4 py-2">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-medium text-sm">${this.escapeHtml(t.stage || 'Etapa não especificada')}</p>
-                        <p class="text-xs text-gray-500">Técnico: ${t.technician_id ? 'ID: ' + t.technician_id.substring(0, 8) + '...' : 'Não atribuído'}</p>
-                        <p class="text-xs text-gray-500">
-                            ${this.formatDateTime(t.started_at)} 
-                            ${t.finished_at ? `- ${this.formatDateTime(t.finished_at)}` : '(Em andamento)'}
-                        </p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-medium">${t.duration_minutes || 0} min</p>
-                        <p class="text-xs text-gray-600">${this.formatCurrency(t.labor_cost || 0)}</p>
-                    </div>
+        // Calcular tempo total trabalhado
+        const totalMinutes = tracking.reduce((sum, t) => sum + (t.duration_minutes || 0), 0);
+        
+        // Agrupar por fase
+        const byStage = {};
+        tracking.forEach(t => {
+            const stage = t.stage || 'Não especificado';
+            if (!byStage[stage]) {
+                byStage[stage] = { minutes: 0, cost: 0, records: [] };
+            }
+            byStage[stage].minutes += (t.duration_minutes || 0);
+            byStage[stage].cost += (t.labor_cost || 0);
+            byStage[stage].records.push(t);
+        });
+
+        // Converter minutos em formato legível
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const days = Math.floor(hours / 24);
+        const remainingHours = hours % 24;
+        
+        let timeDisplay = '';
+        if (days > 0) {
+            timeDisplay = `${days}d ${remainingHours}h ${mins}min`;
+        } else if (hours > 0) {
+            timeDisplay = `${hours}h ${mins}min`;
+        } else {
+            timeDisplay = `${mins}min`;
+        }
+
+        let html = productionTimeHtml + `
+            <!-- Resumo Tempo Trabalhado -->
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-4">
+                <div class="text-center">
+                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                        <i class="fas fa-user-clock mr-1"></i>Tempo Efetivamente Trabalhado
+                    </p>
+                    <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">${timeDisplay}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${tracking.length} ${tracking.length === 1 ? 'período' : 'períodos'} de trabalho</p>
                 </div>
             </div>
-        `).join('');
+
+            <!-- Resumo por Fase -->
+            ${Object.keys(byStage).length > 1 ? `
+                <div class="mb-4 space-y-2">
+                    <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Por Fase:</p>
+                    ${Object.entries(byStage).map(([stage, data]) => {
+                        const stageHours = Math.floor(data.minutes / 60);
+                        const stageMins = data.minutes % 60;
+                        const stageTime = stageHours > 0 ? `${stageHours}h ${stageMins}min` : `${stageMins}min`;
+                        return `
+                            <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(stage)}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">${data.records.length} ${data.records.length === 1 ? 'período' : 'períodos'}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold text-blue-600 dark:text-blue-400">${stageTime}</p>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">${this.formatCurrency(data.cost)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : ''}
+
+            <!-- Detalhes de Cada Período -->
+            <div class="space-y-3">
+                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Detalhes dos Períodos:</p>
+                ${tracking.map((t, index) => `
+                    <div class="border-l-4 border-blue-500 bg-white dark:bg-gray-800 rounded-r-lg shadow-sm hover:shadow-md transition-shadow pl-4 pr-3 py-3">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 text-xs font-bold">
+                                        ${index + 1}
+                                    </span>
+                                    <p class="font-semibold text-sm text-gray-900 dark:text-gray-100">${this.escapeHtml(t.stage || 'Etapa não especificada')}</p>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 ml-8">
+                                    <i class="fas fa-user-circle mr-1"></i>
+                                    Técnico: ${t.technician_id ? 'ID: ' + t.technician_id.substring(0, 8) + '...' : 'Não atribuído'}
+                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 ml-8">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    ${this.formatDateTime(t.started_at)} 
+                                    ${t.finished_at ? `→ ${this.formatDateTime(t.finished_at)}` : '<span class="text-green-600 dark:text-green-400 font-medium">(Em andamento)</span>'}
+                                </p>
+                            </div>
+                            <div class="text-right ml-4">
+                                <p class="text-lg font-bold text-blue-600 dark:text-blue-400">${t.duration_minutes || 0} min</p>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">${this.formatCurrency(t.labor_cost || 0)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        container.innerHTML = html;
     }
 
     // =====================================================
@@ -1111,6 +1323,28 @@ class ProstoralOrdersApp {
     showStartWorkModal() {
         const modal = document.getElementById('modal-start-work');
         if (modal) {
+            // Carregar etapas customizadas
+            this.populateStageDropdown();
+            
+            // Limpar seleção
+            const select = document.getElementById('work-stage');
+            if (select) {
+                select.value = '';
+                
+                // Re-adicionar listener para detectar "Adicionar etapa"
+                // (Remove listeners antigos primeiro)
+                const newSelect = select.cloneNode(true);
+                select.parentNode.replaceChild(newSelect, select);
+                
+                newSelect.addEventListener('change', (e) => {
+                    if (e.target.value === '__add_new__') {
+                        this.showAddStageModal();
+                        // Resetar select para vazio
+                        e.target.value = '';
+                    }
+                });
+            }
+            
             modal.classList.remove('hidden');
         }
     }
@@ -1123,12 +1357,14 @@ class ProstoralOrdersApp {
 
         try {
             const stage = document.getElementById('work-stage').value;
-            const hourlyRate = parseFloat(document.getElementById('work-hourly-rate').value);
 
-            if (!stage || !hourlyRate) {
-                this.showError('Por favor, preencha todos os campos');
+            if (!stage) {
+                this.showError('Por favor, selecione uma etapa');
                 return;
             }
+
+            // Taxa horária fixa de 70€
+            const hourlyRate = 70.00;
 
             const token = await window.authManager.getAccessToken();
             
@@ -1159,6 +1395,106 @@ class ProstoralOrdersApp {
         } catch (error) {
             console.error('Erro ao iniciar trabalho:', error);
             this.showError('Erro ao iniciar trabalho');
+        }
+    }
+
+    // Gerenciar etapas customizadas
+    loadCustomStages() {
+        const stages = localStorage.getItem('customWorkStages');
+        return stages ? JSON.parse(stages) : [];
+    }
+
+    saveCustomStage(stageName) {
+        const stages = this.loadCustomStages();
+        
+        // Gerar ID único
+        const stageId = `custom_${stageName.toLowerCase().replace(/\s+/g, '_')}`;
+        
+        // Verificar se já existe
+        if (stages.some(s => s.id === stageId)) {
+            this.showError('Esta etapa já existe!');
+            return false;
+        }
+        
+        stages.push({
+            id: stageId,
+            name: stageName
+        });
+        
+        localStorage.setItem('customWorkStages', JSON.stringify(stages));
+        return true;
+    }
+
+    populateStageDropdown() {
+        const select = document.getElementById('work-stage');
+        if (!select) return;
+        
+        // Carregar etapas customizadas
+        const customStages = this.loadCustomStages();
+        
+        // Remover etapas customizadas antigas (se houver)
+        const options = select.querySelectorAll('option[data-custom="true"]');
+        options.forEach(opt => opt.remove());
+        
+        // Adicionar etapas customizadas antes da opção "Adicionar etapa"
+        const addNewOption = select.querySelector('option[value="__add_new__"]');
+        
+        customStages.forEach(stage => {
+            const option = document.createElement('option');
+            option.value = stage.id;
+            option.textContent = stage.name;
+            option.setAttribute('data-custom', 'true');
+            
+            if (addNewOption) {
+                select.insertBefore(option, addNewOption);
+            } else {
+                select.appendChild(option);
+            }
+        });
+    }
+
+    showAddStageModal() {
+        const modal = document.getElementById('modal-add-stage');
+        const input = document.getElementById('new-stage-name');
+        
+        if (modal && input) {
+            input.value = '';
+            modal.classList.remove('hidden');
+            
+            // Focar no input
+            setTimeout(() => input.focus(), 100);
+        }
+    }
+
+    closeAddStageModal() {
+        const modal = document.getElementById('modal-add-stage');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    saveNewStage() {
+        const input = document.getElementById('new-stage-name');
+        const stageName = input?.value?.trim();
+        
+        if (!stageName) {
+            this.showError('Digite um nome para a etapa');
+            return;
+        }
+        
+        if (this.saveCustomStage(stageName)) {
+            this.showSuccess(`Etapa "${stageName}" adicionada com sucesso!`);
+            this.closeAddStageModal();
+            
+            // Atualizar dropdown
+            this.populateStageDropdown();
+            
+            // Selecionar a nova etapa
+            const select = document.getElementById('work-stage');
+            const stageId = `custom_${stageName.toLowerCase().replace(/\s+/g, '_')}`;
+            if (select) {
+                select.value = stageId;
+            }
         }
     }
 
@@ -1963,6 +2299,355 @@ class ProstoralOrdersApp {
     showSuccess(message) {
         // Implementar toast/notification
         alert(message); // Temporário
+    }
+
+    // =====================================================
+    // SISTEMA DE REPAROS
+    // =====================================================
+
+    async loadOrderRepairs(orderId) {
+        try {
+            const token = await window.authManager.getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/orders/${orderId}/related`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao carregar reparos');
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Erro ao carregar reparos:', error);
+            return null;
+        }
+    }
+
+    async renderOrderRepairs(order) {
+        const repairsSection = document.getElementById('repairs-section');
+        const repairsList = document.getElementById('order-repairs-list');
+        
+        if (!repairsSection || !repairsList) return;
+
+        // Só mostrar seção para OSs finalizadas que NÃO são reparos
+        // Nota: is_repair pode ser undefined em OSs antigas, então tratamos como false
+        if (order.status !== 'delivered' || order.is_repair === true) {
+            repairsSection.classList.add('hidden');
+            return;
+        }
+
+        // Mostrar seção (mesmo se não houver reparos ou houver erro)
+        repairsSection.classList.remove('hidden');
+        
+        // Carregar reparos vinculados
+        const data = await this.loadOrderRepairs(order.id);
+        
+        if (!data || !data.success) {
+            // Mostrar mensagem de que não há reparos
+            repairsList.innerHTML = `
+                <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-tools text-3xl mb-2 opacity-50"></i>
+                    <p class="text-sm">Nenhum reparo vinculado a esta OS</p>
+                </div>
+            `;
+            return;
+        }
+
+        const repairs = data.repairs || [];
+        
+        if (repairs.length === 0) {
+            repairsList.innerHTML = `
+                <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-tools text-3xl mb-2 opacity-50"></i>
+                    <p class="text-sm">Nenhum reparo vinculado a esta OS</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Renderizar lista de reparos
+        repairsList.innerHTML = repairs.map(repair => `
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800 mb-3">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-mono font-bold text-blue-600 dark:text-blue-400">${this.escapeHtml(repair.order_number)}</span>
+                            ${this.renderRepairTypeBadge(repair.repair_type)}
+                            ${this.renderStatusBadge(repair.status)}
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${this.escapeHtml(repair.work_description || '-')}</p>
+                    </div>
+                    <button data-repair-id="${repair.id}" class="btn-view-repair text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <span><i class="fas fa-calendar mr-1"></i>${this.formatDate(repair.created_at)}</span>
+                    <span><i class="fas fa-euro-sign mr-1"></i>${this.formatCurrency(repair.total_cost || 0)}</span>
+                </div>
+                ${repair.repair_reason ? `
+                    <div class="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-300">
+                        <strong>Motivo:</strong> ${this.escapeHtml(repair.repair_reason)}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+
+        // Adicionar event listeners para ver detalhes dos reparos
+        repairsList.querySelectorAll('.btn-view-repair').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const repairId = btn.dataset.repairId;
+                this.viewOrderDetails(repairId);
+            });
+        });
+    }
+
+    renderRepairTypeBadge(repairType) {
+        const badges = {
+            'warranty': '<span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs rounded-full">🛡️ Garantia</span>',
+            'billable': '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 text-xs rounded-full">💰 Pago</span>',
+            'goodwill': '<span class="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 text-xs rounded-full">💝 Cortesia</span>'
+        };
+        return badges[repairType] || '';
+    }
+
+    showCreateRepairModal() {
+        const modal = document.getElementById('modal-create-repair');
+        if (!modal || !this.currentOrder) return;
+
+        // Preencher dados da OS principal
+        document.getElementById('repair-parent-order-number').textContent = this.currentOrder.order_number;
+        document.getElementById('repair-client-name').textContent = this.currentOrder.client?.name || 'N/A';
+        document.getElementById('repair-patient-name').textContent = this.currentOrder.patient_name || 'N/A';
+        
+        // Preview do número da OS de reparo
+        this.updateRepairNumberPreview();
+
+        // Limpar campos
+        document.getElementById('repair-type').value = '';
+        document.getElementById('repair-reason').value = '';
+        document.getElementById('repair-work-description').value = '';
+        document.getElementById('repair-due-date').value = '';
+        document.getElementById('repair-priority').value = 'high';
+
+        modal.classList.remove('hidden');
+    }
+
+    async updateRepairNumberPreview() {
+        if (!this.currentOrder) return;
+        
+        const previewEl = document.getElementById('repair-preview-number');
+        if (!previewEl) return;
+
+        try {
+            const data = await this.loadOrderRepairs(this.currentOrder.id);
+            const repairCount = data?.repairs?.length || 0;
+            const nextNumber = `${this.currentOrder.order_number}-R${repairCount + 1}`;
+            previewEl.textContent = nextNumber;
+        } catch (error) {
+            previewEl.textContent = `${this.currentOrder.order_number}-R?`;
+        }
+    }
+
+    async createRepairOrder() {
+        try {
+            const repairType = document.getElementById('repair-type').value;
+            const repairReason = document.getElementById('repair-reason').value;
+            const workDescription = document.getElementById('repair-work-description').value;
+            const dueDate = document.getElementById('repair-due-date').value;
+            const priority = document.getElementById('repair-priority').value;
+
+            // Validação
+            if (!repairType || !repairReason) {
+                this.showError('Preencha os campos obrigatórios');
+                return;
+            }
+
+            const token = await window.authManager.getAccessToken();
+            const response = await fetch(`${this.apiBaseUrl}/orders/${this.currentOrder.id}/repair`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    repair_type: repairType,
+                    repair_reason: repairReason,
+                    work_description: workDescription,
+                    due_date: dueDate || null,
+                    priority: priority
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao criar OS de reparo');
+            }
+
+            const data = await response.json();
+            
+            this.showSuccess('✅ OS de Reparo criada com sucesso!');
+            
+            // Fechar modal
+            document.getElementById('modal-create-repair').classList.add('hidden');
+            
+            // Recarregar detalhes da OS para atualizar a lista de reparos
+            await this.viewOrderDetails(this.currentOrder.id);
+
+        } catch (error) {
+            console.error('Erro ao criar OS de reparo:', error);
+            this.showError(error.message || 'Erro ao criar OS de reparo');
+        }
+    }
+
+    // =====================================================
+    // REAL-TIME SUBSCRIPTIONS
+    // =====================================================
+
+    setupRealtimeSubscriptions() {
+        console.log('🔴 Configurando subscriptions real-time...');
+        
+        // Verificar se o Supabase está disponível
+        if (!window.authManager || !window.authManager.supabase) {
+            console.warn('⚠️ Supabase não disponível ainda, tentando novamente em 2s...');
+            setTimeout(() => this.setupRealtimeSubscriptions(), 2000);
+            return;
+        }
+        
+        // Unsubscribe de qualquer subscription anterior
+        this.cleanupRealtimeSubscriptions();
+        
+        const supabase = window.authManager.supabase;
+        
+        // Subscribe a mudanças nas work orders
+        const ordersSubscription = supabase
+            .channel('prostoral_work_orders_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'prostoral_work_orders'
+                },
+                (payload) => this.handleOrderChange(payload)
+            )
+            .subscribe();
+        
+        this.realtimeSubscriptions.push(ordersSubscription);
+        
+        // Subscribe a mudanças nas intercorrências
+        const issuesSubscription = supabase
+            .channel('prostoral_work_order_issues_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'prostoral_work_order_issues'
+                },
+                (payload) => this.handleIssueChange(payload)
+            )
+            .subscribe();
+        
+        this.realtimeSubscriptions.push(issuesSubscription);
+        
+        // Subscribe a mudanças no histórico
+        const historySubscription = supabase
+            .channel('prostoral_work_order_status_history_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'prostoral_work_order_status_history'
+                },
+                (payload) => this.handleHistoryChange(payload)
+            )
+            .subscribe();
+        
+        this.realtimeSubscriptions.push(historySubscription);
+        
+        console.log('✅ Real-time subscriptions ativas');
+    }
+
+    cleanupRealtimeSubscriptions() {
+        if (this.realtimeSubscriptions.length > 0 && window.authManager?.supabase) {
+            console.log('🔴 Limpando subscriptions antigas...');
+            this.realtimeSubscriptions.forEach(sub => {
+                window.authManager.supabase.removeChannel(sub);
+            });
+            this.realtimeSubscriptions = [];
+        }
+    }
+
+    handleOrderChange(payload) {
+        console.log('🔔 Mudança detectada em Work Order:', payload);
+        
+        const { eventType, new: newRecord, old: oldRecord } = payload;
+        
+        // Se estamos vendo a lista de ordens, atualizar
+        const ordersContent = document.getElementById('orders-content');
+        if (ordersContent && !ordersContent.classList.contains('hidden')) {
+            this.showRealtimeNotification('Uma ordem foi atualizada. Atualizando lista...');
+            this.loadOrders();
+        }
+        
+        // Se estamos vendo os detalhes desta ordem específica, atualizar
+        if (this.currentOrder && (newRecord?.id === this.currentOrder.id || oldRecord?.id === this.currentOrder.id)) {
+            if (eventType === 'DELETE') {
+                this.showRealtimeNotification('⚠️ Esta ordem foi excluída');
+                this.closeModal('modal-order-details');
+                this.loadOrders();
+            } else {
+                this.showRealtimeNotification('Ordem atualizada. Recarregando detalhes...');
+                this.viewOrderDetails(this.currentOrder.id);
+            }
+        }
+    }
+
+    handleIssueChange(payload) {
+        console.log('🔔 Mudança detectada em Intercorrência:', payload);
+        
+        const { new: newRecord, old: oldRecord } = payload;
+        const workOrderId = newRecord?.work_order_id || oldRecord?.work_order_id;
+        
+        // Se estamos vendo os detalhes desta ordem, atualizar
+        if (this.currentOrder && workOrderId === this.currentOrder.id) {
+            this.showRealtimeNotification('Nova intercorrência adicionada');
+            this.viewOrderDetails(this.currentOrder.id);
+        }
+    }
+
+    handleHistoryChange(payload) {
+        console.log('🔔 Novo registro de histórico:', payload);
+        
+        const { new: newRecord } = payload;
+        
+        // Se estamos vendo os detalhes desta ordem, atualizar histórico
+        if (this.currentOrder && newRecord?.work_order_id === this.currentOrder.id) {
+            this.viewOrderDetails(this.currentOrder.id);
+        }
+    }
+
+    showRealtimeNotification(message) {
+        // Criar notificação flutuante
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-20 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in-down';
+        notification.innerHTML = `
+            <div class="flex items-center gap-2">
+                <i class="fas fa-sync-alt fa-spin"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            notification.classList.add('animate-fade-out-up');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 }
 

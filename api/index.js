@@ -18,6 +18,10 @@ function sanitizeFileName(filename) {
 const { createClient } = require('@supabase/supabase-js');
 const { authenticateToken, requirePermission, requireRole, requireAdmin, getCurrentUser } = require('./middleware/auth');
 
+// Importar módulo de Ordens de Serviço
+const prostoralOrders = require('./prostoral-ordens');
+const prostoralClients = require('./prostoral-clientes');
+
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -145,7 +149,11 @@ app.use(helmet({
             ],
             imgSrc: ["'self'", "data:", "https:"],
             fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-            connectSrc: ["'self'", process.env.SUPABASE_URL]
+            connectSrc: [
+                "'self'", 
+                process.env.SUPABASE_URL,
+                process.env.SUPABASE_URL?.replace('https://', 'wss://') // WebSocket para Realtime
+            ]
         }
     }
 }));
@@ -2562,217 +2570,8 @@ app.get('/api/prostoral/inventory/low-stock', authenticateToken, async (req, res
 });
 
 // ==================== ORDENS DE SERVIÇO ====================
-
-// GET - Listar ordens de serviço
-app.get('/api/prostoral/orders', authenticateToken, async (req, res) => {
-    try {
-        const { status, client_id, search, work_type_id } = req.query;
-        
-        let query = supabaseAdmin
-            .from('prostoral_work_orders')
-            .select(`
-                *,
-                client:prostoral_clients(id, name, clinic_name, dentist_name),
-                work_type:prostoral_work_types(id, name, category)
-            `)
-            .order('created_at', { ascending: false });
-        
-        if (status) {
-            query = query.eq('status', status);
-        }
-        
-        if (client_id) {
-            query = query.eq('client_id', client_id);
-        }
-        
-        if (work_type_id) {
-            query = query.eq('work_type_id', work_type_id);
-        }
-        
-        if (search) {
-            query = query.or(`work_order_number.ilike.%${search}%,patient_name.ilike.%${search}%,notes.ilike.%${search}%`);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        res.json({ success: true, orders: data });
-    } catch (error) {
-        console.error('Erro ao buscar ordens de serviço:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// GET - Buscar OS por ID
-app.get('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_orders')
-            .select(`
-                *,
-                client:prostoral_clients(*),
-                work_type:prostoral_work_types(*),
-                materials:prostoral_work_order_materials(
-                    *,
-                    inventory_item:prostoral_inventory(id, name, code, unit)
-                ),
-                status_history:prostoral_work_order_status_history(*)
-            `)
-            .eq('id', id)
-            .single();
-        
-        if (error) throw error;
-        
-        res.json({ success: true, order: data });
-    } catch (error) {
-        console.error('Erro ao buscar ordem de serviço:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// POST - Criar nova OS
-app.post('/api/prostoral/orders', authenticateToken, async (req, res) => {
-    try {
-        const orderData = {
-            ...req.body,
-            tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
-            created_by: req.user.id,
-            status: req.body.status || 'pending'
-        };
-        
-        // Gerar número de OS
-        const { data: orderNumber, error: numberError } = await supabaseAdmin
-            .rpc('get_next_work_order_number', {
-                p_tenant_id: orderData.tenant_id
-            });
-        
-        if (numberError) throw numberError;
-        
-        orderData.work_order_number = orderNumber;
-        
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_orders')
-            .insert([orderData])
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        res.json({ success: true, order: data });
-    } catch (error) {
-        console.error('Erro ao criar ordem de serviço:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// PUT - Atualizar OS
-app.put('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const orderData = {
-            ...req.body,
-            updated_by: req.user.id
-        };
-        
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_orders')
-            .update(orderData)
-            .eq('id', id)
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        res.json({ success: true, order: data });
-    } catch (error) {
-        console.error('Erro ao atualizar ordem de serviço:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// PATCH - Atualizar status da OS
-app.patch('/api/prostoral/orders/:id/status', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status, notes } = req.body;
-        
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_orders')
-            .update({ 
-                status,
-                updated_by: req.user.id
-            })
-            .eq('id', id)
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        // Registrar no histórico (o trigger já faz isso, mas podemos adicionar notas extras)
-        if (notes) {
-            await supabaseAdmin
-                .from('prostoral_work_order_status_history')
-                .insert([{
-                    work_order_id: id,
-                    from_status: data.status,
-                    to_status: status,
-                    notes,
-                    changed_by: req.user.id
-                }]);
-        }
-        
-        res.json({ success: true, order: data });
-    } catch (error) {
-        console.error('Erro ao atualizar status:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// DELETE - Cancelar OS
-app.delete('/api/prostoral/orders/:id', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_orders')
-            .update({ 
-                status: 'cancelled',
-                is_active: false,
-                updated_by: req.user.id
-            })
-            .eq('id', id)
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        res.json({ success: true, order: data });
-    } catch (error) {
-        console.error('Erro ao cancelar ordem de serviço:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// GET - Tipos de trabalho disponíveis
-app.get('/api/prostoral/work-types', authenticateToken, async (req, res) => {
-    try {
-        const { data, error } = await supabaseAdmin
-            .from('prostoral_work_types')
-            .select('*')
-            .eq('is_active', true)
-            .order('name', { ascending: true });
-        
-        if (error) throw error;
-        
-        res.json({ success: true, workTypes: data });
-    } catch (error) {
-        console.error('Erro ao buscar tipos de trabalho:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
+// As rotas de Ordens de Serviço foram movidas para o módulo prostoral-ordens.js
+// Veja a seção "ORDENS DE SERVIÇO - NOVO MÓDULO" no final deste arquivo
 
 // ==================== KITS DE PROCEDIMENTOS ====================
 
@@ -2782,34 +2581,50 @@ app.get('/api/prostoral/kits', authenticateToken, async (req, res) => {
         const { work_type_id, search } = req.query;
         
         let query = supabaseAdmin
-            .from('prostoral_procedure_kits')
+            .from('kits')
             .select(`
-                *,
-                work_type:prostoral_work_types(id, name, category),
-                items:prostoral_kit_items(
+                id,
+                nome,
+                tipo,
+                descricao,
+                created_at,
+                kit_produtos(
                     id,
-                    standard_quantity,
-                    unit,
-                    display_order,
-                    inventory_item:prostoral_inventory(id, name, code, unit, unit_cost)
+                    quantidade,
+                    produto:prostoral_inventory!kit_produtos_produto_id_fkey(
+                        id,
+                        name,
+                        code,
+                        unit,
+                        unit_cost
+                    )
                 )
             `)
-            .eq('is_active', true)
-            .order('name', { ascending: true });
-        
-        if (work_type_id) {
-            query = query.eq('work_type_id', work_type_id);
-        }
+            .order('nome', { ascending: true });
         
         if (search) {
-            query = query.ilike('name', `%${search}%`);
+            query = query.ilike('nome', `%${search}%`);
         }
         
         const { data, error } = await query;
         
         if (error) throw error;
         
-        res.json({ success: true, kits: data });
+        // Mapear para o formato esperado pelo frontend
+        const kitsFormatados = data.map(kit => ({
+            id: kit.id,
+            name: kit.nome,
+            tipo: kit.tipo,
+            description: kit.descricao,
+            items: kit.kit_produtos.map(kp => ({
+                id: kp.id,
+                standard_quantity: kp.quantidade,
+                unit: kp.produto?.unit || 'un',
+                inventory_item: kp.produto
+            }))
+        }));
+        
+        res.json({ success: true, kits: kitsFormatados });
     } catch (error) {
         console.error('Erro ao buscar kits:', error);
         res.status(500).json({ error: error.message });
@@ -5466,6 +5281,47 @@ app.get('/api/laboratorio/relatorios/consumo/export', authenticateToken, async (
         res.status(500).json({ error: error.message });
     }
 });
+
+// ==================== ORDENS DE SERVIÇO - NOVO MÓDULO ====================
+
+// Rotas principais de CRUD
+app.get('/api/prostoral/orders', authenticateToken, prostoralOrders.listOrders);
+app.get('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.getOrderDetails);
+app.post('/api/prostoral/orders', authenticateToken, prostoralOrders.createOrder);
+app.put('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.updateOrder);
+app.delete('/api/prostoral/orders/:id', authenticateToken, prostoralOrders.deleteOrder);
+
+// Rotas de Materiais
+app.post('/api/prostoral/orders/:id/materials', authenticateToken, prostoralOrders.addMaterial);
+app.post('/api/prostoral/orders/:id/materials/kit', authenticateToken, prostoralOrders.addKit);
+app.delete('/api/prostoral/orders/:id/materials/:materialId', authenticateToken, prostoralOrders.removeMaterial);
+
+// Rotas de Time Tracking
+app.post('/api/prostoral/orders/:id/time-tracking', authenticateToken, prostoralOrders.startTimeTracking);
+app.put('/api/prostoral/orders/:id/time-tracking/:trackingId', authenticateToken, prostoralOrders.updateTimeTracking);
+app.get('/api/prostoral/orders/:id/time-tracking', authenticateToken, prostoralOrders.listTimeTracking);
+
+// Rotas de Intercorrências/Issues
+app.post('/api/prostoral/orders/:id/issues', authenticateToken, prostoralOrders.createIssue);
+app.put('/api/prostoral/orders/:id/issues/:issueId', authenticateToken, prostoralOrders.updateIssue);
+app.get('/api/prostoral/orders/:id/issues', authenticateToken, prostoralOrders.listIssues);
+
+// Rota de Histórico
+app.get('/api/prostoral/orders/:id/history', authenticateToken, prostoralOrders.getOrderHistory);
+
+// Rotas de Reparo
+app.post('/api/prostoral/orders/:id/repair', authenticateToken, prostoralOrders.createRepairOrder);
+app.get('/api/prostoral/orders/:id/related', authenticateToken, prostoralOrders.getRelatedOrders);
+
+// ==================== PORTAL DO CLIENTE ====================
+// Rotas exclusivas para clientes (acesso restrito)
+app.get('/api/prostoral/check-client-role', authenticateToken, prostoralClients.checkClientRole);
+app.get('/api/prostoral/client/dashboard/kpis', authenticateToken, prostoralClients.getClientDashboardKPIs);
+app.get('/api/prostoral/client/orders/recent', authenticateToken, prostoralClients.getClientRecentOrders);
+app.get('/api/prostoral/client/orders', authenticateToken, prostoralClients.listClientOrders);
+app.get('/api/prostoral/client/orders/:id', authenticateToken, prostoralClients.getClientOrderDetails);
+app.post('/api/prostoral/client/orders', authenticateToken, prostoralClients.createClientOrder);
+app.post('/api/prostoral/client/orders/:id/issues', authenticateToken, prostoralClients.createClientIssue);
 
 // Middleware de tratamento de erros 404 - deve vir ANTES do error handler
 app.use((req, res, next) => {

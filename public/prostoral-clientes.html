@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <title>🦷 Portal do Cliente - ProStoral</title>
+    
+    <!-- Tailwind CSS v3+ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- QR Code Generator (Local) -->
+    <script src="qrcode.min.js"></script>
+    
+    <!-- Estilos principais -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="responsive.css">
+    
+    <!-- Scripts de autenticação -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    darkMode: 'class',
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: {
+                                    50: '#ecfdf5',
+                                    100: '#d1fae5',
+                                    200: '#a7f3d0',
+                                    300: '#6ee7b7',
+                                    400: '#34d399',
+                                    500: '#10b981',
+                                    600: '#059669',
+                                    700: '#047857',
+                                    800: '#065f46',
+                                    900: '#064e3b',
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    
+    <!-- Custom Styles -->
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block !important;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+            background-color: #f8fafc !important;
+            color: #111827;
+        }
+        
+        html.dark {
+            background-color: #0f172a !important;
+            color: #f8fafc;
+        }
+        
+        /* Badge de status */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-received { background-color: #dbeafe; color: #1e40af; }
+        .status-design { background-color: #fef3c7; color: #92400e; }
+        .status-production { background-color: #fde68a; color: #78350f; }
+        .status-finishing { background-color: #fed7aa; color: #9a3412; }
+        .status-quality_control { background-color: #e0e7ff; color: #3730a3; }
+        .status-delivered { background-color: #d1fae5; color: #065f46; }
+        .status-cancelled { background-color: #fee2e2; color: #991b1b; }
+        
+        .dark .status-received { background-color: #1e3a8a; color: #bfdbfe; }
+        .dark .status-design { background-color: #78350f; color: #fef3c7; }
+        .dark .status-production { background-color: #713f12; color: #fde68a; }
+        .dark .status-finishing { background-color: #7c2d12; color: #fed7aa; }
+        .dark .status-quality_control { background-color: #312e81; color: #e0e7ff; }
+        .dark .status-delivered { background-color: #065f46; color: #d1fae5; }
+        .dark .status-cancelled { background-color: #7f1d1d; color: #fee2e2; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-40 border-b border-gray-200 dark:border-gray-700">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo e Nome -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <i class="fas fa-tooth text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Portal do Cliente</h1>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">ProStoral - Grupo AreLuna</p>
+                    </div>
+                </div>
+                
+                <!-- User Info e Actions -->
+                <div class="flex items-center space-x-4">
+                    <!-- User Info -->
+                    <div class="hidden md:flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <i class="fas fa-user-circle text-emerald-600 dark:text-emerald-400"></i>
+                        <div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Usuário</p>
+                            <p class="text-sm font-semibold" id="user-email">Logado</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="dark-mode-toggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-moon dark:fa-sun text-gray-700 dark:text-gray-300"></i> Modo Escuro
+                    </button>
+                    
+                    <!-- Logout -->
+                    <button id="logout-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400">
+                        <i class="fas fa-sign-out-alt"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Navigation Tabs -->
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-[73px] z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex space-x-1 overflow-x-auto">
+                <button class="tab-button active px-6 py-4 font-medium text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 border-b-2 border-transparent hover:border-emerald-600 transition-all" data-tab="dashboard">
+                    <i class="fas fa-chart-line mr-2"></i>Dashboard
+                </button>
+                <button class="tab-button px-6 py-4 font-medium text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 border-b-2 border-transparent hover:border-emerald-600 transition-all" data-tab="orders">
+                    <i class="fas fa-clipboard-list mr-2"></i>Minhas Ordens
+                </button>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Dashboard Tab -->
+        <div id="dashboard-content" class="tab-content active">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                <i class="fas fa-chart-line text-emerald-600 dark:text-emerald-400 mr-2"></i>
+                Dashboard
+            </h2>
+            
+            <!-- KPIs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Total OSs -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Total de OSs</h3>
+                        <i class="fas fa-clipboard-list text-2xl text-blue-500"></i>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-total-orders">0</p>
+                </div>
+                
+                <!-- OSs Em Andamento -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Em Andamento</h3>
+                        <i class="fas fa-cog fa-spin text-2xl text-yellow-500"></i>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-active-orders">0</p>
+                </div>
+                
+                <!-- OSs Concluídas -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Concluídas</h3>
+                        <i class="fas fa-check-circle text-2xl text-green-500"></i>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-completed-orders">0</p>
+                </div>
+                
+                <!-- Intercorrências Abertas -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Intercorrências</h3>
+                        <i class="fas fa-exclamation-triangle text-2xl text-orange-500"></i>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="kpi-open-issues">0</p>
+                </div>
+            </div>
+            
+            <!-- Atividades Recentes -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                    <i class="fas fa-history text-emerald-600 dark:text-emerald-400 mr-2"></i>
+                    Atividades Recentes
+                </h3>
+                <div id="recent-activities" class="space-y-3">
+                    <p class="text-gray-500 dark:text-gray-400">Carregando...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Orders Tab -->
+        <div id="orders-content" class="tab-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-clipboard-list text-emerald-600 dark:text-emerald-400 mr-2"></i>
+                    Minhas Ordens de Serviço
+                </h2>
+                <button id="btn-new-order" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-all">
+                    <i class="fas fa-plus mr-2"></i>Nova Ordem
+                </button>
+            </div>
+            
+            <!-- Filtros -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-search mr-1"></i>Buscar
+                        </label>
+                        <input type="text" id="filter-search" placeholder="Buscar ordem..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-filter mr-1"></i>Status
+                        </label>
+                        <select id="filter-status" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">Todos os status</option>
+                            <option value="received">Recebido</option>
+                            <option value="design">Design</option>
+                            <option value="production">Produção</option>
+                            <option value="finishing">Acabamento</option>
+                            <option value="quality_control">Controle de Qualidade</option>
+                            <option value="delivered">Entregue</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <i class="fas fa-calendar mr-1"></i>Período
+                        </label>
+                        <input type="date" id="filter-date-from" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lista de Ordens -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-900">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nº OS</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <tr>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Carregando ordens...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal: Nova Ordem de Serviço -->
+    <div id="modal-new-order" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Nova Ordem de Serviço</h3>
+            </div>
+            
+            <form id="new-order-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome do Paciente *</label>
+                    <input type="text" id="order-patient-name" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Trabalho</label>
+                    <input type="text" id="order-work-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição do Trabalho *</label>
+                    <textarea id="order-work-description" required rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Prevista de Entrega</label>
+                    <input type="datetime-local" id="order-expected-delivery" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+            </form>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" id="btn-cancel-order" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="submit" form="new-order-form" class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all">
+                    <i class="fas fa-check mr-2"></i>Criar Ordem
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal: Detalhes da Ordem -->
+    <div id="modal-order-details" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h3 id="modal-order-title" class="text-2xl font-bold text-gray-900 dark:text-white">Detalhes da OS</h3>
+                <button id="btn-close-details" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div id="order-details-content" class="p-6">
+                <p class="text-gray-500 dark:text-gray-400">Carregando...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="prostoral-clientes.js"></script>
+</body>
+</html>
+

@@ -591,9 +591,9 @@
             <div id="inventory-content" class="tab-content">
                 <!-- Sub-navegação do Laboratório -->
                 <div class="mb-4 sm:mb-6 animate-fade-in">
-                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1">
+                    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-1" style="min-height: 80px;">
                         <!-- Mobile: Grid 2x2 -->
-                        <div class="grid grid-cols-2 gap-1 sm:hidden">
+                        <div id="lab-submenu-mobile" class="grid grid-cols-2 gap-1 sm:hidden" style="display: grid !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
                             <button class="lab-tab active flex flex-col items-center justify-center space-y-1 px-3 py-3 rounded-lg transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
                                 <i class="fas fa-flask text-lg"></i>
                                 <span class="text-xs">Produtos</span>
@@ -614,7 +614,7 @@
                         </div>
                         
                         <!-- Desktop: Horizontal -->
-                        <div class="hidden sm:flex space-x-2">
+                        <div id="lab-submenu-desktop" class="hidden sm:flex space-x-2" style="display: flex !important; visibility: visible !important; opacity: 1 !important; height: auto !important;">
                             <button class="lab-tab active flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-xl transition-all duration-300 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium touch-target" data-lab-tab="produtos">
                                 <i class="fas fa-flask"></i>
                                 <span>Produtos</span>
@@ -1488,28 +1488,9 @@
                     <textarea id="order-work-description" required rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Prevista de Entrega</label>
-                        <input type="datetime-local" id="order-expected-delivery" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preço Final (€)</label>
-                        <input type="number" id="order-final-price" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-                </div>
-                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
-                    <select id="order-status" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        <option value="received">Recebido</option>
-                        <option value="design">Design</option>
-                        <option value="production">Produção</option>
-                        <option value="finishing">Acabamento</option>
-                        <option value="quality_control">Controle de Qualidade</option>
-                        <option value="delivered">Entregue</option>
-                    </select>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Prevista de Entrega</label>
+                    <input type="datetime-local" id="order-expected-delivery" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
             </form>
             
@@ -1634,6 +1615,19 @@
                     </div>
                     
                     <div id="order-time-tracking-list"></div>
+                </div>
+
+                <!-- Reparos Vinculados -->
+                <div id="repairs-section" class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 hidden">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg text-gray-900 dark:text-white">
+                            <i class="fas fa-tools text-blue-600 mr-2"></i>Reparos Vinculados
+                        </h4>
+                        <button id="btn-create-repair" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-all">
+                            <i class="fas fa-plus mr-1"></i>Criar OS de Reparo
+                        </button>
+                    </div>
+                    <div id="order-repairs-list"></div>
                 </div>
 
                 <!-- Intercorrências -->
@@ -1761,13 +1755,9 @@
                         <option value="production">Produção</option>
                         <option value="finishing">Acabamento</option>
                         <option value="quality_control">Controle de Qualidade</option>
-                        <option value="other">Outro</option>
+                        <!-- Etapas customizadas serão inseridas aqui -->
+                        <option value="__add_new__" style="color: #9333ea; font-weight: 600;">+ Adicionar etapa</option>
                     </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Taxa Horária (€/hora) *</label>
-                    <input type="number" id="work-hourly-rate" required min="0" step="0.01" value="25.00" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
                 
                 <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
@@ -1784,6 +1774,141 @@
                 </button>
                 <button type="button" id="btn-start-work" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
                     <i class="fas fa-play mr-2"></i>Iniciar Trabalho
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Adicionar Nova Etapa -->
+    <div id="modal-add-stage" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-plus-circle text-purple-600 mr-2"></i>
+                    Adicionar Nova Etapa
+                </h3>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome da Etapa *</label>
+                    <input type="text" id="new-stage-name" required placeholder="Ex: Polimento, Montagem..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+                
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p class="text-sm text-blue-800 dark:text-blue-300">
+                        <i class="fas fa-lightbulb mr-2"></i>
+                        Esta etapa ficará salva e poderá ser reutilizada em futuros trabalhos.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" id="btn-cancel-stage" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-save-stage" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-check mr-2"></i>Salvar Etapa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Criar OS de Reparo -->
+    <div id="modal-create-repair" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-tools text-blue-600 mr-2"></i>
+                    Criar OS de Reparo
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Esta OS de reparo será vinculada à OS principal
+                </p>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <!-- OS Principal (somente leitura) -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p class="text-sm font-medium text-blue-900 dark:text-blue-300">
+                        <i class="fas fa-link mr-2"></i>
+                        OS Principal: <span id="repair-parent-order-number" class="font-bold"></span>
+                    </p>
+                    <p class="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                        Cliente: <span id="repair-client-name"></span> | Paciente: <span id="repair-patient-name"></span>
+                    </p>
+                </div>
+
+                <!-- Tipo de Reparo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Tipo de Reparo *
+                    </label>
+                    <select id="repair-type" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Selecione...</option>
+                        <option value="warranty">🛡️ Garantia (Sem custo)</option>
+                        <option value="billable">💰 Pago (Com custo)</option>
+                        <option value="goodwill">💝 Cortesia (Sem custo)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <i class="fas fa-info-circle"></i>
+                        Garantia e Cortesia não geram custo adicional
+                    </p>
+                </div>
+
+                <!-- Motivo do Reparo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Motivo do Reparo *
+                    </label>
+                    <textarea id="repair-reason" required rows="3" placeholder="Descreva o motivo do reparo..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+
+                <!-- Descrição do Trabalho -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Descrição do Trabalho
+                        <span class="text-gray-400">(opcional)</span>
+                    </label>
+                    <textarea id="repair-work-description" rows="2" placeholder="Descrição específica do trabalho de reparo..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                </div>
+
+                <!-- Data de Entrega e Prioridade (grid 2 colunas) -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Data de Entrega
+                        </label>
+                        <input type="date" id="repair-due-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Prioridade
+                        </label>
+                        <select id="repair-priority" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="normal">Normal</option>
+                            <option value="high" selected>Alta</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Informação sobre numeração -->
+                <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
+                        <i class="fas fa-hashtag mr-1"></i>
+                        A OS de reparo será criada com numeração automática: <span id="repair-preview-number" class="font-mono font-bold"></span>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button type="button" data-close-modal="modal-create-repair" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-create-repair" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-all font-semibold">
+                    <i class="fas fa-check mr-2"></i>Criar OS de Reparo
                 </button>
             </div>
         </div>
@@ -1980,6 +2105,14 @@
                             window.ordersApp.init();
                             window.ordersApp.initialized = true;
                         }
+                    } else if (targetTab === 'inventory' && window.prostoralLab) {
+                        // Inicializar o módulo de laboratório
+                        if (!window.prostoralLab.initialized) {
+                            window.prostoralLab.init();
+                            window.prostoralLab.initialized = true;
+                        }
+                        // Carregar produtos por padrão
+                        window.prostoralLab.loadProducts();
                     }
                 }
             });
@@ -2025,6 +2158,40 @@
                 }
             });
         });
+        
+        // FIX: Forçar exibição do submenu de laboratório
+        function forceLabSubmenuDisplay() {
+            const inventoryTab = document.querySelector('[data-tab="inventory"]');
+            if (inventoryTab && inventoryTab.classList.contains('active')) {
+                const mobileGrid = document.querySelector('#inventory-content .grid.grid-cols-2');
+                const desktopFlex = document.querySelector('#inventory-content .hidden.sm\\:flex');
+                
+                if (mobileGrid) {
+                    mobileGrid.style.display = 'grid';
+                    mobileGrid.style.visibility = 'visible';
+                    mobileGrid.style.opacity = '1';
+                    mobileGrid.style.height = 'auto';
+                }
+                
+                if (desktopFlex) {
+                    desktopFlex.style.display = 'flex';
+                    desktopFlex.style.visibility = 'visible';
+                    desktopFlex.style.opacity = '1';
+                    desktopFlex.style.height = 'auto';
+                }
+            }
+        }
+        
+        // Executar após mudança de aba e ao carregar
+        const originalTabClick = document.querySelectorAll('.prostoral-tab');
+        originalTabClick.forEach(tab => {
+            tab.addEventListener('click', () => {
+                setTimeout(forceLabSubmenuDisplay, 100);
+            });
+        });
+        
+        // Executar ao carregar a página se a aba estiver ativa
+        setTimeout(forceLabSubmenuDisplay, 500);
     </script>
 
     <!-- jsQR - Biblioteca para leitura de QR Code -->

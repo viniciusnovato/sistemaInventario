@@ -1,5 +1,6 @@
 # 🔄 Solução: Problema de Cache do Navegador
 
+
 ## 🚨 Problema
 
 Ao fazer alterações no código JavaScript, o navegador pode usar a **versão antiga em cache**, causando erros como:

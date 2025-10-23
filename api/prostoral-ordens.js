@@ -851,6 +851,208 @@ async function getOrderHistory(req, res) {
 }
 
 // =====================================================
+// CRIAR OS DE REPARO
+// POST /api/prostoral/orders/:id/repair
+// =====================================================
+async function createRepairOrder(req, res) {
+    try {
+        const { id: parentOrderId } = req.params;
+        const { 
+            repair_type,  // 'warranty', 'billable', 'goodwill'
+            repair_reason,
+            work_description,
+            due_date,
+            priority
+        } = req.body;
+
+        const user = req.user;
+        const tenant_id = await getUserTenant(user.id);
+
+        // Validar tipo de reparo
+        if (!['warranty', 'billable', 'goodwill'].includes(repair_type)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Tipo de reparo inválido. Use: warranty, billable ou goodwill' 
+            });
+        }
+
+        // Buscar OS original
+        const { data: parentOrder, error: parentError } = await supabase
+            .from('prostoral_work_orders')
+            .select('*')
+            .eq('id', parentOrderId)
+            .single();
+
+        if (parentError || !parentOrder) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'OS original não encontrada' 
+            });
+        }
+
+        // Verificar se a OS original não é ela mesma um reparo
+        if (parentOrder.is_repair) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Não é possível criar reparo de um reparo. Use a OS original.' 
+            });
+        }
+
+        // Gerar número da OS de reparo (baseado no número da OS original)
+        const { data: repairCount, error: countError } = await supabase
+            .from('prostoral_work_orders')
+            .select('id', { count: 'exact' })
+            .eq('parent_order_id', parentOrderId);
+
+        const repairNumber = `${parentOrder.order_number}-R${(repairCount?.length || 0) + 1}`;
+
+        // Criar OS de reparo
+        const repairOrder = {
+            order_number: repairNumber,
+            client_id: parentOrder.client_id,
+            patient_name: parentOrder.patient_name,
+            patient_age: parentOrder.patient_age,
+            work_type_id: parentOrder.work_type_id,
+            work_type: parentOrder.work_type,
+            work_description: work_description || `REPARO: ${parentOrder.work_description}`,
+            shade: parentOrder.shade,
+            due_date: due_date || null,
+            priority: priority || 'high',
+            status: 'received',
+            technician_id: parentOrder.technician_id,
+            account_manager_id: parentOrder.account_manager_id,
+            final_price: repair_type === 'warranty' || repair_type === 'goodwill' ? 0 : parentOrder.final_price,
+            is_repair: true,
+            parent_order_id: parentOrderId,
+            repair_type: repair_type,
+            repair_reason: repair_reason,
+            tenant_id: tenant_id,
+            created_by: user.id
+        };
+
+        const { data: newRepairOrder, error: createError } = await supabase
+            .from('prostoral_work_orders')
+            .insert([repairOrder])
+            .select()
+            .single();
+
+        if (createError) {
+            console.error('Erro ao criar OS de reparo:', createError);
+            return res.status(500).json({ 
+                success: false, 
+                error: createError.message 
+            });
+        }
+
+        // Registrar no histórico da OS original
+        await supabase
+            .from('prostoral_work_order_history')
+            .insert([{
+                work_order_id: parentOrderId,
+                change_type: 'repair_created',
+                details: JSON.stringify({
+                    repair_order_id: newRepairOrder.id,
+                    repair_order_number: repairNumber,
+                    repair_type: repair_type,
+                    repair_reason: repair_reason
+                }),
+                changed_by: user.id,
+                tenant_id: tenant_id
+            }]);
+
+        return res.json({ 
+            success: true, 
+            order: newRepairOrder,
+            message: 'OS de reparo criada com sucesso'
+        });
+
+    } catch (error) {
+        console.error('Erro ao criar OS de reparo:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+}
+
+// =====================================================
+// LISTAR OSs RELACIONADAS (Principal + Reparos)
+// GET /api/prostoral/orders/:id/related
+// =====================================================
+async function getRelatedOrders(req, res) {
+    try {
+        const { id: orderId } = req.params;
+        const user = req.user;
+
+        // Buscar OS fornecida
+        const { data: currentOrder, error: currentError } = await supabase
+            .from('prostoral_work_orders')
+            .select('id, parent_order_id, is_repair')
+            .eq('id', orderId)
+            .single();
+
+        if (currentError || !currentOrder) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'OS não encontrada' 
+            });
+        }
+
+        // Determinar a OS principal
+        const parentId = currentOrder.is_repair ? currentOrder.parent_order_id : orderId;
+
+        // Buscar OS principal
+        const { data: parentOrder, error: parentError } = await supabase
+            .from('prostoral_work_orders')
+            .select('*')
+            .eq('id', parentId)
+            .single();
+
+        if (parentError) {
+            console.error('Erro ao buscar OS principal:', parentError);
+            return res.status(500).json({ 
+                success: false, 
+                error: parentError.message 
+            });
+        }
+
+        // Buscar todos os reparos
+        const { data: repairs, error: repairsError } = await supabase
+            .from('prostoral_work_orders')
+            .select('*')
+            .eq('parent_order_id', parentId)
+            .order('created_at', { ascending: true });
+
+        if (repairsError) {
+            console.error('Erro ao buscar reparos:', repairsError);
+            return res.status(500).json({ 
+                success: false, 
+                error: repairsError.message 
+            });
+        }
+
+        // Calcular custo total (original + reparos)
+        const totalCost = (parentOrder.total_cost || 0) + 
+            (repairs || []).reduce((sum, r) => sum + (r.total_cost || 0), 0);
+
+        return res.json({ 
+            success: true, 
+            parent: parentOrder,
+            repairs: repairs || [],
+            total_cost: totalCost,
+            repairs_count: repairs?.length || 0
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar OSs relacionadas:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+}
+
+// =====================================================
 // EXPORTS
 // =====================================================
 module.exports = {
@@ -868,7 +1070,9 @@ module.exports = {
     createIssue,
     updateIssue,
     listIssues,
-    getOrderHistory
+    getOrderHistory,
+    createRepairOrder,
+    getRelatedOrders
 };
 
 console.log('✅ Módulo prostoral-ordens.js exportado com sucesso!');

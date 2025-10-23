@@ -9,12 +9,17 @@ class LaboratorioModule {
         this.alerts = [];
         this.alertFilter = 'all'; // 'all', 'critico', 'aviso', 'informativo'
         this.currentPage = 1;
-        this.itemsPerPage = 20;
+        this.itemsPerPage = 100; // Aumentado para 100 produtos por página
         this.apiBaseUrl = '/api/laboratorio';
         this.init();
     }
 
     async init() {
+        if (this.initialized) {
+            console.log('Módulo de Laboratório já foi inicializado');
+            return;
+        }
+        
         console.log('Iniciando Módulo de Laboratório...');
         this.setupEventListeners();
         
@@ -23,6 +28,8 @@ class LaboratorioModule {
         
         // Carregar estatísticas dos relatórios
         await this.loadReportStats();
+        
+        this.initialized = true;
     }
 
     setupEventListeners() {
@@ -206,36 +213,69 @@ class LaboratorioModule {
 
     async loadProducts() {
         try {
-            const token = await window.authManager.getAccessToken();
             const search = document.getElementById('product-search')?.value || '';
             const categoria = document.getElementById('product-filter-categoria')?.value || '';
             const status = document.getElementById('product-filter-status')?.value || '';
 
-            const queryParams = new URLSearchParams({
-                page: this.currentPage,
-                limit: this.itemsPerPage,
-                search,
-                categoria,
-                status
-            });
+            // Query com JOIN entre produtoslaboratorio e estoquelaboratorio
+            let query = window.authManager.supabase
+                .from('produtoslaboratorio')
+                .select(`
+                    *,
+                    estoquelaboratorio (
+                        quantidade_atual,
+                        quantidade_minima,
+                        quantidade_maxima,
+                        status
+                    )
+                `, { count: 'exact' })
+                .eq('ativo', true)
+                .is('deleted_at', null);
 
-            const response = await fetch(`${this.apiBaseUrl}/produtos?${queryParams}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            // Filtro de busca
+            if (search) {
+                query = query.or(`nome_material.ilike.%${search}%,codigo_barras.ilike.%${search}%,marca.ilike.%${search}%`);
+            }
 
-            if (!response.ok) throw new Error('Erro ao carregar produtos');
+            // Filtro de categoria
+            if (categoria) {
+                query = query.eq('categoria', categoria);
+            }
 
-            const result = await response.json();
-            this.products = result.data || [];
+            // Ordenação e paginação
+            const from = (this.currentPage - 1) * this.itemsPerPage;
+            const to = from + this.itemsPerPage - 1;
+            
+            const { data, error, count } = await query
+                .order('data_criacao', { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+
+            // Filtrar por status de estoque (após busca, pois envolve dados do JOIN)
+            let products = data || [];
+            if (status) {
+                products = products.filter(p => {
+                    const qty = p.estoquelaboratorio?.quantidade_atual || 0;
+                    if (status === 'critico') return qty <= 5;
+                    if (status === 'baixo') return qty > 5 && qty <= 20;
+                    if (status === 'ok') return qty > 20;
+                    return true;
+                });
+            }
+
+            this.products = products;
             
             this.renderProducts();
-            this.updateProductsPagination(result);
+            this.updateProductsPagination({ 
+                data: products, 
+                total: count || 0,
+                page: this.currentPage,
+                limit: this.itemsPerPage
+            });
         } catch (error) {
             console.error('Erro ao carregar produtos:', error);
-            this.showNotification('Erro ao carregar produtos', 'error');
+            this.showNotification('Erro ao carregar produtos: ' + error.message, 'error');
         }
     }
 
@@ -255,47 +295,66 @@ class LaboratorioModule {
             return;
         }
 
-        tbody.innerHTML = this.products.map(product => `
-            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <td class="py-3 px-4">
-                    <span class="font-mono text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                        ${product.qr_code || '-'}
-                    </span>
-                </td>
-                <td class="py-3 px-4">
-                    <div class="font-medium text-gray-900 dark:text-white">${product.nome_material}</div>
-                    ${product.referencia_lote ? `<div class="text-xs text-gray-500">Lote: ${product.referencia_lote}</div>` : ''}
-                </td>
-                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">${product.marca || '-'}</td>
-                <td class="py-3 px-4">
-                    <span class="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
-                        ${this.formatCategoria(product.categoria)}
-                    </span>
-                </td>
-                <td class="py-3 px-4">
-                    <span class="font-semibold">${product.quantidade_atual || 0} ${product.unidade_medida}</span>
-                </td>
-                <td class="py-3 px-4">
-                    ${this.renderStatusBadge(product.status)}
-                </td>
-                <td class="py-3 px-4">
-                    <div class="flex space-x-2">
-                        <button data-action="view" data-id="${product.id}" class="product-action-btn p-2 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900 rounded-lg transition-colors" title="Visualizar">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button data-action="edit" data-id="${product.id}" class="product-action-btn p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button data-action="qrcode" data-id="${product.id}" class="product-action-btn p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-lg transition-colors" title="Ver QR Code">
-                            <i class="fas fa-qrcode"></i>
-                        </button>
-                        <button data-action="delete" data-id="${product.id}" class="product-action-btn p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors" title="Excluir">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = this.products.map(product => {
+            // Pegar quantidade do estoque
+            const quantidade = product.estoquelaboratorio?.quantidade_atual || 0;
+            
+            // Calcular status baseado na quantidade
+            let statusClass = 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
+            let statusText = 'Normal';
+            
+            if (quantidade <= 5) {
+                statusClass = 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
+                statusText = 'Crítico';
+            } else if (quantidade <= 20) {
+                statusClass = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
+                statusText = 'Baixo';
+            }
+            
+            return `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <td class="py-3 px-4">
+                        <span class="font-mono text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                            ${product.codigo_barras || product.qr_code || '-'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="font-medium text-gray-900 dark:text-white">${product.nome_material}</div>
+                        ${product.referencia_lote ? `<div class="text-xs text-gray-500">Lote: ${product.referencia_lote}</div>` : ''}
+                    </td>
+                    <td class="py-3 px-4 text-gray-600 dark:text-gray-400">${product.marca || '-'}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                            ${this.formatCategoria(product.categoria)}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="font-semibold">${quantidade} ${product.unidade_medida}</span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs px-2 py-1 rounded-full ${statusClass}">
+                            ${statusText}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex space-x-2">
+                            <button data-action="view" data-id="${product.id}" class="product-action-btn p-2 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900 rounded-lg transition-colors" title="Visualizar">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button data-action="edit" data-id="${product.id}" class="product-action-btn p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button data-action="qrcode" data-id="${product.id}" class="product-action-btn p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-lg transition-colors" title="Ver QR Code">
+                                <i class="fas fa-qrcode"></i>
+                            </button>
+                            <button data-action="delete" data-id="${product.id}" class="product-action-btn p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
         
         // Adicionar event listeners aos botões de ação
         document.querySelectorAll('.product-action-btn').forEach(btn => {
@@ -643,22 +702,19 @@ class LaboratorioModule {
         if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
         try {
-            const token = await window.authManager.getAccessToken();
-            const response = await fetch(`${this.apiBaseUrl}/produtos/${productId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            // Hard delete: remove permanentemente (evita problemas de RLS)
+            const { error } = await window.authManager.supabase
+                .from('produtoslaboratorio')
+                .delete()
+                .eq('id', productId);
 
-            if (!response.ok) throw new Error('Erro ao excluir produto');
+            if (error) throw error;
 
             this.showNotification('Produto excluído com sucesso!', 'success');
             await this.loadProducts();
         } catch (error) {
             console.error('Erro ao excluir produto:', error);
-            this.showNotification('Erro ao excluir produto', 'error');
+            this.showNotification('Erro ao excluir produto: ' + error.message, 'error');
         }
     }
 
