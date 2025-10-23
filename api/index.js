@@ -427,9 +427,11 @@ app.post('/api/items', upload.fields([
         console.log('=== DEBUG PDF PATHS (POST) ===');
         console.log('req.body:', req.body);
         console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
+        console.log('req.body.pdf_paths:', req.body.pdf_paths);
         console.log('req.files:', req.files);
         
-        const pdfPaths = req.body['pdf_paths[]'];
+        // Aceita tanto pdf_paths[] quanto pdf_paths (com ou sem colchetes)
+        const pdfPaths = req.body['pdf_paths[]'] || req.body.pdf_paths;
         
         if (pdfPaths) {
             // PDFs já foram enviados para o Supabase Storage pelo frontend
@@ -665,9 +667,11 @@ app.put('/api/items/:id', upload.fields([
         console.log('req.files:', req.files);
         console.log('req.files.pdf:', req.files ? req.files.pdf : 'undefined');
         console.log('req.body["pdf_paths[]"]:', req.body['pdf_paths[]']);
+        console.log('req.body.pdf_paths:', req.body.pdf_paths);
         
         // Processar PDFs - pode vir como arquivo (multer) ou como caminhos já enviados
-        const pdfPaths = req.body['pdf_paths[]'];
+        // Aceita tanto pdf_paths[] quanto pdf_paths (com ou sem colchetes)
+        const pdfPaths = req.body['pdf_paths[]'] || req.body.pdf_paths;
         
         if (pdfPaths) {
             // PDFs já foram enviados para o Supabase Storage pelo frontend
