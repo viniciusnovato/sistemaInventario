@@ -213,9 +213,60 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateImageProgressBar(100, 'Processando imagem...');
                 }
                 
-                // O PDF será enviado diretamente no FormData
-                // O servidor fará o upload para o Supabase Storage
-                // Não precisamos fazer upload aqui no frontend
+                // Upload de PDFs diretamente para o Supabase Storage (evita limite de 4.5MB da Vercel)
+                const pdfFiles = document.getElementById('itemPdf')?.files;
+                
+                if (pdfFiles && pdfFiles.length > 0) {
+                    const pdfUploadProgress = document.getElementById('pdfUploadProgress');
+                    const pdfPreview = document.getElementById('pdfPreview');
+                    
+                    if (pdfPreview) pdfPreview.classList.add('hidden');
+                    if (pdfUploadProgress) pdfUploadProgress.classList.remove('hidden');
+                    
+                    updatePdfProgressBar(0, 'Iniciando upload de PDFs...');
+                    
+                    const pdfPaths = [];
+                    const totalFiles = pdfFiles.length;
+                    
+                    for (let i = 0; i < pdfFiles.length; i++) {
+                        const pdfFile = pdfFiles[i];
+                        
+                        // Sanitizar o nome do arquivo
+                        const sanitizedFileName = pdfFile.name
+                            .normalize('NFD')
+                            .replace(/[\u0300-\u036f]/g, '')
+                            .replace(/[^\w\s.-]/g, '')
+                            .replace(/\s+/g, '_')
+                            .toLowerCase();
+                        
+                        const pdfFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedFileName}`;
+                        
+                        const progress = Math.round((i / totalFiles) * 75);
+                        updatePdfProgressBar(progress, `Enviando PDF ${i + 1}/${totalFiles}...`);
+                        
+                        const { data: pdfUploadData, error: pdfUploadError } = await supabase.storage
+                            .from('item-pdfs')
+                            .upload(pdfFileName, pdfFile);
+                        
+                        if (pdfUploadError) {
+                            if (pdfUploadProgress) pdfUploadProgress.classList.add('hidden');
+                            if (pdfPreview) pdfPreview.classList.remove('hidden');
+                            throw new Error(`Erro ao fazer upload do PDF ${i + 1}: ` + pdfUploadError.message);
+                        }
+                        
+                        pdfPaths.push(pdfFileName);
+                    }
+                    
+                    updatePdfProgressBar(90, 'Upload de PDFs concluído!');
+                    
+                    // Remover os arquivos PDF do FormData e adicionar apenas os paths
+                    formData.delete('pdf');
+                    pdfPaths.forEach(path => {
+                        formData.append('pdf_paths[]', path);
+                    });
+                    
+                    updatePdfProgressBar(100, 'Processando PDFs...');
+                }
                 
                 // Enviar dados do item
                 const response = await fetch('/api/items', {

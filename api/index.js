@@ -401,8 +401,14 @@ app.post('/api/items', upload.fields([
         let imageUrl = null;
         let pdfUrls = [];
 
-        // Se há uma imagem, fazer upload para o Supabase Storage
-        if (req.files && req.files.image && req.files.image[0]) {
+        // Processar imagem - pode vir como arquivo (multer) ou como caminho já enviado
+        const imagePath = req.body.image_path;
+        
+        if (imagePath) {
+            // Imagem já foi enviada para o Supabase Storage pelo frontend
+            imageUrl = `${supabaseUrl}/storage/v1/object/public/item-images/${imagePath}`;
+        } else if (req.files && req.files.image && req.files.image[0]) {
+            // Fallback: upload tradicional via multer
             const imageFile = req.files.image[0];
             const sanitizedName = sanitizeFileName(imageFile.originalname);
             const fileName = `${Date.now()}-${sanitizedName}`;
@@ -417,8 +423,15 @@ app.post('/api/items', upload.fields([
             }
         }
 
-        // Se há PDFs, fazer upload para o Supabase Storage
-        if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+        // Processar PDFs - pode vir como arquivo (multer) ou como caminhos já enviados
+        const pdfPaths = req.body['pdf_paths[]'];
+        
+        if (pdfPaths) {
+            // PDFs já foram enviados para o Supabase Storage pelo frontend
+            const paths = Array.isArray(pdfPaths) ? pdfPaths : [pdfPaths];
+            pdfUrls = paths.map(path => `${supabaseUrl}/storage/v1/object/public/item-pdfs/${path}`);
+        } else if (req.files && req.files.pdf && req.files.pdf.length > 0) {
+            // Fallback: upload tradicional via multer (pode exceder 4.5MB na Vercel)
             for (const pdfFile of req.files.pdf) {
                 const sanitizedName = sanitizeFileName(pdfFile.originalname);
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedName}`;
