@@ -361,28 +361,81 @@ async function updateOrder(req, res) {
 // DELETAR ORDEM DE SERVIÇO
 // DELETE /api/prostoral/orders/:id
 // =====================================================
+// Soft delete: muda status para 'cancelled' ao invés de deletar fisicamente
 async function deleteOrder(req, res) {
     try {
         const { id } = req.params;
         const userId = req.user.id;
         const tenantId = await getUserTenant(userId);
 
-        const { error } = await supabase
-            .from('prostoral_work_orders')
-            .delete()
-            .eq('id', id)
-            .eq('tenant_id', tenantId);
+        console.log('🗑️ Cancelando ordem:', id, 'por usuário:', userId);
 
-        if (error) {
-            console.error('Erro ao deletar ordem:', error);
-            return res.status(500).json({ success: false, error: error.message });
+        // Primeiro busca a ordem para verificar se existe e pegar o status atual
+        const { data: order, error: fetchError } = await supabase
+            .from('prostoral_work_orders')
+            .select('id, status, order_number')
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .single();
+
+        if (fetchError || !order) {
+            console.error('❌ Ordem não encontrada:', fetchError);
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Ordem não encontrada' 
+            });
         }
 
-        return res.json({ success: true, message: 'Ordem deletada com sucesso' });
+        // Soft delete: muda status para 'cancelled'
+        const { data: updatedOrder, error: updateError } = await supabase
+            .from('prostoral_work_orders')
+            .update({
+                status: 'cancelled',
+                updated_at: new Date().toISOString(),
+                updated_by: userId
+            })
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('❌ Erro ao cancelar ordem:', updateError);
+            return res.status(500).json({ 
+                success: false, 
+                error: updateError.message,
+                details: updateError
+            });
+        }
+
+        // Registrar no histórico de status
+        if (order.status !== 'cancelled') {
+            await supabase
+                .from('prostoral_work_order_status_history')
+                .insert([{
+                    work_order_id: id,
+                    old_status: order.status,
+                    new_status: 'cancelled',
+                    changed_by: userId,
+                    notes: 'Ordem cancelada pelo usuário'
+                }]);
+        }
+
+        console.log('✅ Ordem cancelada com sucesso:', order.order_number);
+
+        return res.json({ 
+            success: true, 
+            message: 'Ordem cancelada com sucesso',
+            order: updatedOrder
+        });
 
     } catch (error) {
-        console.error('Erro ao deletar ordem:', error);
-        return res.status(500).json({ success: false, error: error.message });
+        console.error('💥 Erro inesperado ao cancelar ordem:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message,
+            details: error.toString()
+        });
     }
 }
 

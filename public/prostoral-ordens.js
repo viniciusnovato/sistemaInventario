@@ -786,14 +786,16 @@ class ProstoralOrdersApp {
 
         try {
             const token = await window.authManager.getAccessToken();
-            
+
             const response = await fetch(`${this.apiBaseUrl}/orders/${orderId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (!response.ok) {
-                throw new Error('Erro ao cancelar ordem');
+                const errorData = await response.json().catch(() => ({}));
+                console.error('❌ Erro na resposta:', response.status, errorData);
+                throw new Error(errorData.error || errorData.message || `Erro HTTP ${response.status}`);
             }
 
             const data = await response.json();
@@ -804,8 +806,8 @@ class ProstoralOrdersApp {
             }
 
         } catch (error) {
-            console.error('Erro ao cancelar ordem:', error);
-            this.showError('Erro ao cancelar ordem');
+            console.error('❌ Erro ao cancelar ordem:', error);
+            this.showError(`Erro ao cancelar ordem: ${error.message}`);
         }
     }
 
