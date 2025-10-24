@@ -3858,6 +3858,8 @@ app.get('/api/admin/roles', authenticateToken, async (req, res) => {
 
 // Create new user (Admin only)
 app.post('/api/admin/users', authenticateToken, async (req, res) => {
+    let createdUserId = null;
+    
     try {
         // Check if user is admin
         const isAdmin = req.user.roles?.some(role => role.toLowerCase().includes('admin')) ||
@@ -3874,34 +3876,115 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Email e senha são obrigatórios' });
         }
 
-        // Create user in Supabase Auth
+        console.log('🔵 Iniciando criação de usuário:', email);
+
+        // ETAPA 1: Create user in Supabase Auth with metadata
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: email,
             password: password,
-            email_confirm: true
+            email_confirm: true,
+            user_metadata: { 
+                full_name: full_name || null 
+            }
         });
 
-        if (authError) throw authError;
+        if (authError) {
+            console.error('❌ Erro ao criar usuário no Auth:', authError);
+            throw new Error(`Falha ao criar usuário: ${authError.message}`);
+        }
 
-        const userId = authData.user.id;
+        createdUserId = authData.user.id;
+        console.log('✅ Usuário criado no Auth:', createdUserId);
 
-        // Create user profile
-        const { error: profileError } = await supabaseAdmin
-            .from('profiles')
+        // ETAPA 2: Create entry in public.users (required for foreign key)
+        const { error: publicUserError } = await supabaseAdmin
+            .from('users')
             .insert([{
-                user_id: userId,
-                full_name: full_name || null,
+                id: createdUserId,
+                email: email,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (publicUserError) {
+            console.error('❌ Erro ao criar usuário em public.users:', publicUserError);
+            // Rollback: deletar usuário do Auth
+            await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+            throw new Error(`Falha ao criar registro de usuário: ${publicUserError.message}`);
+        }
+
+        console.log('✅ Usuário criado em public.users');
+
+        // ETAPA 3: Create user profile in user_profiles
+        const { error: profileError } = await supabaseAdmin
+            .from('user_profiles')
+            .insert([{
+                user_id: createdUserId,
+                display_name: full_name || null,
                 is_active: true,
                 tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
             }]);
 
         if (profileError) {
-            console.error('Erro ao criar perfil:', profileError);
+            console.error('❌ Erro ao criar perfil:', profileError);
+            // Rollback: deletar usuário do Auth e public.users
+            await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+            await supabaseAdmin.from('users').delete().eq('id', createdUserId);
+            throw new Error(`Falha ao criar perfil: ${profileError.message}`);
         }
 
-        // Assign role
+        console.log('✅ Perfil criado em user_profiles');
+
+        // ETAPA 4: Process permissions and create module access
+        if (permissions && permissions.length > 0) {
+            // Group permissions by module (extract unique module codes)
+            const moduleCodes = new Set();
+            
+            for (const perm of permissions) {
+                const [moduleCode, action] = perm.split(':');
+                moduleCodes.add(moduleCode);
+            }
+
+            console.log('📦 Módulos a liberar:', Array.from(moduleCodes));
+
+            // Create user_module_access entries (one per module)
+            for (const moduleCode of moduleCodes) {
+                // Get module ID
+                const { data: module, error: moduleError } = await supabaseAdmin
+                    .from('modules')
+                    .select('id')
+                    .eq('code', moduleCode)
+                    .single();
+
+                if (moduleError || !module) {
+                    console.warn(`⚠️ Módulo não encontrado: ${moduleCode}`);
+                    continue;
+                }
+
+                // Insert module access (simple: just grants access to the module)
+                const { error: accessError } = await supabaseAdmin
+                    .from('user_module_access')
+                    .insert([{
+                        user_id: createdUserId,
+                        module_id: module.id,
+                        granted_by: req.user.id,
+                        is_active: true
+                    }]);
+
+                if (accessError) {
+                    console.error(`❌ Erro ao criar acesso ao módulo ${moduleCode}:`, accessError);
+                    // Rollback completo
+                    await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+                    await supabaseAdmin.from('users').delete().eq('id', createdUserId);
+                    await supabaseAdmin.from('user_profiles').delete().eq('user_id', createdUserId);
+                    throw new Error(`Falha ao atribuir permissões: ${accessError.message}`);
+                }
+
+                console.log(`✅ Acesso ao módulo ${moduleCode} criado`);
+            }
+        }
+
+        // ETAPA 5: Assign admin role if needed
         if (is_admin) {
-            // Get admin role
             const { data: adminRole } = await supabaseAdmin
                 .from('roles')
                 .select('id')
@@ -3909,61 +3992,50 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
                 .single();
 
             if (adminRole) {
-                await supabaseAdmin
+                const { error: roleError } = await supabaseAdmin
                     .from('user_roles')
                     .insert([{
-                        user_id: userId,
+                        user_id: createdUserId,
                         role_id: adminRole.id,
                         tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
                     }]);
-            }
-        } else if (permissions && permissions.length > 0) {
-            // Create or get a custom role for this user
-            const roleName = `user_${userId.substring(0, 8)}`;
-            const { data: customRole, error: roleError } = await supabaseAdmin
-                .from('roles')
-                .insert([{
-                    name: roleName,
-                    description: `Função personalizada para ${email}`,
-                    tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
-                }])
-                .select()
-                .single();
 
-            if (customRole && !roleError) {
-                // Assign role to user
-                await supabaseAdmin
-                    .from('user_roles')
-                    .insert([{
-                        user_id: userId,
-                        role_id: customRole.id,
-                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
-                    }]);
-
-                // Assign permissions to role
-                const permissionInserts = permissions.map(perm => ({
-                    role_id: customRole.id,
-                    permission: perm
-                }));
-
-                await supabaseAdmin
-                    .from('role_permissions')
-                    .insert(permissionInserts);
+                if (roleError) {
+                    console.warn('⚠️ Erro ao atribuir role admin:', roleError);
+                }
             }
         }
+
+        console.log('✅ Usuário criado com sucesso:', email);
 
         res.json({ 
             success: true, 
             message: 'Usuário criado com sucesso',
             user: {
-                id: userId,
+                id: createdUserId,
                 email: email,
                 full_name: full_name
             }
         });
     } catch (error) {
-        console.error('Erro ao criar usuário:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro fatal ao criar usuário:', error);
+        
+        // Tentativa final de rollback se algo der errado
+        if (createdUserId) {
+            try {
+                await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+                await supabaseAdmin.from('users').delete().eq('id', createdUserId);
+                await supabaseAdmin.from('user_profiles').delete().eq('user_id', createdUserId);
+                await supabaseAdmin.from('user_module_access').delete().eq('user_id', createdUserId);
+            } catch (rollbackError) {
+                console.error('❌ Erro no rollback:', rollbackError);
+            }
+        }
+        
+        res.status(500).json({ 
+            error: error.message || 'Erro ao criar usuário',
+            details: error.toString()
+        });
     }
 });
 

@@ -1,6 +1,6 @@
 # 📚 Índice da Documentação - Sistema Inventário AreLuna
 
-> Última atualização: 23/10/2025
+> Última atualização: 24/10/2025
 
 ---
 
@@ -43,6 +43,28 @@
 
 ---
 
+## 👥 Portal do Cliente e Gerenciamento de Usuários
+
+### Portal do Cliente
+- [PORTAL_CLIENTE_COMPLETO.md](PORTAL_CLIENTE_COMPLETO.md) - Documentação técnica completa
+- [GUIA_RAPIDO_PORTAL_CLIENTE.md](GUIA_RAPIDO_PORTAL_CLIENTE.md) - Guia rápido de configuração
+- [PORTAL_CLIENTE_DESIGN_IDENTICO.md](PORTAL_CLIENTE_DESIGN_IDENTICO.md) - Design do portal
+- [TESTE_CRIACAO_OS_PORTAL_CLIENTE.md](TESTE_CRIACAO_OS_PORTAL_CLIENTE.md) - Testes de criação de OS
+
+### Gerenciamento de Usuários
+- [CORRECAO_FINAL_CRIACAO_USUARIOS.md](CORRECAO_FINAL_CRIACAO_USUARIOS.md) - ✅ **SISTEMA 100% FUNCIONAL**
+- [VERIFICACAO_FLUXO_CADASTRO_USUARIOS.md](VERIFICACAO_FLUXO_CADASTRO_USUARIOS.md) - ✅ Verificação completa do fluxo
+- [ACESSO_CLIENTE_GERENCIAMENTO.md](ACESSO_CLIENTE_GERENCIAMENTO.md) - Gestão de acesso cliente
+- [CLIENTE_PROSTORAL_ESPECIFICADO.md](CLIENTE_PROSTORAL_ESPECIFICADO.md) - Cliente Prostoral
+- [TECNICOS_LABORATORIO_CRIADOS.md](TECNICOS_LABORATORIO_CRIADOS.md) - Criação de técnicos
+- [SOLUCAO_COMPLETA_LOGIN_TECNICOS.md](SOLUCAO_COMPLETA_LOGIN_TECNICOS.md) - ✅ Solução de login
+
+### Cliente e Sistema
+- [RESET_SISTEMA_INSTITUTO_ARELUNA.md](RESET_SISTEMA_INSTITUTO_ARELUNA.md) - Reset e configuração
+- [MODULO_LABORATORIO_CLIENTE_DASHBOARD.md](MODULO_LABORATORIO_CLIENTE_DASHBOARD.md) - Módulo no dashboard
+
+---
+
 ## 🔧 Correções e Melhorias
 
 ### Correções Gerais
@@ -53,6 +75,13 @@
 - [CORRECAO_MODAL_OS_APLICADA.md](CORRECAO_MODAL_OS_APLICADA.md) - Correção de modal
 - [CORRECAO_RLS_EXCLUSAO_PRODUTOS.md](CORRECAO_RLS_EXCLUSAO_PRODUTOS.md) - Correção RLS
 - [CORRECAO_TIPO_TRABALHO_DATA.md](CORRECAO_TIPO_TRABALHO_DATA.md) - Correção de tipo de trabalho
+- [CORRECAO_ROTAS_CLIENTES.md](CORRECAO_ROTAS_CLIENTES.md) - Correção de rotas de clientes
+- [CORRECAO_LOGOUT_PORTAL_CLIENTE.md](CORRECAO_LOGOUT_PORTAL_CLIENTE.md) - Correção logout
+- [CORRECAO_SENHAS_TECNICOS.md](CORRECAO_SENHAS_TECNICOS.md) - Correção de senhas bcrypt
+
+### Correções de Upload
+- [VERIFICACAO_PDF_UPLOAD.md](VERIFICACAO_PDF_UPLOAD.md) - Análise do upload de PDFs
+- [CORRECOES_PDF_APLICADAS.md](CORRECOES_PDF_APLICADAS.md) - ✅ Correções aplicadas
 
 ### Submenu e UI
 - [CORRECAO_SUBMENU_ESTOQUE.md](CORRECAO_SUBMENU_ESTOQUE.md) - Correção do submenu
@@ -180,9 +209,9 @@
 
 ## 📊 Estatísticas
 
-- **Total de Documentos**: 73
-- **Categorias**: 11
-- **Última Atualização**: 23/10/2025
+- **Total de Documentos**: 85
+- **Categorias**: 12
+- **Última Atualização**: 24/10/2025
 
 ---
 
@@ -202,6 +231,12 @@
 1. [COMO_USAR_KITS.md](COMO_USAR_KITS.md) - Como usar kits
 2. [GUIA_IMPORTACAO_PRODUTOS.md](GUIA_IMPORTACAO_PRODUTOS.md) - Importar produtos
 3. [LABORATORIO_README.md](LABORATORIO_README.md) - Usar o laboratório
+
+### Para Administradores
+1. [CORRECAO_FINAL_CRIACAO_USUARIOS.md](CORRECAO_FINAL_CRIACAO_USUARIOS.md) - ✅ **SISTEMA 100% FUNCIONAL**
+2. [VERIFICACAO_FLUXO_CADASTRO_USUARIOS.md](VERIFICACAO_FLUXO_CADASTRO_USUARIOS.md) - ✅ Gestão de usuários
+3. [SOLUCAO_COMPLETA_LOGIN_TECNICOS.md](SOLUCAO_COMPLETA_LOGIN_TECNICOS.md) - ✅ Solução de problemas de login
+4. [PORTAL_CLIENTE_COMPLETO.md](PORTAL_CLIENTE_COMPLETO.md) - Portal do cliente
 
 ---
 
