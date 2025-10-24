@@ -132,13 +132,42 @@ async function authenticateToken(req, res, next) {
             permissionsArray: Array.from(userPermissions)
         });
 
+        // NOVO: Buscar módulos diretos do usuário em user_module_access
+        let userModuleCodes = [];
+        try {
+            const { data: userModuleAccess, error: moduleAccessError } = await supabaseAdmin
+                .from('user_module_access')
+                .select(`
+                    modules (
+                        code
+                    )
+                `)
+                .eq('user_id', user.id)
+                .eq('is_active', true);
+
+            if (!moduleAccessError && userModuleAccess) {
+                userModuleCodes = userModuleAccess
+                    .map(uma => uma.modules?.code)
+                    .filter(code => code);
+                console.log('📦 [AUTH] User has direct module access:', userModuleCodes);
+                
+                // Adicionar permissões genéricas para cada módulo
+                userModuleCodes.forEach(moduleCode => {
+                    userPermissions.add(`${moduleCode}:read`);
+                });
+            }
+        } catch (moduleError) {
+            console.warn('⚠️ [AUTH] Error fetching user module access:', moduleError);
+        }
+
         // Adicionar informações do usuário ao request
         req.user = {
             id: user.id,
             email: user.email,
             profile: userProfile,
             roles: roleNames,
-            permissions: Array.from(userPermissions)
+            permissions: Array.from(userPermissions),
+            module_codes: userModuleCodes // NOVO: códigos dos módulos com acesso direto
         };
 
         console.log('✅ [AUTH] User object created:', {
@@ -242,10 +271,19 @@ async function getCurrentUser(req, res) {
 
         // Buscar módulos disponíveis para o usuário
         const availableModules = new Set();
+        
+        // Adicionar módulos das permissions (de roles)
         req.user.permissions.forEach(permission => {
             const [module] = permission.split(':');
             availableModules.add(module);
         });
+        
+        // Adicionar módulos diretos (de user_module_access)
+        if (req.user.module_codes) {
+            req.user.module_codes.forEach(code => {
+                availableModules.add(code);
+            });
+        }
 
         const userData = {
             id: req.user.id,
