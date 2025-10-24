@@ -701,7 +701,7 @@ class ProstoralOrdersApp {
         }
         
         // Campo final_price removido do formulário
-        setElementValue('order-status', order.status || 'pending');
+        setElementValue('order-status', order.status || 'received');
     }
 
     async saveOrder() {
@@ -733,7 +733,7 @@ class ProstoralOrdersApp {
                 work_description: getElementValue('order-work-description'),
                 due_date: getElementValue('order-expected-delivery', null),
                 final_price: 0, // Campo removido do formulário
-                status: getElementValue('order-status', 'pending')
+                status: getElementValue('order-status', 'received') // Default: recebida
             };
 
             // Validações
