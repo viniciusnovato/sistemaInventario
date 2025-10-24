@@ -1492,6 +1492,24 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Prevista de Entrega</label>
                     <input type="datetime-local" id="order-expected-delivery" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preço Final</label>
+                        <input type="number" id="order-final-price" step="0.01" min="0" placeholder="0.00" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                        <select id="order-status" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="pending">Pendente</option>
+                            <option value="in_progress">Em Andamento</option>
+                            <option value="completed">Concluída</option>
+                            <option value="delivered">Entregue</option>
+                            <option value="cancelled">Cancelada</option>
+                        </select>
+                    </div>
+                </div>
             </form>
             
             <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">

@@ -675,23 +675,33 @@ class ProstoralOrdersApp {
     }
 
     populateOrderForm(order) {
-        document.getElementById('order-client-id').value = order.client_id || '';
-        document.getElementById('order-patient-name').value = order.patient_name || '';
-        document.getElementById('order-work-type').value = order.work_type || '';
-        document.getElementById('order-work-description').value = order.work_description || '';
+        // Função auxiliar para setar valores com validação defensiva
+        const setElementValue = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.value = value || '';
+            } else {
+                console.warn(`⚠️ Elemento não encontrado ao popular form: ${id}`);
+            }
+        };
+        
+        setElementValue('order-client-id', order.client_id);
+        setElementValue('order-patient-name', order.patient_name);
+        setElementValue('order-work-type', order.work_type);
+        setElementValue('order-work-description', order.work_description);
         
         // Formatar data para datetime-local (YYYY-MM-DDTHH:mm)
         if (order.due_date) {
             const date = new Date(order.due_date);
             // Format: YYYY-MM-DDTHH:mm
             const formatted = date.toISOString().slice(0, 16);
-            document.getElementById('order-expected-delivery').value = formatted;
+            setElementValue('order-expected-delivery', formatted);
         } else {
-            document.getElementById('order-expected-delivery').value = '';
+            setElementValue('order-expected-delivery', '');
         }
         
-        document.getElementById('order-final-price').value = order.final_price || '';
-        document.getElementById('order-status').value = order.status || 'pending';
+        setElementValue('order-final-price', order.final_price);
+        setElementValue('order-status', order.status || 'pending');
     }
 
     async saveOrder() {
@@ -704,16 +714,26 @@ class ProstoralOrdersApp {
 
             const token = await window.authManager.getAccessToken();
             
-            const workType = document.getElementById('order-work-type').value;
+            // Função auxiliar para obter valores com validação defensiva
+            const getElementValue = (id, defaultValue = '') => {
+                const element = document.getElementById(id);
+                if (!element) {
+                    console.warn(`⚠️ Elemento não encontrado: ${id}`);
+                    return defaultValue;
+                }
+                return element.value || defaultValue;
+            };
+            
+            const workType = getElementValue('order-work-type', '');
             
             const formData = {
-                client_id: document.getElementById('order-client-id').value,
-                patient_name: document.getElementById('order-patient-name').value,
-                work_type: workType || null, // Adicionar work_type como campo separado
-                work_description: document.getElementById('order-work-description').value,
-                due_date: document.getElementById('order-expected-delivery').value || null,
-                final_price: parseFloat(document.getElementById('order-final-price').value) || 0,
-                status: document.getElementById('order-status').value
+                client_id: getElementValue('order-client-id'),
+                patient_name: getElementValue('order-patient-name'),
+                work_type: workType || null,
+                work_description: getElementValue('order-work-description'),
+                due_date: getElementValue('order-expected-delivery', null),
+                final_price: parseFloat(getElementValue('order-final-price', '0')) || 0,
+                status: getElementValue('order-status', 'pending')
             };
 
             // Validações
