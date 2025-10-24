@@ -3960,7 +3960,7 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
 
         console.log('✅ Perfil criado em user_profiles');
 
-        // ETAPA 4: Process permissions and create module access
+        // ETAPA 4: Process permissions and create module access + granular permissions
         if (permissions && permissions.length > 0) {
             // Group permissions by module (extract unique module codes)
             const moduleCodes = new Set();
@@ -3971,8 +3971,9 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
             }
 
             console.log('📦 Módulos a liberar:', Array.from(moduleCodes));
+            console.log('🔑 Permissões específicas recebidas:', permissions);
 
-            // Create user_module_access entries (one per module)
+            // ETAPA 4.1: Create user_module_access entries (one per module)
             for (const moduleCode of moduleCodes) {
                 // Get module ID
                 const { data: module, error: moduleError } = await supabaseAdmin
@@ -4006,6 +4007,87 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
                 }
 
                 console.log(`✅ Acesso ao módulo ${moduleCode} criado`);
+            }
+
+            // ETAPA 4.2: Create custom role with granular permissions
+            console.log('🎭 Criando role customizada para permissões granulares...');
+            
+            // Create custom role for this user
+            const roleName = `user_${createdUserId.substring(0, 8)}_permissions`;
+            const { data: customRole, error: roleCreateError } = await supabaseAdmin
+                .from('roles')
+                .insert([{
+                    name: roleName,
+                    display_name: `Permissões de ${full_name || email}`,
+                    description: `Role customizada com permissões específicas`,
+                    is_active: true,
+                    tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                }])
+                .select()
+                .single();
+
+            if (roleCreateError) {
+                console.error('❌ Erro ao criar role customizada:', roleCreateError);
+                // Rollback completo
+                await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+                await supabaseAdmin.from('users').delete().eq('id', createdUserId);
+                await supabaseAdmin.from('user_profiles').delete().eq('user_id', createdUserId);
+                await supabaseAdmin.from('user_module_access').delete().eq('user_id', createdUserId);
+                throw new Error(`Falha ao criar role: ${roleCreateError.message}`);
+            }
+
+            console.log('✅ Role customizada criada:', customRole.id);
+
+            // Assign role to user
+            const { error: userRoleError } = await supabaseAdmin
+                .from('user_roles')
+                .insert([{
+                    user_id: createdUserId,
+                    role_id: customRole.id,
+                    tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+                    is_active: true
+                }]);
+
+            if (userRoleError) {
+                console.error('❌ Erro ao atribuir role ao usuário:', userRoleError);
+                // Rollback
+                await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+                await supabaseAdmin.from('users').delete().eq('id', createdUserId);
+                await supabaseAdmin.from('user_profiles').delete().eq('user_id', createdUserId);
+                await supabaseAdmin.from('user_module_access').delete().eq('user_id', createdUserId);
+                await supabaseAdmin.from('roles').delete().eq('id', customRole.id);
+                throw new Error(`Falha ao atribuir role: ${userRoleError.message}`);
+            }
+
+            console.log('✅ Role atribuída ao usuário');
+
+            // ETAPA 4.3: Link specific permissions to the custom role
+            for (const permName of permissions) {
+                // Find the permission in the permissions table
+                const { data: permission, error: permError } = await supabaseAdmin
+                    .from('permissions')
+                    .select('id')
+                    .eq('name', permName)
+                    .maybeSingle();
+
+                if (permError || !permission) {
+                    console.warn(`⚠️ Permissão não encontrada: ${permName}`);
+                    continue;
+                }
+
+                // Link permission to role
+                const { error: rolePermError } = await supabaseAdmin
+                    .from('role_permissions')
+                    .insert([{
+                        role_id: customRole.id,
+                        permission_id: permission.id
+                    }]);
+
+                if (rolePermError) {
+                    console.warn(`⚠️ Erro ao vincular permissão ${permName}:`, rolePermError);
+                }
+
+                console.log(`✅ Permissão ${permName} vinculada à role`);
             }
         }
 
@@ -4144,7 +4226,41 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
             console.log('✅ Acessos antigos removidos');
         }
 
-        // ETAPA 2: Process permissions and create new module access
+        // ETAPA 2: Remove existing custom roles (keep admin role for now if exists)
+        const { data: existingRoles } = await supabaseAdmin
+            .from('user_roles')
+            .select('role_id, roles(name)')
+            .eq('user_id', userId);
+
+        if (existingRoles) {
+            for (const userRole of existingRoles) {
+                // Delete custom roles (those starting with user_)
+                if (userRole.roles?.name?.startsWith('user_')) {
+                    // Delete role_permissions first
+                    await supabaseAdmin
+                        .from('role_permissions')
+                        .delete()
+                        .eq('role_id', userRole.role_id);
+
+                    // Delete user_role
+                    await supabaseAdmin
+                        .from('user_roles')
+                        .delete()
+                        .eq('user_id', userId)
+                        .eq('role_id', userRole.role_id);
+
+                    // Delete the role itself
+                    await supabaseAdmin
+                        .from('roles')
+                        .delete()
+                        .eq('id', userRole.role_id);
+                    
+                    console.log('✅ Role customizada antiga removida');
+                }
+            }
+        }
+
+        // ETAPA 3: Process permissions and create new module access + granular permissions
         if (permissions && permissions.length > 0) {
             // Extract unique module codes from permissions
             const moduleCodes = new Set();
@@ -4155,8 +4271,9 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
             }
 
             console.log('📦 Módulos a liberar:', Array.from(moduleCodes));
+            console.log('🔑 Permissões específicas recebidas:', permissions);
 
-            // Create user_module_access entries (one per module)
+            // ETAPA 3.1: Create user_module_access entries (one per module)
             for (const moduleCode of moduleCodes) {
                 // Get module ID
                 const { data: module, error: moduleError } = await supabaseAdmin
@@ -4186,14 +4303,83 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
                     console.log(`✅ Acesso ao módulo ${moduleCode} criado`);
                 }
             }
+
+            // ETAPA 3.2: Create custom role with granular permissions
+            console.log('🎭 Criando role customizada para permissões granulares...');
+            
+            // Create custom role for this user
+            const roleName = `user_${userId.substring(0, 8)}_permissions`;
+            const { data: customRole, error: roleCreateError } = await supabaseAdmin
+                .from('roles')
+                .insert([{
+                    name: roleName,
+                    display_name: `Permissões de ${full_name || 'usuário'}`,
+                    description: `Role customizada com permissões específicas`,
+                    is_active: true,
+                    tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
+                }])
+                .select()
+                .single();
+
+            if (roleCreateError) {
+                console.error('❌ Erro ao criar role customizada:', roleCreateError);
+            } else {
+                console.log('✅ Role customizada criada:', customRole.id);
+
+                // Assign role to user
+                const { error: userRoleError } = await supabaseAdmin
+                    .from('user_roles')
+                    .insert([{
+                        user_id: userId,
+                        role_id: customRole.id,
+                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002',
+                        is_active: true
+                    }]);
+
+                if (userRoleError) {
+                    console.error('❌ Erro ao atribuir role ao usuário:', userRoleError);
+                } else {
+                    console.log('✅ Role atribuída ao usuário');
+
+                    // ETAPA 3.3: Link specific permissions to the custom role
+                    for (const permName of permissions) {
+                        // Find the permission in the permissions table
+                        const { data: permission, error: permError } = await supabaseAdmin
+                            .from('permissions')
+                            .select('id')
+                            .eq('name', permName)
+                            .maybeSingle();
+
+                        if (permError || !permission) {
+                            console.warn(`⚠️ Permissão não encontrada: ${permName}`);
+                            continue;
+                        }
+
+                        // Link permission to role
+                        const { error: rolePermError } = await supabaseAdmin
+                            .from('role_permissions')
+                            .insert([{
+                                role_id: customRole.id,
+                                permission_id: permission.id
+                            }]);
+
+                        if (rolePermError) {
+                            console.warn(`⚠️ Erro ao vincular permissão ${permName}:`, rolePermError);
+                        } else {
+                            console.log(`✅ Permissão ${permName} vinculada à role`);
+                        }
+                    }
+                }
+            }
         }
 
-        // ETAPA 3: Handle admin role
-        // Remove existing user roles
+        // ETAPA 4: Handle admin role
+        // Remove existing admin roles if switching from admin to normal user
         await supabaseAdmin
             .from('user_roles')
             .delete()
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .in('role_id', (await supabaseAdmin.from('roles').select('id').eq('name', 'admin')).data.map(r => r.id));
 
         if (is_admin) {
             // Assign admin role
