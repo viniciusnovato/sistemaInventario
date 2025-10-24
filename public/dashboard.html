@@ -285,8 +285,18 @@
                 card.className = 'module-card bg-white rounded-xl shadow-lg overflow-hidden fade-in';
                 card.style.animationDelay = `${index * 0.1}s`;
                 
+                // Badge "Em Desenvolvimento" se aplicável
+                const devBadge = module.in_development 
+                    ? '<span class="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-semibold">🔧 Em Desenvolvimento</span>' 
+                    : '';
+                
+                // Determinar URL (externa ou interna)
+                const targetUrl = module.external_url || module.route;
+                const isExternal = !!module.external_url;
+                
                 card.innerHTML = `
-                    <div class="bg-gradient-to-br ${colorClass} p-6 text-white text-center">
+                    <div class="bg-gradient-to-br ${colorClass} p-6 text-white text-center relative">
+                        ${devBadge}
                         <div class="module-icon">
                             ${module.emoji || '📦'}
                         </div>
@@ -297,11 +307,12 @@
                             ${module.description || 'Módulo do sistema'}
                         </p>
                         <button 
-                            data-route="${module.route}"
+                            data-url="${targetUrl}"
+                            data-external="${isExternal}"
                             class="module-access-btn w-full bg-gradient-to-r ${colorClass} text-white py-2 px-4 rounded-lg hover:shadow-lg transition font-semibold"
                         >
                             <i class="${module.icon} mr-2"></i>
-                            Acessar
+                            Acessar${isExternal ? ' <i class="fas fa-external-link-alt ml-1"></i>' : ''}
                         </button>
                     </div>
                 `;
@@ -313,8 +324,16 @@
             const accessButtons = document.querySelectorAll('.module-access-btn');
             accessButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    const route = this.getAttribute('data-route');
-                    openModule(route);
+                    const url = this.getAttribute('data-url');
+                    const isExternal = this.getAttribute('data-external') === 'true';
+                    
+                    if (isExternal) {
+                        // Abrir em nova aba para links externos
+                        window.open(url, '_blank');
+                    } else {
+                        // Navegação normal
+                        openModule(url);
+                    }
                 });
             });
         }
