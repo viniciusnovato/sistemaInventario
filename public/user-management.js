@@ -454,7 +454,8 @@ class UserManagement {
 
         const moduleIcons = {
             inventory: '📦',
-            laboratory: '🧪',
+            prostoral: '🧪',
+            laboratory: '🧪', // Legacy (mantido por compatibilidade)
             reports: '📊',
             settings: '⚙️',
             admin: '👑',
@@ -530,7 +531,7 @@ class UserManagement {
             });
 
             // Check modules if all permissions are checked
-            ['inventory', 'laboratory', 'reports', 'settings'].forEach(module => {
+            ['inventory', 'prostoral', 'reports', 'settings'].forEach(module => {
                 const modulePerms = document.querySelectorAll(`[data-permission^="${module}:"]`);
                 const allChecked = Array.from(modulePerms).every(cb => cb.checked);
                 const moduleCheckbox = document.querySelector(`[data-module="${module}"]`);
