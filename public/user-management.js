@@ -339,17 +339,59 @@ class UserManagement {
         `).join('');
     }
 
+    // Mapa de tradução de roles técnicas para nomes legíveis
+    getRoleDisplayName(roleName) {
+        const roleMap = {
+            'admin': 'Administrador',
+            'Admin': 'Administrador',
+            'user': 'Usuário',
+            'laboratorist': 'Técnico de Laboratório',
+            'lab_client': 'Cliente Laboratório',
+            'technician': 'Técnico',
+            'manager': 'Gerente',
+            'receptionist': 'Recepcionista'
+        };
+
+        // Se começa com "user_" é uma role customizada, ignora
+        if (roleName.startsWith('user_')) {
+            return null; // Será tratado por roleDescriptions
+        }
+
+        return roleMap[roleName] || roleName;
+    }
+
     renderRoles(roles, roleDescriptions) {
-        // Se tem roles, mostra as roles
+        // Se tem roles, processa e mostra (evitando duplicatas e customizadas)
         if (roles && roles.length > 0) {
-            return roles.slice(0, 2).map(role => `
-                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                    ${role}
-                </span>
-            `).join('');
+            const uniqueRoles = new Set();
+            const processedRoles = [];
+            
+            for (const role of roles) {
+                // Ignora roles customizadas (user_*)
+                if (role.startsWith('user_')) {
+                    continue;
+                }
+                
+                const displayName = this.getRoleDisplayName(role);
+                
+                // Adiciona apenas se não for duplicado
+                if (displayName && !uniqueRoles.has(displayName)) {
+                    uniqueRoles.add(displayName);
+                    processedRoles.push(displayName);
+                }
+            }
+            
+            // Se tiver roles válidas após processamento, mostra
+            if (processedRoles.length > 0) {
+                return processedRoles.slice(0, 2).map(displayName => `
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                        ${displayName}
+                    </span>
+                `).join('');
+            }
         }
         
-        // Se não tem roles mas tem descrição, mostra a descrição
+        // Se não tem roles válidas mas tem descrição, mostra a descrição
         if (roleDescriptions && roleDescriptions.length > 0) {
             return `<span class="text-xs text-blue-600 font-medium">${roleDescriptions[0]}</span>`;
         }
