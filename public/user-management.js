@@ -360,6 +360,34 @@ class UserManagement {
         return roleMap[roleName] || roleName;
     }
 
+    // Converte descrição de acesso em função equivalente
+    convertAccessToRole(roleDescription) {
+        if (!roleDescription) return null;
+        
+        // Se a descrição menciona apenas "Laboratório" → Técnico de Laboratório
+        if (roleDescription === 'Acesso a: Laboratório') {
+            return 'Técnico de Laboratório';
+        }
+        
+        // Se a descrição menciona apenas "Inventário" → Gestor de Inventário
+        if (roleDescription === 'Acesso a: Inventário') {
+            return 'Gestor de Inventário';
+        }
+        
+        // Se menciona apenas "Configurações" → Administrador de Sistema
+        if (roleDescription === 'Acesso a: Configurações') {
+            return 'Administrador de Sistema';
+        }
+        
+        // Se menciona apenas "Relatórios" → Analista
+        if (roleDescription === 'Acesso a: Relatórios') {
+            return 'Analista';
+        }
+        
+        // Se tem múltiplos acessos, mantém a descrição original
+        return null;
+    }
+
     renderRoles(roles, roleDescriptions) {
         // Se tem roles, processa e mostra (evitando duplicatas e customizadas)
         if (roles && roles.length > 0) {
@@ -391,9 +419,22 @@ class UserManagement {
             }
         }
         
-        // Se não tem roles válidas mas tem descrição, mostra a descrição
+        // Se não tem roles válidas mas tem descrição
         if (roleDescriptions && roleDescriptions.length > 0) {
-            return `<span class="text-xs text-blue-600 font-medium">${roleDescriptions[0]}</span>`;
+            const description = roleDescriptions[0];
+            
+            // Tenta converter descrição de acesso único em função equivalente
+            const equivalentRole = this.convertAccessToRole(description);
+            
+            if (equivalentRole) {
+                // Exibe como se fosse uma role (roxo)
+                return `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                    ${equivalentRole}
+                </span>`;
+            }
+            
+            // Se não conseguiu converter, mostra a descrição em azul (múltiplos acessos)
+            return `<span class="text-xs text-blue-600 font-medium">${description}</span>`;
         }
         
         // Se não tem nada, mostra "Sem função"
