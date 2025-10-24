@@ -700,7 +700,7 @@ class ProstoralOrdersApp {
             setElementValue('order-expected-delivery', '');
         }
         
-        setElementValue('order-final-price', order.final_price);
+        // Campo final_price removido do formulário
         setElementValue('order-status', order.status || 'pending');
     }
 
@@ -732,7 +732,7 @@ class ProstoralOrdersApp {
                 work_type: workType || null,
                 work_description: getElementValue('order-work-description'),
                 due_date: getElementValue('order-expected-delivery', null),
-                final_price: parseFloat(getElementValue('order-final-price', '0')) || 0,
+                final_price: 0, // Campo removido do formulário
                 status: getElementValue('order-status', 'pending')
             };
 
