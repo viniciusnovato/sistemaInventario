@@ -3799,6 +3799,31 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
                 }
             }
 
+            // Get user's module access from user_module_access
+            const { data: userModules } = await supabaseAdmin
+                .from('user_module_access')
+                .select(`
+                    module_id,
+                    is_active,
+                    modules (
+                        id,
+                        code,
+                        name
+                    )
+                `)
+                .eq('user_id', profile.user_id)
+                .eq('is_active', true);
+
+            // Extract module codes for permissions array (compatibility)
+            if (userModules && userModules.length > 0) {
+                userModules.forEach(um => {
+                    if (um.modules) {
+                        // Add basic permissions for each module
+                        permissions.add(`${um.modules.code}:read`);
+                    }
+                });
+            }
+
             // Get user's auth data from Supabase Auth
             let email = 'N/A';
             try {
@@ -3814,7 +3839,8 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
                 full_name: profile.display_name || profile.first_name || 'Usuário',
                 is_active: profile.is_active !== false,
                 roles: roles,
-                permissions: Array.from(permissions)
+                permissions: Array.from(permissions),
+                modules: userModules?.map(um => um.modules) || [] // NOVO: adiciona módulos
             };
         }));
 
