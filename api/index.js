@@ -4054,20 +4054,86 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
         const { userId } = req.params;
         const { full_name, is_admin, permissions } = req.body;
 
-        // Update profile
+        console.log('🔵 Atualizando usuário:', userId);
+        console.log('📦 Permissões recebidas:', permissions);
+
+        // Update profile in user_profiles (not 'profiles')
         if (full_name !== undefined) {
             const { error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .update({ full_name })
+                .from('user_profiles')
+                .update({ display_name: full_name })
                 .eq('user_id', userId);
 
             if (profileError) {
-                console.error('Erro ao atualizar perfil:', profileError);
+                console.error('❌ Erro ao atualizar perfil:', profileError);
+            } else {
+                console.log('✅ Perfil atualizado');
+            }
+
+            // Also update auth metadata
+            await supabaseAdmin.auth.admin.updateUserById(userId, {
+                user_metadata: { full_name }
+            });
+        }
+
+        // ETAPA 1: Remove existing user_module_access
+        const { error: deleteAccessError } = await supabaseAdmin
+            .from('user_module_access')
+            .delete()
+            .eq('user_id', userId);
+
+        if (deleteAccessError) {
+            console.error('❌ Erro ao deletar acessos antigos:', deleteAccessError);
+        } else {
+            console.log('✅ Acessos antigos removidos');
+        }
+
+        // ETAPA 2: Process permissions and create new module access
+        if (permissions && permissions.length > 0) {
+            // Extract unique module codes from permissions
+            const moduleCodes = new Set();
+
+            for (const perm of permissions) {
+                const [moduleCode, action] = perm.split(':');
+                moduleCodes.add(moduleCode);
+            }
+
+            console.log('📦 Módulos a liberar:', Array.from(moduleCodes));
+
+            // Create user_module_access entries (one per module)
+            for (const moduleCode of moduleCodes) {
+                // Get module ID
+                const { data: module, error: moduleError } = await supabaseAdmin
+                    .from('modules')
+                    .select('id')
+                    .eq('code', moduleCode)
+                    .single();
+
+                if (moduleError || !module) {
+                    console.warn(`⚠️ Módulo não encontrado: ${moduleCode}`);
+                    continue;
+                }
+
+                // Insert module access (simple: just grants access to the module)
+                const { error: accessError } = await supabaseAdmin
+                    .from('user_module_access')
+                    .insert([{
+                        user_id: userId,
+                        module_id: module.id,
+                        granted_by: req.user.id,
+                        is_active: true
+                    }]);
+
+                if (accessError) {
+                    console.error(`❌ Erro ao criar acesso ao módulo ${moduleCode}:`, accessError);
+                } else {
+                    console.log(`✅ Acesso ao módulo ${moduleCode} criado`);
+                }
             }
         }
 
-        // Update roles and permissions
-        // First, remove existing user roles
+        // ETAPA 3: Handle admin role
+        // Remove existing user roles
         await supabaseAdmin
             .from('user_roles')
             .delete()
@@ -4089,68 +4155,18 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
                         role_id: adminRole.id,
                         tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
                     }]);
-            }
-        } else if (permissions && permissions.length > 0) {
-            // Get or create custom role
-            const roleName = `user_${userId.substring(0, 8)}`;
-            
-            // Try to find existing role
-            let { data: existingRole } = await supabaseAdmin
-                .from('roles')
-                .select('id')
-                .eq('name', roleName)
-                .single();
-
-            let roleId;
-            if (existingRole) {
-                roleId = existingRole.id;
-                // Delete existing permissions
-                await supabaseAdmin
-                    .from('role_permissions')
-                    .delete()
-                    .eq('role_id', roleId);
-            } else {
-                // Create new role
-                const { data: newRole } = await supabaseAdmin
-                    .from('roles')
-                    .insert([{
-                        name: roleName,
-                        description: `Função personalizada`,
-                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
-                    }])
-                    .select()
-                    .single();
-                roleId = newRole?.id;
-            }
-
-            if (roleId) {
-                // Assign role to user
-                await supabaseAdmin
-                    .from('user_roles')
-                    .insert([{
-                        user_id: userId,
-                        role_id: roleId,
-                        tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
-                    }]);
-
-                // Assign new permissions
-                const permissionInserts = permissions.map(perm => ({
-                    role_id: roleId,
-                    permission: perm
-                }));
-
-                await supabaseAdmin
-                    .from('role_permissions')
-                    .insert(permissionInserts);
+                console.log('✅ Role admin atribuído');
             }
         }
+
+        console.log('✅ Usuário atualizado com sucesso');
 
         res.json({ 
             success: true, 
             message: 'Usuário atualizado com sucesso'
         });
     } catch (error) {
-        console.error('Erro ao atualizar usuário:', error);
+        console.error('❌ Erro ao atualizar usuário:', error);
         res.status(500).json({ error: error.message });
     }
 });
