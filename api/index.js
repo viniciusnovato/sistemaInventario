@@ -3780,20 +3780,33 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
             // Get permissions from roles
             const permissions = new Set();
             const roles = [];
+            const roleDescriptions = [];
             
             if (userRoles && userRoles.length > 0) {
                 for (const ur of userRoles) {
                     if (ur.roles) {
                         roles.push(ur.roles.name);
+                        if (ur.roles.description) {
+                            roleDescriptions.push(ur.roles.description);
+                        }
                         
-                        // Get permissions for this role
+                        // Get permissions for this role (CORRIGIDO)
                         const { data: rolePerms } = await supabaseAdmin
                             .from('role_permissions')
-                            .select('permission')
+                            .select(`
+                                permission_id,
+                                permissions (
+                                    name,
+                                    action,
+                                    module_name
+                                )
+                            `)
                             .eq('role_id', ur.role_id);
                         
-                        rolePerms?.forEach(p => {
-                            if (p.permission) permissions.add(p.permission);
+                        rolePerms?.forEach(rp => {
+                            if (rp.permissions?.name) {
+                                permissions.add(rp.permissions.name);
+                            }
                         });
                     }
                 }
@@ -3814,14 +3827,27 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
                 .eq('user_id', profile.user_id)
                 .eq('is_active', true);
 
-            // Extract module codes for permissions array (compatibility)
+            // Extract module codes for permissions array
+            // NOVO: Adiciona todas as permissões básicas para cada módulo
             if (userModules && userModules.length > 0) {
                 userModules.forEach(um => {
                     if (um.modules) {
-                        // Add basic permissions for each module
-                        permissions.add(`${um.modules.code}:read`);
+                        // Adiciona permissões básicas se não existirem via roles
+                        const moduleCode = um.modules.code;
+                        permissions.add(`${moduleCode}:read`);
+                        permissions.add(`${moduleCode}:create`);
+                        permissions.add(`${moduleCode}:update`);
+                        permissions.add(`${moduleCode}:delete`);
                     }
                 });
+            }
+
+            // NOVO: Se não tem roles, cria uma descrição virtual baseada nos módulos
+            if (roles.length === 0 && userModules && userModules.length > 0) {
+                const moduleNames = userModules.map(um => um.modules?.name).filter(Boolean);
+                if (moduleNames.length > 0) {
+                    roleDescriptions.push(`Acesso a: ${moduleNames.join(', ')}`);
+                }
             }
 
             // Get user's auth data from Supabase Auth
@@ -3839,8 +3865,9 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
                 full_name: profile.display_name || profile.first_name || 'Usuário',
                 is_active: profile.is_active !== false,
                 roles: roles,
+                role_descriptions: roleDescriptions,  // NOVO: descrições das roles
                 permissions: Array.from(permissions),
-                modules: userModules?.map(um => um.modules) || [] // NOVO: adiciona módulos
+                modules: userModules?.map(um => um.modules) || [] // adiciona módulos
             };
         }));
 
