@@ -4004,6 +4004,36 @@ app.post('/api/admin/users', authenticateToken, async (req, res) => {
                     console.warn('⚠️ Erro ao atribuir role admin:', roleError);
                 }
             }
+
+            // IMPORTANTE: Admins precisam de acesso a TODOS os módulos em user_module_access
+            // Buscar todos os módulos disponíveis
+            const { data: allModules, error: modulesError } = await supabaseAdmin
+                .from('modules')
+                .select('id, code, name')
+                .eq('is_active', true);
+
+            if (!modulesError && allModules && allModules.length > 0) {
+                console.log('📦 Criando acesso admin a todos os módulos:', allModules.length);
+
+                // Criar acesso para cada módulo
+                for (const module of allModules) {
+                    const { error: accessError } = await supabaseAdmin
+                        .from('user_module_access')
+                        .insert([{
+                            user_id: createdUserId,
+                            module_id: module.id,
+                            granted_by: req.user.id,
+                            is_active: true
+                        }]);
+
+                    if (accessError) {
+                        console.error(`❌ Erro ao criar acesso admin ao módulo ${module.code}:`, accessError);
+                        // Não fazer rollback completo, apenas avisar
+                    } else {
+                        console.log(`✅ Acesso admin ao módulo ${module.code} criado`);
+                    }
+                }
+            }
         }
 
         console.log('✅ Usuário criado com sucesso:', email);
@@ -4156,6 +4186,35 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
                         tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
                     }]);
                 console.log('✅ Role admin atribuído');
+            }
+
+            // IMPORTANTE: Admins precisam de acesso a TODOS os módulos em user_module_access
+            // Buscar todos os módulos disponíveis
+            const { data: allModules, error: modulesError } = await supabaseAdmin
+                .from('modules')
+                .select('id, code, name')
+                .eq('is_active', true);
+
+            if (!modulesError && allModules && allModules.length > 0) {
+                console.log('📦 Criando acesso admin a todos os módulos:', allModules.length);
+
+                // Criar acesso para cada módulo
+                for (const module of allModules) {
+                    const { error: accessError } = await supabaseAdmin
+                        .from('user_module_access')
+                        .insert([{
+                            user_id: userId,
+                            module_id: module.id,
+                            granted_by: req.user.id,
+                            is_active: true
+                        }]);
+
+                    if (accessError) {
+                        console.error(`❌ Erro ao criar acesso admin ao módulo ${module.code}:`, accessError);
+                    } else {
+                        console.log(`✅ Acesso admin ao módulo ${module.code} criado`);
+                    }
+                }
             }
         }
 
