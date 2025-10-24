@@ -1249,6 +1249,15 @@ const AdvancedSearch = {
                 
                 return {
                     ...item,
+                    module_data: {
+                        ...moduleData,
+                        // Garantir que todos os campos estão acessíveis
+                        location: moduleData.location || item.location || null,
+                        company: moduleData.company || null,
+                        brand: moduleData.brand || null,
+                        model: moduleData.model || null,
+                        value: moduleData.value || item.unit_price || null
+                    },
                     category: item.category || null,
                     collaborator: item.collaborator || null,
                     company: moduleData.company || null,
