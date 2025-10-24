@@ -132,7 +132,23 @@ class UserManagement {
             checkbox.addEventListener('change', (e) => {
                 const module = e.target.dataset.module;
                 const permissions = document.querySelectorAll(`[data-permission^="${module}:"]`);
-                permissions.forEach(perm => perm.checked = e.target.checked);
+                
+                console.log(`🔄 Checkbox do módulo ${module} ${e.target.checked ? 'MARCADO' : 'DESMARCADO'}`);
+                console.log(`   📋 Permissões a atualizar: ${permissions.length}`);
+                
+                permissions.forEach(perm => {
+                    perm.checked = e.target.checked;
+                    if (e.target.checked) {
+                        console.log(`      ✅ ${perm.dataset.permission}`);
+                    }
+                });
+                
+                // Adicionar permissão :manage automaticamente
+                const managePermCheckbox = document.querySelector(`[data-permission="${module}:manage"]`);
+                if (managePermCheckbox) {
+                    managePermCheckbox.checked = e.target.checked;
+                    console.log(`   🔑 Permissão :manage ${e.target.checked ? 'MARCADA' : 'DESMARCADA'}`);
+                }
             });
         });
 
@@ -523,6 +539,8 @@ class UserManagement {
 
         // Load permissions
         if (user.permissions && !isAdmin) {
+            console.log('📋 Carregando permissões do usuário:', user.permissions);
+            
             user.permissions.forEach(perm => {
                 const checkbox = document.querySelector(`[data-permission="${perm}"]`);
                 if (checkbox) {
@@ -530,13 +548,30 @@ class UserManagement {
                 }
             });
 
-            // Check modules if all permissions are checked
+            // Check modules if all permissions are present in user data
+            const requiredPerms = {
+                'inventory': ['inventory:read', 'inventory:create', 'inventory:update', 'inventory:delete', 'inventory:manage'],
+                'prostoral': ['prostoral:read', 'prostoral:create', 'prostoral:update', 'prostoral:delete', 'prostoral:manage'],
+                'reports': ['reports:read', 'reports:create', 'reports:manage'],
+                'settings': ['settings:read', 'settings:update', 'settings:manage']
+            };
+            
             ['inventory', 'prostoral', 'reports', 'settings'].forEach(module => {
-                const modulePerms = document.querySelectorAll(`[data-permission^="${module}:"]`);
-                const allChecked = Array.from(modulePerms).every(cb => cb.checked);
+                const required = requiredPerms[module];
+                const hasAllPerms = required.every(perm => user.permissions.includes(perm));
                 const moduleCheckbox = document.querySelector(`[data-module="${module}"]`);
-                if (moduleCheckbox && allChecked) {
+                
+                console.log(`🔍 Módulo ${module}:`, {
+                    required: required.length,
+                    userHas: required.filter(p => user.permissions.includes(p)).length,
+                    hasAll: hasAllPerms
+                });
+                
+                if (moduleCheckbox && hasAllPerms) {
                     moduleCheckbox.checked = true;
+                    console.log(`✅ Checkbox do módulo ${module} MARCADO`);
+                } else if (moduleCheckbox) {
+                    console.log(`❌ Checkbox do módulo ${module} NÃO marcado (faltam permissões)`);
                 }
             });
         }
@@ -590,9 +625,20 @@ class UserManagement {
             // Get selected permissions
             const permissions = [];
             if (!isAdmin) {
-                document.querySelectorAll('.permission-checkbox:checked').forEach(cb => {
-                    permissions.push(cb.dataset.permission);
+                const allCheckboxes = document.querySelectorAll('.permission-checkbox');
+                const checkedCheckboxes = document.querySelectorAll('.permission-checkbox:checked');
+                
+                console.log('📋 Total de checkboxes de permissão:', allCheckboxes.length);
+                console.log('✅ Checkboxes marcados:', checkedCheckboxes.length);
+                
+                checkedCheckboxes.forEach(cb => {
+                    const permission = cb.dataset.permission;
+                    permissions.push(permission);
+                    console.log(`   ✅ ${permission}${cb.classList.contains('hidden') ? ' (hidden)' : ''}`);
                 });
+                
+                console.log('💾 Salvando permissões:', permissions);
+                console.log('📊 Total de permissões:', permissions.length);
             }
 
             const userData = {

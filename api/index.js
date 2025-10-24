@@ -4333,6 +4333,7 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
 
             // ETAPA 3.2: Create custom role with granular permissions
             console.log('🎭 Criando role customizada para permissões granulares...');
+            console.log('🔑 Permissões a vincular:', permissions);
             
             // Create custom role for this user
             const roleName = `user_${userId.substring(0, 8)}_permissions`;
@@ -4340,9 +4341,9 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
                 .from('roles')
                 .insert([{
                     name: roleName,
-                    display_name: `Permissões de ${full_name || 'usuário'}`,
-                    description: `Role customizada com permissões específicas`,
-                    is_active: true,
+                    description: `Permissões customizadas de ${full_name || 'usuário'}`,
+                    level: 10,
+                    is_system: false,
                     tenant_id: req.user.tenant_id || '00000000-0000-0000-0000-000000000002'
                 }])
                 .select()
@@ -4350,8 +4351,9 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
 
             if (roleCreateError) {
                 console.error('❌ Erro ao criar role customizada:', roleCreateError);
+                throw new Error(`Falha ao criar role: ${roleCreateError.message}`);
             } else {
-                console.log('✅ Role customizada criada:', customRole.id);
+                console.log('✅ Role customizada criada:', customRole.id, customRole.name);
 
                 // Assign role to user
                 const { error: userRoleError } = await supabaseAdmin
@@ -4365,22 +4367,30 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
 
                 if (userRoleError) {
                     console.error('❌ Erro ao atribuir role ao usuário:', userRoleError);
+                    throw new Error(`Falha ao atribuir role: ${userRoleError.message}`);
                 } else {
                     console.log('✅ Role atribuída ao usuário');
 
                     // ETAPA 3.3: Link specific permissions to the custom role
+                    console.log(`🔗 Vinculando ${permissions.length} permissões à role ${customRole.id}...`);
+                    let permissionsLinked = 0;
+                    let permissionsNotFound = 0;
+                    
                     for (const permName of permissions) {
                         // Find the permission in the permissions table
                         const { data: permission, error: permError } = await supabaseAdmin
                             .from('permissions')
-                            .select('id')
+                            .select('id, name')
                             .eq('name', permName)
                             .maybeSingle();
 
                         if (permError || !permission) {
-                            console.warn(`⚠️ Permissão não encontrada: ${permName}`);
+                            console.warn(`⚠️ Permissão não encontrada no banco: ${permName}`);
+                            permissionsNotFound++;
                             continue;
                         }
+
+                        console.log(`   🔍 Permissão encontrada: ${permission.name} (${permission.id})`);
 
                         // Link permission to role
                         const { error: rolePermError } = await supabaseAdmin
@@ -4391,11 +4401,14 @@ app.put('/api/admin/users/:userId', authenticateToken, async (req, res) => {
                             }]);
 
                         if (rolePermError) {
-                            console.warn(`⚠️ Erro ao vincular permissão ${permName}:`, rolePermError);
+                            console.warn(`⚠️ Erro ao vincular permissão ${permName}:`, rolePermError.message);
                         } else {
-                            console.log(`✅ Permissão ${permName} vinculada à role`);
+                            console.log(`   ✅ Permissão ${permName} vinculada à role`);
+                            permissionsLinked++;
                         }
                     }
+                    
+                    console.log(`📊 Resultado: ${permissionsLinked} vinculadas, ${permissionsNotFound} não encontradas`);
                 }
             }
         }
