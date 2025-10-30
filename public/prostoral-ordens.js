@@ -420,23 +420,23 @@ class ProstoralOrdersApp {
         }
 
         tbody.innerHTML = this.orders.map(order => `
-            <tr class="hover:bg-gray-50 transition-colors">
+            <tr class="transition-colors">
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${this.escapeHtml(order.order_number || '-')}</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">${this.escapeHtml(order.order_number || '-')}</div>
                 </td>
                 <td class="px-6 py-4">
-                    <div class="text-sm text-gray-900">${this.escapeHtml(order.client?.name || 'Sem cliente')}</div>
+                    <div class="text-sm text-gray-900 dark:text-white">${this.escapeHtml(order.client?.name || 'Sem cliente')}</div>
                 </td>
                 <td class="px-6 py-4">
-                    <div class="text-sm text-gray-900">${this.escapeHtml(order.patient_name || 'Sem paciente')}</div>
+                    <div class="text-sm text-gray-900 dark:text-white">${this.escapeHtml(order.patient_name || 'Sem paciente')}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     ${this.renderStatusBadge(order.status)}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                     ${this.formatDate(order.created_at)}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     ${this.formatCurrency(order.total_cost || 0)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

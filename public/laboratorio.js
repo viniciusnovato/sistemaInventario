@@ -321,7 +321,7 @@ class LaboratorioModule {
             return `
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <td class="py-3 px-4">
-                        <span class="font-mono text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                        <span class="font-mono text-sm bg-gray-100 dark:bg-gray-700 dark:text-gray-400 px-2 py-1 rounded">
                             ${product.codigo_barras || product.qr_code || '-'}
                         </span>
                     </td>
@@ -336,7 +336,7 @@ class LaboratorioModule {
                         </span>
                     </td>
                     <td class="py-3 px-4">
-                        <span class="font-semibold">${quantidade} ${product.unidade_medida}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">${quantidade} ${product.unidade_medida}</span>
                     </td>
                     <td class="py-3 px-4">
                         <span class="text-xs px-2 py-1 rounded-full ${statusClass}">
