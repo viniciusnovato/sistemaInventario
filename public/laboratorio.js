@@ -258,18 +258,24 @@ class LaboratorioModule {
             if (status) {
                 products = products.filter(p => {
                     const qty = p.estoquelaboratorio?.quantidade_atual || 0;
-                    if (status === 'critico') return qty <= 5;
-                    if (status === 'baixo') return qty > 5 && qty <= 20;
-                    if (status === 'ok') return qty > 20;
+                    const qtyMin = p.estoquelaboratorio?.quantidade_minima || 0;
+                    if (status === 'critico') return qty <= 0;
+                    if (status === 'baixo') return qty <= qtyMin && qtyMin > 0;
+                    if (status === 'ok') return qty > qtyMin;
                     return true;
                 });
             }
 
             this.products = products;
             this.renderProducts();
+            
+            // Se há filtro de status, usar o tamanho dos produtos filtrados
+            // Caso contrário, usar o count original da query
+            const totalCount = status ? products.length : (count || 0);
+            
             this.updateProductsPagination({ 
                 data: products, 
-                total: count || 0,
+                total: totalCount,
                 page: this.currentPage,
                 limit: this.itemsPerPage
             });
@@ -298,15 +304,16 @@ class LaboratorioModule {
         tbody.innerHTML = this.products.map(product => {
             // Pegar quantidade do estoque
             const quantidade = product.estoquelaboratorio?.quantidade_atual || 0;
+            const quantidadeMin = product.estoquelaboratorio?.quantidade_minima || 0;
             
             // Calcular status baseado na quantidade
             let statusClass = 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
             let statusText = 'Normal';
             
-            if (quantidade <= 5) {
+            if (quantidade <= 0) {
                 statusClass = 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
                 statusText = 'Crítico';
-            } else if (quantidade <= 20) {
+            } else if (quantidade <= quantidadeMin) {
                 statusClass = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
                 statusText = 'Baixo';
             }
@@ -379,6 +386,16 @@ class LaboratorioModule {
                 }
             });
         });
+        
+        // Atualizar contador de produtos
+        this.updateProductsCount();
+    }
+
+    updateProductsCount() {
+        const countElement = document.getElementById('productsCount');
+        if (countElement) {
+            countElement.textContent = this.products.length;
+        }
     }
 
     formatCategoria(categoria) {
@@ -1671,9 +1688,9 @@ class LaboratorioModule {
 
     updateAlertsStats() {
         const alertsCount = this.alerts.length;
-        const alertsCriticos = this.alerts.filter(a => a.tipo.includes('critico') || a.tipo.includes('esgotado') || a.tipo.includes('vencido')).length;
-        const alertsAvisos = this.alerts.filter(a => a.tipo.includes('baixo') || a.tipo.includes('proxima')).length;
-        const alertsInfo = alertsCount - alertsCriticos - alertsAvisos;
+        const alertsCriticos = this.alerts.filter(a => a.tipo === 'critico').length;
+        const alertsAvisos = this.alerts.filter(a => a.tipo === 'aviso').length;
+        const alertsInfo = this.alerts.filter(a => a.tipo === 'informativo').length;
 
         document.getElementById('alertsCriticos').textContent = alertsCriticos;
         document.getElementById('alertsAvisos').textContent = alertsAvisos;

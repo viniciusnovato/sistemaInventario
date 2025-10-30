@@ -3515,14 +3515,10 @@ app.get('/api/prostoral/dashboard/kpis', authenticateToken, async (req, res) => 
         
         // Estoque baixo - buscar itens onde quantity <= min_stock
         const { data: inventoryItems } = await supabaseAdmin
-            .from('prostoral_inventory')
-            .select('id, quantity, min_stock')
-            .eq('tenant_id', tenant_id);
-        
-        const lowStockCount = inventoryItems?.filter(item => 
-            item.quantity <= (item.min_stock || 0)
-        ).length || 0;
-        
+            .rpc('get_inventory_below_minimum');
+
+        const lowStockCount = inventoryItems.length || 0;
+
         // Intercorrências abertas
         const { count: openIncidents } = await supabaseAdmin
             .from('prostoral_incidents')

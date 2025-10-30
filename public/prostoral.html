@@ -535,6 +535,14 @@
                         </table>
                     </div>
                 </div>
+                
+                <!-- Contador de Ordens -->
+                <div class="flex justify-between items-center mt-6">
+                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                        <span id="orders-count">0</span>
+                         produtos encontrados
+                    </div>
+                </div>
             </div>
 
             <!-- Kits Tab -->
@@ -2078,6 +2086,43 @@
         darkModeToggle?.addEventListener('click', toggleDarkMode);
         mobileDarkModeToggle?.addEventListener('click', toggleDarkMode);
         
+        // Função para carregar dados de todas as abas na inicialização
+        function loadAllTabsData() {
+            console.log('🔄 Carregando dados de todas as abas...');
+            
+            // Carregar dados dos clientes
+            if (window.prostoralApp) {
+                console.log('📋 Carregando dados dos clientes...');
+                window.prostoralApp.loadClients();
+            }
+            
+            // Inicializar e carregar dados dos kits
+            if (window.kitsModule) {
+                console.log('📦 Carregando dados dos kits...');
+                window.kitsModule.init();
+            }
+            
+            // Inicializar e carregar dados das ordens
+            if (window.ordersApp && !window.ordersApp.initialized) {
+                console.log('📋 Inicializando e carregando ordens...');
+                window.ordersApp.init();
+                window.ordersApp.initialized = true;
+            }
+            
+            // Inicializar e carregar dados do inventário/laboratório
+            if (window.prostoralLab && !window.prostoralLab.initialized) {
+                console.log('🧪 Inicializando laboratório...');
+                window.prostoralLab.init();
+                window.prostoralLab.initialized = true;
+            }
+            if (window.prostoralLab) {
+                console.log('📊 Carregando produtos do laboratório...');
+                window.prostoralLab.loadProducts();
+            }
+            
+            console.log('✅ Todos os dados das abas foram carregados!');
+        }
+
         // Tab Navigation
         const tabs = document.querySelectorAll('.prostoral-tab');
         const tabContents = document.querySelectorAll('.tab-content');
@@ -2108,28 +2153,16 @@
                 if (targetContent) {
                     targetContent.classList.add('active');
                     
-                    // Carregar dados da aba se necessário
-                    if (targetTab === 'clients' && window.prostoralApp) {
-                        window.prostoralApp.loadClients();
-                    } else if (targetTab === 'kits' && window.kitsModule) {
-                        window.kitsModule.init();
-                    } else if (targetTab === 'orders' && window.ordersApp) {
-                        if (!window.ordersApp.initialized) {
-                            window.ordersApp.init();
-                            window.ordersApp.initialized = true;
-                        }
-                    } else if (targetTab === 'inventory' && window.prostoralLab) {
-                        // Inicializar o módulo de laboratório
-                        if (!window.prostoralLab.initialized) {
-                            window.prostoralLab.init();
-                            window.prostoralLab.initialized = true;
-                        }
-                        // Carregar produtos por padrão
-                        window.prostoralLab.loadProducts();
-                    }
+                    // Apenas exibir o conteúdo - os dados já foram carregados na inicialização
+                    console.log(`🔄 Exibindo aba: ${targetTab}`);
                 }
             });
         });
+        
+        // Carregar dados de todas as abas após um pequeno delay para garantir que todos os módulos estejam carregados
+        setTimeout(() => {
+            loadAllTabsData();
+        }, 1000);
 
         // Lab tabs navigation
         document.querySelectorAll('.lab-tab').forEach(tab => {

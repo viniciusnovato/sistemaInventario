@@ -26,9 +26,14 @@
         // Event listeners
         setupEventListeners();
         
-        // Carregar dados
-        loadKits();
-        loadProdutos();
+        // Carregar dados em paralelo
+        Promise.all([
+            loadKits(),
+            loadProdutos()
+        ]).catch(error => {
+            console.error('❌ Erro ao carregar dados iniciais:', error);
+            showNotification('Erro ao carregar dados iniciais', 'error');
+        });
     }
     
     // ============================================

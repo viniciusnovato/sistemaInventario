@@ -37,7 +37,7 @@ class ProstoralApp {
         // Carregar dados do usuário
         await this.loadUserInfo();
 
-        // Carregar dashboard (view inicial)
+        // Carregar dashboard (que já carrega clientes e atividades)
         await this.loadDashboard();
 
         // Setup event listeners
@@ -119,8 +119,11 @@ class ProstoralApp {
                 document.getElementById('mobileTotalOrders').textContent = data.kpis.totalOrders || 0;
             }
 
-            // Carregar atividades recentes
-            await this.loadRecentActivities();
+            // Carregar atividades recentes e clientes apenas uma vez
+            await Promise.all([
+                this.loadRecentActivities(),
+                this.loadClients()
+            ]);
 
         } catch (error) {
             console.error('Erro ao carregar dashboard:', error);
@@ -156,8 +159,8 @@ class ProstoralApp {
                                         <i class="fas fa-clipboard-list text-emerald-600 dark:text-emerald-400"></i>
                                     </div>
                                     <div>
-                                        <p class="font-semibold text-gray-900 dark:text-white">OS #${order.work_order_number || order.id.substring(0, 8)}</p>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">${order.patient_name || 'Paciente'}</p>
+                                        <p class="font-semibold text-left text-gray-900 dark:text-white">OS #${order.work_order_number || order.id.substring(0, 8)}</p>
+                                        <p class="text-sm text-left text-gray-600 dark:text-gray-400">${order.patient_name || 'Paciente'}</p>
                                     </div>
                                 </div>
                                 <div class="text-right">

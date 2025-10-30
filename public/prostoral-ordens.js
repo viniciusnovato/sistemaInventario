@@ -42,14 +42,14 @@ class ProstoralOrdersApp {
             return;
         }
 
-        // Carregar dados iniciais
-        await this.loadInitialData();
+        // Carregar dados iniciais e ordens em paralelo
+        await Promise.all([
+            this.loadInitialData(),
+            this.loadOrders()
+        ]);
         
         // Setup event listeners
         this.setupEventListeners();
-        
-        // Carregar ordens
-        await this.loadOrders();
         
         // Iniciar subscriptions real-time
         this.setupRealtimeSubscriptions();
@@ -486,6 +486,16 @@ class ProstoralOrdersApp {
                 });
             });
         }, 0);
+        
+        // Atualizar contador de ordens
+        this.updateOrdersCount();
+    }
+
+    updateOrdersCount() {
+        const countElement = document.getElementById('orders-count');
+        if (countElement) {
+            countElement.textContent = this.orders.length;
+        }
     }
 
     renderStatusBadge(status) {
@@ -2608,11 +2618,15 @@ class ProstoralOrdersApp {
         
         const { eventType, new: newRecord, old: oldRecord } = payload;
         
-        // Se estamos vendo a lista de ordens, atualizar
+        // Se estamos vendo a lista de ordens, atualizar apenas se necessário
         const ordersContent = document.getElementById('orders-content');
         if (ordersContent && !ordersContent.classList.contains('hidden')) {
-            this.showRealtimeNotification('Uma ordem foi atualizada. Atualizando lista...');
-            this.loadOrders();
+            // Debounce para evitar múltiplas atualizações
+            clearTimeout(this.realtimeUpdateTimeout);
+            this.realtimeUpdateTimeout = setTimeout(() => {
+                this.showRealtimeNotification('Uma ordem foi atualizada. Atualizando lista...');
+                this.loadOrders();
+            }, 1000);
         }
         
         // Se estamos vendo os detalhes desta ordem específica, atualizar
@@ -2620,7 +2634,10 @@ class ProstoralOrdersApp {
             if (eventType === 'DELETE') {
                 this.showRealtimeNotification('⚠️ Esta ordem foi excluída');
                 this.closeModal('modal-order-details');
-                this.loadOrders();
+                // Não recarregar a lista imediatamente se já está sendo recarregada
+                if (!this.realtimeUpdateTimeout) {
+                    this.loadOrders();
+                }
             } else {
                 this.showRealtimeNotification('Ordem atualizada. Recarregando detalhes...');
                 this.viewOrderDetails(this.currentOrder.id);

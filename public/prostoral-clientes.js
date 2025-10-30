@@ -15,6 +15,10 @@ class ClientPortalApp {
         this.itemsPerPage = 20;
         this.totalPages = 1;
         this.apiBaseUrl = '/api/prostoral';
+        
+        // Flags para controlar carregamento
+        this.dashboardLoaded = false;
+        this.ordersLoaded = false;
     }
 
     async init() {
@@ -43,11 +47,13 @@ class ClientPortalApp {
         // Setup event listeners
         this.setupEventListeners();
         
-        // Carregar dashboard
-        await this.loadDashboard();
-        
-        // Carregar ordens inicialmente
-        await this.loadOrders();
+        // Carregar dados iniciais baseado na aba ativa
+        const activeTab = document.querySelector('.tab-button.active')?.dataset.tab || 'dashboard';
+        if (activeTab === 'dashboard') {
+            await this.loadDashboard();
+        } else if (activeTab === 'orders') {
+            await this.loadOrders();
+        }
         
         console.log('Portal do Cliente inicializado!');
     }
@@ -206,11 +212,13 @@ class ClientPortalApp {
             activeContent.classList.add('active');
         }
 
-        // Carregar dados da aba
-        if (tabName === 'dashboard') {
+        // Carregar dados apenas se ainda não foram carregados ou se necessário
+        if (tabName === 'dashboard' && !this.dashboardLoaded) {
             this.loadDashboard();
-        } else if (tabName === 'orders') {
+            this.dashboardLoaded = true;
+        } else if (tabName === 'orders' && !this.ordersLoaded) {
             this.loadOrders();
+            this.ordersLoaded = true;
         }
     }
 
