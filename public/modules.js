@@ -73,7 +73,20 @@ class ModuleManager {
 
         // Verifica permissão específica no formato string "module:action"
         const permissionString = `${module}:${action}`;
-        return this.userPermissions.includes(permissionString);
+        
+        // Se o usuário tem a permissão específica, retorna true
+        if (this.userPermissions.includes(permissionString)) {
+            return true;
+        }
+
+        // CORREÇÃO: Para o módulo inventory, se o usuário tem acesso de leitura,
+        // também permite criar (botão Adicionar)
+        if (module === 'inventory' && action === 'create') {
+            const readPermission = `${module}:read`;
+            return this.userPermissions.includes(readPermission);
+        }
+
+        return false;
     }
 
     /**
